@@ -160,6 +160,16 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 @keyframes wobble{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-6deg)}90%{transform:rotate(6deg)}95%{transform:rotate(-3deg)}}
 @keyframes shake{25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
 .center{text-align:center}
+.wallet{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font:600 .74rem var(--mono);color:var(--muted)}
+.wallet b{color:var(--fg);font-variant-numeric:tabular-nums}
+.wallet .favbtn{margin-left:auto;padding:6px 12px}
+.shop{display:grid;gap:8px}
+.shopitem{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px}
+.shopitem .info{display:grid;gap:2px;min-width:0}
+.shopitem .info small{color:var(--muted);font-size:.78rem;line-height:1.3}
+.shopitem .act{min-width:76px}
+.egg.mini{width:40px;height:52px;animation:none;cursor:default;display:block}
+.egg.rare{background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.75),transparent 30%),radial-gradient(circle at 62% 60%,var(--star) 0 12%,transparent 13%),radial-gradient(circle at 34% 68%,var(--accent) 0 9%,transparent 10%),radial-gradient(circle at 55% 28%,var(--star) 0 7%,transparent 8%),var(--fg);box-shadow:inset -10px -14px 0 rgba(0,0,0,.2),0 0 0 2px var(--star)}
 .party{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
 .slot{position:relative;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:4px 2px 5px;display:grid;justify-items:center;gap:1px;min-width:0}
 .slot img{width:40px;height:40px;object-fit:contain}
@@ -272,6 +282,8 @@ const G = store.get('dx_game_v1', null) || { partner: null, col: {}, history: []
 // older saves had a single partner; move it into the party
 if (!Array.isArray(G.party)){ G.party = G.partner ? [G.partner] : []; G.active = 0; delete G.partner; }
 const PARTY_MAX = 6;
+if (typeof G.data !== 'number') G.data = 0;
+if (!Array.isArray(G.eggs)) G.eggs = [];
 const saveGame = () => store.set('dx_game_v1', G);
 const raised = id => G.col[id] === 'raised';
 const known = id => !!G.col[id];
@@ -632,7 +644,7 @@ function renderPartner(){
   if (!state.ready){ if (!v.querySelector('.status')) v.innerHTML = '<div class="status">Loading…</div>'; return; }
   const p = P();
   if (!p) return renderEgg();
-  const partyHtml = partyBar();
+  const partyHtml = partyBar() + walletRow();
   const need = EVO_NEED[p.stage];
   const atTop = p.stage >= 5 || p.final;
   const lineImgs = p.line.map(id => state.byId.get(id)).filter(Boolean)
@@ -662,11 +674,11 @@ function renderPartner(){
     </div>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
-    ${atTop ? `<button class="big" id="newEggBtn">Retire ${esc(p.name)} & free its slot</button>` : `<button class="ghost danger" id="retireBtn">Release ${esc(p.name)}</button>`}
+    <button class="${atTop ? 'big' : 'ghost danger'}" id="retireBtn">${atTop ? 'Retire' : 'Release'} ${esc(p.name)} · +${releaseValue(p)} DigiData</button>
   `;
   updateCount();
   const eb = $('#evolveBtn'); if (eb) eb.onclick = digivolve;
-  const ne = $('#newEggBtn'); if (ne) ne.onclick = retire;
+  const sb = $('#shopBtn'); if (sb) sb.onclick = openShop;
   const dd = $('#dedigiBtn'); if (dd) dd.onclick = () => {
     if (dd.dataset.armed){ dedigivolve(); return; }
     dd.dataset.armed = '1'; dd.textContent = 'Tap again to de-digivolve (evo points reset)';
@@ -674,8 +686,9 @@ function renderPartner(){
   };
   const rb = $('#retireBtn'); if (rb) rb.onclick = () => {
     if (rb.dataset.armed){ retire(); return; }
-    rb.dataset.armed = '1'; rb.textContent = `Tap again to release ${p.name}`;
-    setTimeout(() => { if (rb.isConnected){ delete rb.dataset.armed; rb.textContent = `Release ${p.name}`; } }, 3500);
+    const label = rb.textContent;
+    rb.dataset.armed = '1'; rb.textContent = `Tap again to say goodbye to ${p.name}`;
+    setTimeout(() => { if (rb.isConnected){ delete rb.dataset.armed; rb.textContent = label; } }, 3500);
   };
 }
 
@@ -691,6 +704,7 @@ $('#partnerView').addEventListener('click', e => {
   const slot = e.target.closest('[data-slot]');
   if (slot){ G.active = +slot.dataset.slot; saveGame(); renderPartner(); window.scrollTo(0, 0); return; }
   if (e.target.closest('[data-hatch]')) return hatchOverlay();
+  if (e.target.closest('[data-shop]')) return openShop();
   const b = e.target.closest('[data-act]'); if (!b) return;
   tick();
   const p = P(); const k = b.dataset.act;
@@ -728,10 +742,12 @@ function renderEgg(){
       <p id="eggMsg" style="margin:0;font:600 .8rem var(--mono);color:var(--muted)">TAP 3 TIMES</p>
       <p style="margin:0;font:600 .8rem var(--mono)">Collection: ${n} raised of ${state.all.length.toLocaleString()}</p>
     </div>
+    ${walletRow()}
     ${G.history.length ? `<h3>Past partners <span>${G.history.length}</span></h3><div class="hist">${G.history.slice().reverse().map(h =>
-      `<div><b>${h.line.map(esc).join(' → ')}</b><br><small>${h.wins} wins · ${new Date(h.date).toLocaleDateString()}</small></div>`).join('')}</div>` : ''}
+      `<div><b>${h.line.map(esc).join(' → ')}</b><br><small>${h.wins} wins${h.data ? ` · +${h.data} DigiData` : ''} · ${new Date(h.date).toLocaleDateString()}</small></div>`).join('')}</div>` : ''}
   `;
   let taps = 0;
+  const sb = $('#shopBtn'); if (sb) sb.onclick = openShop;
   $('#egg').onclick = async () => {
     if (busy) return;
     const egg = $('#egg'); taps++;
@@ -745,12 +761,53 @@ function renderEgg(){
     say(`${P().name} hatched! Take good care of it.`, 'happy');
   };
 }
-function hatchNew(){
+function hatchNew(type = 'mystery'){
   const pool = state.stageIds[0].filter(id => state.byId.has(id));
-  // favor ones you haven't raised yet, and not one already in the party
   const inParty = new Set(G.party.map(m => m.id));
+  // rare eggs: a Fresh Digimon you have never discovered; otherwise favor ones you haven't raised
+  const undiscovered = pool.filter(id => !known(id) && !inParty.has(id));
   const fresh = pool.filter(id => !raised(id) && !inParty.has(id));
-  newPartner(pick(fresh.length ? fresh : pool));
+  const from = type === 'rare' && undiscovered.length ? undiscovered : fresh.length ? fresh : pool;
+  newPartner(pick(from));
+  if (type === 'rare'){ const g = growthOf(P()); g.hp += 6; g.sp += 2; g.atk += 2; g.int += 2; g.spd += 2; P().mood = 90; saveGame(); }
+}
+
+// ----- DigiData: earned by releasing Digimon, spent in the shop -----
+const STAGE_VALUE = [5, 20, 50, 110, 200, 360];
+function releaseValue(p){
+  if (!p.stage) return STAGE_VALUE[0];
+  const st = partnerStats(p);
+  return Math.round(STAGE_VALUE[p.stage] + (st.atk + st.int + st.spd + st.sp + st.hp / 5) / 3 + p.wins * 2);
+}
+const SHOP = [
+  { key: 'mystery', name: 'Mystery Egg', price: 80, desc: 'Hatches a random Fresh Digimon, usually one you haven\'t raised yet.' },
+  { key: 'rare', name: 'Rare Mystery Egg', price: 250, desc: 'Hatches a Digimon you\'ve never discovered, born with bonus stats and in a great mood.' },
+];
+function walletRow(){
+  const eggs = G.eggs.length;
+  return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
+}
+function openShop(){
+  busy = true;
+  const room = G.party.length < PARTY_MAX;
+  openOv(`<h4>DigiData Shop</h4>
+    <p style="margin:0;color:var(--muted)">You have <b style="color:var(--fg)">${G.data.toLocaleString()}</b> DigiData. Release Digimon to earn more; higher levels and stronger stats are worth more.</p>
+    <div class="shop">${SHOP.map(it => `<div class="shopitem">
+      <span class="egg mini ${it.key}" aria-hidden="true"></span>
+      <div class="info"><b>${it.name}</b><small>${it.desc}</small><small>Owned: ${G.eggs.filter(e => e === it.key).length}</small></div>
+      <button class="act" data-buy="${it.key}" ${G.data < it.price ? 'disabled' : ''}>${it.price}<small>DigiData</small></button></div>`).join('')}</div>
+    <p id="shopMsg" style="margin:0;min-height:1.4em;font-size:.88rem"></p>
+    ${G.eggs.length && room ? '<button class="big" id="shopHatch">Hatch an egg now</button>' : ''}
+    <button class="ghost" id="shopClose">Close</button>`);
+  $('#shopClose').onclick = () => { closeOv(); renderPartner(); };
+  const sh = $('#shopHatch'); if (sh) sh.onclick = () => { closeOv(); hatchOverlay(); };
+  $('#overlay').querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
+    const it = SHOP.find(x => x.key === b.dataset.buy);
+    if (G.data < it.price) return;
+    G.data -= it.price; G.eggs.push(it.key); saveGame();
+    openShop();
+    $('#shopMsg').textContent = room ? `Bought a ${it.name}! Hatch it now or tap an empty party slot later.` : `Bought a ${it.name}! It's stored until a party slot opens up.`;
+  });
 }
 
 // ----- party: up to 6 Digimon, tap one to make it active -----
@@ -761,16 +818,19 @@ function partyBar(){
     if (m){
       const flag = m.hunger < 25 || m.mood < 25 ? '!' : canEvolve(m) ? '▲' : '';
       slots.push(`<button class="slot${i === G.active ? ' on' : ''}" data-slot="${i}" aria-label="${esc(m.name)}${i === G.active ? ' (active)' : ''}"><img alt="" src="${esc(m.image)}"><small>${esc(m.name)}</small>${flag ? `<i title="${flag === '!' ? 'Needs care' : 'Ready to digivolve'}">${flag}</i>` : ''}</button>`);
-    } else slots.push(`<button class="slot empty" data-hatch="1" aria-label="Hatch a new egg into this slot"><span>+</span><small>Egg</small></button>`);
+    } else slots.push(G.eggs.length
+      ? `<button class="slot empty" data-hatch="1" aria-label="Hatch a stored egg into this slot"><span>+</span><small>Hatch</small></button>`
+      : `<button class="slot empty" data-shop="1" aria-label="Buy an egg in the shop"><span>+</span><small>Shop</small></button>`);
   }
   return `<div class="party" aria-label="Your party">${slots.join('')}</div>`;
 }
 function hatchOverlay(){
-  if (G.party.length >= PARTY_MAX) return;
+  if (G.party.length >= PARTY_MAX || !G.eggs.length) return;
   busy = true;
-  openOv(`<h4>A new Digi-Egg</h4>
+  const type = G.eggs[0], item = SHOP.find(x => x.key === type) || SHOP[0];
+  openOv(`<h4>${item.name}</h4>
     <p style="margin:0;color:var(--muted)">Tap it three times to hatch. The new Digimon joins your party in slot ${G.party.length + 1}.</p>
-    <button class="egg" id="egg2" aria-label="Tap to hatch"></button>
+    <button class="egg ${type}" id="egg2" aria-label="Tap to hatch"></button>
     <p id="eggMsg2" class="center" style="margin:0;font:600 .8rem var(--mono);color:var(--muted)">TAP 3 TIMES</p>
     <button class="ghost" id="eggCancel">Not now</button>`);
   $('#eggCancel').onclick = closeOv;
@@ -781,19 +841,23 @@ function hatchOverlay(){
     $('#eggMsg2').textContent = taps < 3 ? ['', 'IT MOVED!', 'IT\'S CRACKING…'][taps] : 'HATCHING!';
     if (taps < 3) return;
     await sleep(600);
-    hatchNew();
+    G.eggs.shift();
+    hatchNew(type);
     closeOv();
-    say(`${P().name} hatched and joined your party!`, 'happy');
+    say(`${P().name} hatched and joined your party!${type === 'rare' ? ' It looks especially strong.' : ''}`, 'happy');
   };
 }
 
 function retire(){
-  const p = P();
-  if (p) G.history.push({ line: p.line.map(id => state.byId.get(id)?.name || '?'), wins: p.wins, date: Date.now() });
-  if (p) G.party.splice(G.active, 1);
+  const p = P(); if (!p) return;
+  const value = releaseValue(p);
+  G.history.push({ line: p.line.map(id => state.byId.get(id)?.name || '?'), wins: p.wins, date: Date.now(), data: value });
+  G.party.splice(G.active, 1);
+  G.data += value;
   G.active = Math.max(0, Math.min(G.active, G.party.length - 1));
   saveGame();
-  renderPartner();
+  if (P()) say(`${p.name} was released and left behind ${value} DigiData.`);
+  else renderPartner();
 }
 
 // ----- de-digivolve: step back one form to try a different branch -----
