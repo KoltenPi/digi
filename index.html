@@ -160,6 +160,15 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 @keyframes wobble{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-6deg)}90%{transform:rotate(6deg)}95%{transform:rotate(-3deg)}}
 @keyframes shake{25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
 .center{text-align:center}
+.party{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.slot{position:relative;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:4px 2px 5px;display:grid;justify-items:center;gap:1px;min-width:0}
+.slot img{width:40px;height:40px;object-fit:contain}
+.slot small{font:.56rem/1.2 var(--mono);color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.slot.on small{color:var(--fg)}
+.slot.empty{border-style:dashed;color:var(--muted)}
+.slot.empty span{font:400 1.4rem/40px var(--display)}
+.slot i{position:absolute;top:2px;right:4px;font:700 .7rem var(--mono);font-style:normal;color:var(--warn)}
 .hist{display:grid;gap:6px}
 .hist div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;font-size:.85rem}
 .hist small{color:var(--muted);font-family:var(--mono)}
@@ -260,6 +269,9 @@ const state = {
   tab: store.get('dx_tab', 'partner'), levelOf: new Map(), stagesOf: new Map(), stageIds: {}, ready: false
 };
 const G = store.get('dx_game_v1', null) || { partner: null, col: {}, history: [] };
+// older saves had a single partner; move it into the party
+if (!Array.isArray(G.party)){ G.party = G.partner ? [G.partner] : []; G.active = 0; delete G.partner; }
+const PARTY_MAX = 6;
 const saveGame = () => store.set('dx_game_v1', G);
 const raised = id => G.col[id] === 'raised';
 const known = id => !!G.col[id];
@@ -555,7 +567,7 @@ function route(){
 }
 
 // ================= PARTNER GAME =================
-const P = () => G.partner;
+const P = () => G.party[G.active] || null;
 let busy = false;
 
 function stageOf(id){ return state.levelOf.get(id); }
@@ -566,27 +578,29 @@ const higherStage = (id, s) => (state.stagesOf.get(id) || []).find(x => x > s);
 function newPartner(id){
   const b = state.byId.get(id);
   const now = Date.now();
-  G.partner = { id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
-    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], stageLine: [0], final: false };
+  if (G.party.length >= PARTY_MAX) return;
+  G.party.push({ id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
+    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], stageLine: [0], final: false });
+  G.active = G.party.length - 1;
   G.col[id] = 'raised';
   saveGame();
 }
 
-// Time passes while you're away
+// Time passes while you're away, for every Digimon in the party
 function tick(){
-  const p = P(); if (!p) return;
-  const now = Date.now();
-  const mins = Math.min((now - p.last) / 60000, 1440);
-  if (mins < 0.2) return;
-  p.hunger = clamp(p.hunger - mins / 4);
-  p.mood = clamp(p.mood - mins / 5);
-  p.energy = clamp(p.energy + mins / 6);
-  p.last = now;
-  checkNeglect();
-  saveGame();
+  const now = Date.now(); let changed = false;
+  for (const p of G.party){
+    const mins = Math.min((now - p.last) / 60000, 1440);
+    if (mins < 0.2) continue;
+    p.hunger = clamp(p.hunger - mins / 4);
+    p.mood = clamp(p.mood - mins / 5);
+    p.energy = clamp(p.energy + mins / 6);
+    p.last = now;
+    checkNeglect(p); changed = true;
+  }
+  if (changed) saveGame();
 }
-function checkNeglect(){
-  const p = P();
+function checkNeglect(p){
   for (const k of ['hunger', 'mood']){
     if (p[k] <= 0 && !p.flags[k]){ p.flags[k] = true; p.mistakes++; p.stageMistakes++; p.msg = `${p.name} was ${k === 'hunger' ? 'starving' : 'miserable'} while you were gone. That's a care mistake.`; }
     if (p[k] > 20) p.flags[k] = false;
@@ -618,11 +632,13 @@ function renderPartner(){
   if (!state.ready){ if (!v.querySelector('.status')) v.innerHTML = '<div class="status">Loading…</div>'; return; }
   const p = P();
   if (!p) return renderEgg();
+  const partyHtml = partyBar();
   const need = EVO_NEED[p.stage];
   const atTop = p.stage >= 5 || p.final;
   const lineImgs = p.line.map(id => state.byId.get(id)).filter(Boolean)
     .map(b => `<img alt="${esc(b.name)}" title="${esc(b.name)}" src="${esc(b.image)}">`).join('<span>→</span>');
   v.innerHTML = `
+    ${partyHtml}
     <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">${LEVEL_EN[STAGES[p.stage]]}</span>
       <span class="stage">${ageText(p)}</span></div>
     <div class="habitat"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
@@ -646,7 +662,7 @@ function renderPartner(){
     </div>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
-    ${atTop ? `<button class="big" id="newEggBtn">Start a new egg</button>` : `<button class="ghost danger" id="retireBtn">Release partner & start over</button>`}
+    ${atTop ? `<button class="big" id="newEggBtn">Retire ${esc(p.name)} & free its slot</button>` : `<button class="ghost danger" id="retireBtn">Release ${esc(p.name)}</button>`}
   `;
   updateCount();
   const eb = $('#evolveBtn'); if (eb) eb.onclick = digivolve;
@@ -659,7 +675,7 @@ function renderPartner(){
   const rb = $('#retireBtn'); if (rb) rb.onclick = () => {
     if (rb.dataset.armed){ retire(); return; }
     rb.dataset.armed = '1'; rb.textContent = `Tap again to release ${p.name}`;
-    setTimeout(() => { if (rb.isConnected){ delete rb.dataset.armed; rb.textContent = 'Release partner & start over'; } }, 3500);
+    setTimeout(() => { if (rb.isConnected){ delete rb.dataset.armed; rb.textContent = `Release ${p.name}`; } }, 3500);
   };
 }
 
@@ -671,7 +687,11 @@ function say(text, anim){
 }
 
 $('#partnerView').addEventListener('click', e => {
-  const b = e.target.closest('[data-act]'); if (!b || busy) return;
+  if (busy) return;
+  const slot = e.target.closest('[data-slot]');
+  if (slot){ G.active = +slot.dataset.slot; saveGame(); renderPartner(); window.scrollTo(0, 0); return; }
+  if (e.target.closest('[data-hatch]')) return hatchOverlay();
+  const b = e.target.closest('[data-act]'); if (!b) return;
   tick();
   const p = P(); const k = b.dataset.act;
   if (k === 'feed'){
@@ -720,20 +740,58 @@ function renderEgg(){
     if (taps < 3) return;
     busy = true;
     await sleep(600);
-    const pool = state.stageIds[0].filter(id => state.byId.has(id));
-    // favor ones you haven't raised yet
-    const fresh = pool.filter(id => !raised(id));
-    const id = pick(fresh.length ? fresh : pool);
-    newPartner(id);
+    hatchNew();
     busy = false;
     say(`${P().name} hatched! Take good care of it.`, 'happy');
+  };
+}
+function hatchNew(){
+  const pool = state.stageIds[0].filter(id => state.byId.has(id));
+  // favor ones you haven't raised yet, and not one already in the party
+  const inParty = new Set(G.party.map(m => m.id));
+  const fresh = pool.filter(id => !raised(id) && !inParty.has(id));
+  newPartner(pick(fresh.length ? fresh : pool));
+}
+
+// ----- party: up to 6 Digimon, tap one to make it active -----
+function partyBar(){
+  const slots = [];
+  for (let i = 0; i < PARTY_MAX; i++){
+    const m = G.party[i];
+    if (m){
+      const flag = m.hunger < 25 || m.mood < 25 ? '!' : canEvolve(m) ? '▲' : '';
+      slots.push(`<button class="slot${i === G.active ? ' on' : ''}" data-slot="${i}" aria-label="${esc(m.name)}${i === G.active ? ' (active)' : ''}"><img alt="" src="${esc(m.image)}"><small>${esc(m.name)}</small>${flag ? `<i title="${flag === '!' ? 'Needs care' : 'Ready to digivolve'}">${flag}</i>` : ''}</button>`);
+    } else slots.push(`<button class="slot empty" data-hatch="1" aria-label="Hatch a new egg into this slot"><span>+</span><small>Egg</small></button>`);
+  }
+  return `<div class="party" aria-label="Your party">${slots.join('')}</div>`;
+}
+function hatchOverlay(){
+  if (G.party.length >= PARTY_MAX) return;
+  busy = true;
+  openOv(`<h4>A new Digi-Egg</h4>
+    <p style="margin:0;color:var(--muted)">Tap it three times to hatch. The new Digimon joins your party in slot ${G.party.length + 1}.</p>
+    <button class="egg" id="egg2" aria-label="Tap to hatch"></button>
+    <p id="eggMsg2" class="center" style="margin:0;font:600 .8rem var(--mono);color:var(--muted)">TAP 3 TIMES</p>
+    <button class="ghost" id="eggCancel">Not now</button>`);
+  $('#eggCancel').onclick = closeOv;
+  let taps = 0;
+  $('#egg2').onclick = async () => {
+    const egg = $('#egg2'); taps++;
+    egg.classList.remove('shake'); void egg.offsetWidth; egg.classList.add('shake');
+    $('#eggMsg2').textContent = taps < 3 ? ['', 'IT MOVED!', 'IT\'S CRACKING…'][taps] : 'HATCHING!';
+    if (taps < 3) return;
+    await sleep(600);
+    hatchNew();
+    closeOv();
+    say(`${P().name} hatched and joined your party!`, 'happy');
   };
 }
 
 function retire(){
   const p = P();
   if (p) G.history.push({ line: p.line.map(id => state.byId.get(id)?.name || '?'), wins: p.wins, date: Date.now() });
-  G.partner = null;
+  if (p) G.party.splice(G.active, 1);
+  G.active = Math.max(0, Math.min(G.active, G.party.length - 1));
   saveGame();
   renderPartner();
 }
@@ -1011,7 +1069,7 @@ async function evolveTo(id){
 
 // ---------- image processing: cut out the white background, optional retro pixel look ----------
 // Done on this device from the official art; silhouettes need the cutout so they show a shape, not a square.
-const IMG_SEL = '.pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
+const IMG_SEL = '.slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
 let retroOn = !!store.get('dx_retro', false);
 const imgCache = new Map();
 function processArt(src, res, retro){
