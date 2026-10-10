@@ -12,10 +12,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: sticky search + level rail over a dense tap grid; detail view is a single column with evo branches above and below the monster */
+/* Layout: bottom tab bar switches between the Partner habitat (one-screen raising game) and the Index (search grid + detail with evo branches) */
 :root{
   --bg:#eef1f7; --panel:#ffffff; --sunk:#e1e6f0; --fg:#141a2b; --muted:#5a6480; --line:#cfd6e4;
   --accent:#e0640f; --accent-ink:#ffffff; --link:#2346c7; --star:#d9a400;
+  --good:#1f9d55; --warn:#d48a00; --bad:#d23c3c; --grid:rgba(35,70,199,.07);
   --display:"Chakra Petch",ui-sans-serif,system-ui,sans-serif;
   --body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,-apple-system,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -24,27 +25,30 @@
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#0d1120; --panel:#161c30; --sunk:#1e263f; --fg:#e6eaf5; --muted:#8f9ab8; --line:#2a3452;
-  --accent:#ff8a3d; --accent-ink:#1a0d02; --link:#8fa8ff; --star:#ffd04d; color-scheme:dark;
+  --accent:#ff8a3d; --accent-ink:#1a0d02; --link:#8fa8ff; --star:#ffd04d;
+  --good:#3ccf7a; --warn:#ffb534; --bad:#ff6b6b; --grid:rgba(143,168,255,.08); color-scheme:dark;
 }}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%}
+html,body{margin:0;min-height:100%}
 body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);-webkit-text-size-adjust:100%;
-  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+  padding-top:env(safe-area-inset-top,0px)}
 button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:default;opacity:.45}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 img{max-width:100%}
 [hidden]{display:none!important}
 .wrap{max-width:1100px;margin:0 auto;padding-inline:16px}
+main.wrap{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 
 header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
 .top{display:flex;align-items:center;gap:12px;padding-block:12px 8px}
 .brand{font:700 1.35rem/1 var(--display);letter-spacing:.02em;margin:0}
 .brand small{display:block;font:400 .72rem/1.3 var(--mono);color:var(--muted);letter-spacing:.04em;margin-top:4px}
-.count{margin-left:auto;font:600 .8rem var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
-.search{display:flex;gap:8px;padding-bottom:10px}
+.count{margin-left:auto;font:600 .8rem var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+.search{display:flex;gap:6px;padding-bottom:10px}
 .search input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
   padding:11px 12px;font:inherit;color:var(--fg)}
-.favbtn{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:0 12px;white-space:nowrap}
+.favbtn{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:0 10px;white-space:nowrap;font-size:.85rem}
 .favbtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .rail{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
@@ -58,16 +62,18 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var
 .err{color:var(--fg)}
 .retry{margin-top:12px;border:0;background:var(--accent);color:var(--accent-ink);border-radius:var(--r);padding:9px 16px;font-weight:700}
 
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;padding-block:14px 40px}
-.card{display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;padding-block:14px 24px}
+.card{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);
   border-radius:var(--r);padding:8px 6px 10px;text-align:center;min-width:0}
 .card:active{transform:scale(.97)}
 .card .pic{width:72px;height:72px;object-fit:contain}
 .card .nm{font-weight:700;font-size:.82rem;line-height:1.2;overflow-wrap:anywhere}
 .card .no{font:.68rem var(--mono);color:var(--muted)}
+.card.raised{border-color:var(--good)}
+.tick{position:absolute;top:5px;right:6px;font:700 .7rem var(--mono);color:var(--good)}
 
 /* detail */
-.detail{padding-block:12px 48px}
+.detail{padding-block:12px 24px}
 .back{border:0;background:none;color:var(--link);padding:6px 0;font-weight:700}
 .trail{display:flex;flex-wrap:wrap;gap:4px 6px;font:.75rem var(--mono);color:var(--muted);margin:4px 0 10px}
 .trail button{border:0;background:none;padding:0;color:var(--link);font:inherit}
@@ -77,17 +83,19 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var
 .art{width:100%;max-width:220px;aspect-ratio:1;object-fit:contain;background:var(--sunk);border-radius:12px}
 .hero h2{font:700 clamp(1.6rem,5vw,2.4rem)/1.05 var(--display);margin:0;text-wrap:balance;overflow-wrap:anywhere}
 .idline{font:.78rem var(--mono);color:var(--muted);margin-top:6px}
+.raisedline{font:700 .78rem var(--mono);color:var(--good);margin-top:4px}
 .star{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 12px;margin-top:10px;font-weight:700}
 .star[aria-pressed="true"]{color:var(--star);border-color:var(--star)}
 dl.stats{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:14px 0 0;text-align:left}
 dl.stats dt{font:600 .7rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:2px}
 dl.stats dd{margin:0;font-weight:700}
 .desc{max-width:65ch;margin:16px 0 0;color:var(--fg)}
-h3{font:700 1rem var(--display);letter-spacing:.04em;text-transform:uppercase;margin:26px 0 10px;display:flex;align-items:baseline;gap:8px}
+h3{font:700 1rem var(--display);letter-spacing:.04em;text-transform:uppercase;margin:26px 0 10px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;letter-spacing:0}
 .evos{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
-.evo{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);
+.evo{position:relative;display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);
   padding:8px;text-align:left;min-width:0}
+.evo.raised{border-color:var(--good)}
 .evo img{width:48px;height:48px;object-fit:contain;flex:none}
 .evo .t{min-width:0}
 .evo b{display:block;overflow-wrap:anywhere}
@@ -99,54 +107,162 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .skill{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
 .skill b{display:block}
 .skill p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
-footer{font:.7rem var(--mono);color:var(--muted);padding-block:0 30px;text-align:center}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}.card:active{transform:none}}
+
+/* tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:1fr 1fr;background:var(--panel);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs button{border:0;background:none;padding:12px 0 10px;font:700 .8rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
+
+/* partner */
+.partner{padding-block:14px 10px;display:grid;gap:12px;max-width:560px;margin:0 auto}
+.ptop{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.ptop h2{font:700 1.6rem/1.1 var(--display);margin:0;overflow-wrap:anywhere}
+.stage{font:600 .72rem var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.habitat{position:relative;height:230px;border-radius:16px;border:1px solid var(--line);overflow:hidden;
+  background:linear-gradient(var(--grid) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/22px 22px,var(--panel);
+  display:flex;align-items:flex-end;justify-content:center}
+.habitat::after{content:"";position:absolute;left:18%;right:18%;bottom:22px;height:14px;border-radius:50%;background:var(--sunk)}
+.sprite{position:relative;z-index:1;width:170px;height:170px;object-fit:contain;margin-bottom:26px;animation:bob 2.4s ease-in-out infinite}
+.sprite.happy{animation:hop .5s ease-in-out 3}
+.sprite.flash{animation:flash .35s steps(2) 8}
+@keyframes bob{50%{transform:translateY(-6px)}}
+@keyframes hop{50%{transform:translateY(-22px)}}
+@keyframes flash{50%{filter:brightness(4) saturate(0)}}
+.bubble{position:absolute;top:12px;left:12px;right:12px;z-index:2;font-size:.85rem;background:var(--bg);border:1px solid var(--line);
+  border-radius:10px;padding:6px 10px;min-height:1.5em}
+.meters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.meter{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.meter label{display:flex;justify-content:space-between;font:600 .68rem var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.meter label b{color:var(--fg);font-variant-numeric:tabular-nums}
+.track{height:7px;border-radius:4px;background:var(--sunk);overflow:hidden;margin-top:6px}
+.track i{display:block;height:100%;border-radius:4px;transition:width .4s}
+.evobox{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:grid;gap:6px}
+.evobox .row{display:flex;justify-content:space-between;gap:8px;font:600 .72rem var(--mono);color:var(--muted);flex-wrap:wrap}
+.evobox .row b{color:var(--fg)}
+.evotrack{height:10px;border-radius:5px;background:var(--sunk);overflow:hidden}
+.evotrack i{display:block;height:100%;background:var(--accent);transition:width .4s}
+.actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.act{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 6px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px}
+.act small{font:400 .66rem var(--mono);color:var(--muted)}
+.act:active:not(:disabled){transform:scale(.96)}
+.big{border:0;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:14px;font:700 1.05rem var(--display);letter-spacing:.04em;width:100%}
+.ghost{border:1px solid var(--line);background:transparent;border-radius:12px;padding:10px;font-weight:700;width:100%}
+.danger{color:var(--bad);border-color:var(--bad)}
+.lineage{display:flex;gap:4px;align-items:center;overflow-x:auto;scrollbar-width:none;font:.72rem var(--mono);color:var(--muted)}
+.lineage img{width:34px;height:34px;object-fit:contain}
+.egg{width:130px;height:165px;margin:0 auto;border-radius:50% 50% 46% 46%/60% 60% 40% 40%;cursor:pointer;border:0;
+  background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.7),transparent 30%),
+    radial-gradient(circle at 65% 62%,var(--accent) 0 11%,transparent 12%),radial-gradient(circle at 35% 70%,var(--link) 0 8%,transparent 9%),
+    radial-gradient(circle at 55% 30%,var(--good) 0 7%,transparent 8%),var(--sunk);
+  box-shadow:inset -10px -14px 0 rgba(0,0,0,.08);animation:wobble 2.6s ease-in-out infinite}
+.egg.shake{animation:shake .4s}
+@keyframes wobble{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-6deg)}90%{transform:rotate(6deg)}95%{transform:rotate(-3deg)}}
+@keyframes shake{25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
+.center{text-align:center}
+.hist{display:grid;gap:6px}
+.hist div{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;font-size:.85rem}
+.hist small{color:var(--muted);font-family:var(--mono)}
+
+/* overlays */
+.ov{position:fixed;inset:0;z-index:20;background:rgba(5,8,18,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;
+  padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.sheet{width:100%;max-width:520px;background:var(--panel);color:var(--fg);border-radius:18px;padding:18px;display:grid;gap:12px;max-height:88vh;overflow:auto}
+.sheet h4{margin:0;font:700 1.2rem var(--display)}
+.tmeter{position:relative;height:34px;border-radius:8px;background:var(--sunk);overflow:hidden}
+.tmeter .zone{position:absolute;top:0;bottom:0;background:var(--good);opacity:.45}
+.tmeter .mark{position:absolute;top:-2px;bottom:-2px;width:5px;margin-left:-2px;background:var(--fg);border-radius:2px}
+.dots{display:flex;gap:6px;justify-content:center;font:700 1rem var(--mono)}
+.arena{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.fighter{display:grid;gap:4px;justify-items:center;text-align:center;min-width:0}
+.fighter img{width:96px;height:96px;object-fit:contain}
+.fighter b{font-size:.85rem;overflow-wrap:anywhere}
+.fighter.hit img{animation:shake .3s}
+.hp{width:100%;height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
+.hp i{display:block;height:100%;width:100%;background:var(--good);transition:width .5s}
+.vs{font:700 1rem var(--display);color:var(--muted)}
+.blog{font-size:.88rem;min-height:2.8em;color:var(--muted)}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.choice{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px;display:grid;justify-items:center;gap:4px;text-align:center}
+.choice img{width:84px;height:84px;object-fit:contain}
+.choice img.sil{filter:brightness(0);opacity:.55}
+.choice b{font-size:.85rem;overflow-wrap:anywhere}
+.choice small{font:.66rem var(--mono);color:var(--good)}
+.reveal{display:grid;justify-items:center;gap:6px;text-align:center}
+.reveal img{width:160px;height:160px;object-fit:contain}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.card:active,.act:active{transform:none}}
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
     <div class="top">
-      <h1 class="brand">Digimon Index<small>every monster · every evo line</small></h1>
+      <h1 class="brand">Digimon Index<small id="tagline">raise · digivolve · collect</small></h1>
       <span class="count" id="count"></span>
     </div>
-    <div class="search" id="searchRow">
-      <input id="q" type="search" placeholder="Search by name" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search Digimon by name">
-      <button id="favOnly" class="favbtn" aria-pressed="false">★ Saved</button>
+    <div id="indexChrome" hidden>
+      <div class="search" id="searchRow">
+        <input id="q" type="search" placeholder="Search by name" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search Digimon by name">
+        <button id="raisedOnly" class="favbtn" aria-pressed="false">✓ Raised</button>
+        <button id="favOnly" class="favbtn" aria-pressed="false">★ Saved</button>
+      </div>
+      <div class="rail" id="rail" role="group" aria-label="Filter by level"></div>
     </div>
-    <div class="rail" id="rail" role="group" aria-label="Filter by level"></div>
   </div>
 </header>
 
 <main class="wrap">
-  <section id="listView">
+  <section id="partnerView" class="partner"><div class="status">Loading…</div></section>
+  <section id="listView" hidden>
     <div class="status" id="status">Loading the database…<div class="bar"><i id="prog"></i></div></div>
     <div class="grid" id="grid"></div>
   </section>
   <section id="detailView" class="detail" hidden></section>
 </main>
-<footer class="wrap">Data and images load live from digi-api.com · personal use</footer>
+
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button id="tabPartner" role="tab" aria-selected="true">Partner</button>
+  <button id="tabIndex" role="tab" aria-selected="false">Index</button>
+</nav>
+<div id="overlay" class="ov" hidden></div>
 
 <script>
 const API = 'https://digi-api.com/api/v1';
 const LEVELS = ['Baby I','Baby II','Child','Adult','Perfect','Ultimate','Armor','Hybrid','Unknown'];
+const STAGES = ['Baby I','Baby II','Child','Adult','Perfect','Ultimate'];
 const LEVEL_EN = {'Baby I':'Fresh','Baby II':'In-Training','Child':'Rookie','Adult':'Champion','Perfect':'Ultimate','Ultimate':'Mega','Armor':'Armor','Hybrid':'Hybrid','Unknown':'Unknown'};
+const EVO_NEED = [4, 8, 14, 22, 32];           // points to leave each stage
+const FOE_BASE = [3, 8, 16, 26, 38, 52];        // opponent strength per stage
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const clamp = v => Math.max(0, Math.min(100, v));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 const store = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
 };
 
 const state = {
-  all: [], byId: new Map(), q: '', level: '', levelSets: {}, favOnly: false,
-  favs: new Set(store.get('dx_favs', [])), details: new Map(), trail: []
+  all: [], byId: new Map(), q: '', level: '', levelSets: {}, favOnly: false, raisedOnly: false,
+  favs: new Set(store.get('dx_favs', [])), details: new Map(), trail: [],
+  tab: store.get('dx_tab', 'partner'), levelOf: new Map(), stageIds: {}, ready: false
 };
+const G = store.get('dx_game_v1', null) || { partner: null, col: {}, history: [] };
+const saveGame = () => store.set('dx_game_v1', G);
+const raised = id => G.col[id] === 'raised';
 
 async function getJSON(url){
   const r = await fetch(url);
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
+}
+async function getDetail(id){
+  let d = state.details.get(id);
+  if (!d){ d = await getJSON(`${API}/digimon/${id}`); state.details.set(id, d); }
+  return d;
 }
 
 // Walk every page of a list endpoint
@@ -166,16 +282,51 @@ async function pageAll(base, onProgress){
 
 async function loadAll(){
   const cached = store.get('dx_list_v1', null);
-  if (cached && cached.t > Date.now() - 7*864e5 && cached.items?.length){ setAll(cached.items); return; }
-  showStatus('Loading the database…', true);
-  try{
-    const items = await pageAll(`${API}/digimon`, (f) => { $('#prog').style.width = Math.round(f*100) + '%'; });
-    items.sort((a,b) => a.id - b.id);
-    store.set('dx_list_v1', {t: Date.now(), items});
-    setAll(items);
-  }catch(e){
-    showError(`Couldn't reach the Digimon database (${esc(e.message)}). Check your connection and try again.`, loadAll);
+  if (cached && cached.t > Date.now() - 7*864e5 && cached.items?.length){ setAll(cached.items); }
+  else {
+    showStatus('Loading the database…', true);
+    $('#partnerView').innerHTML = '<div class="status">Loading the database…</div>';
+    try{
+      const items = await pageAll(`${API}/digimon`, (f) => { const p = $('#prog'); if (p) p.style.width = Math.round(f*100) + '%'; });
+      items.sort((a,b) => a.id - b.id);
+      store.set('dx_list_v1', {t: Date.now(), items});
+      setAll(items);
+    }catch(e){
+      const msg = `Couldn't reach the Digimon database (${esc(e.message)}). Check your connection and try again.`;
+      showError(msg, loadAll);
+      $('#partnerView').innerHTML = `<div class="status"><div class="err">${msg}</div><button class="retry" id="retryAll">Try again</button></div>`;
+      $('#retryAll').onclick = loadAll;
+      return;
+    }
   }
+  await loadStages();
+}
+
+// Which stage (0 = Fresh … 5 = Mega) every Digimon belongs to
+async function loadStages(){
+  let cached = store.get('dx_levels_v1', null);
+  if (!(cached && cached.t > Date.now() - 7*864e5 && cached.sets)){
+    $('#partnerView').innerHTML = '<div class="status">Learning every evolution stage…</div>';
+    try{
+      const sets = {};
+      for (const lv of STAGES) sets[lv] = (await pageAll(`${API}/digimon?level=${encodeURIComponent(lv)}`)).map(d => d.id);
+      cached = {t: Date.now(), sets};
+      store.set('dx_levels_v1', cached);
+    }catch(e){
+      $('#partnerView').innerHTML = `<div class="status"><div class="err">Couldn't load evolution stages (${esc(e.message)}).</div><button class="retry" id="retryLv">Try again</button></div>`;
+      $('#retryLv').onclick = loadStages;
+      return;
+    }
+  }
+  STAGES.forEach((lv, i) => {
+    state.stageIds[i] = cached.sets[lv] || [];
+    state.levelSets[lv] = new Set(cached.sets[lv] || []);
+    for (const id of cached.sets[lv] || []) if (!state.levelOf.has(id)) state.levelOf.set(id, i);
+  });
+  state.ready = true;
+  tick();
+  renderPartner();
+  updateCount();
 }
 
 function setAll(items){
@@ -195,11 +346,33 @@ function showError(html, retry){
   s.innerHTML = `<div class="err">${html}</div><button class="retry">Try again</button>`;
   s.querySelector('.retry').onclick = retry;
 }
+function updateCount(){
+  const n = Object.values(G.col).filter(v => v === 'raised').length;
+  if (state.tab === 'partner') $('#count').innerHTML = `${n} raised<br>${state.all.length ? state.all.length.toLocaleString() : '—'} total`;
+  else { const list = filtered(); $('#count').textContent = `${list.length.toLocaleString()} / ${state.all.length.toLocaleString()}`; }
+}
 
-// ---------- list ----------
+// ---------- tabs ----------
+function setTab(t){
+  state.tab = t; store.set('dx_tab', t);
+  $('#tabPartner').setAttribute('aria-selected', t === 'partner');
+  $('#tabIndex').setAttribute('aria-selected', t === 'index');
+  const isP = t === 'partner';
+  $('#partnerView').hidden = !isP;
+  $('#indexChrome').hidden = isP || !$('#detailView').hidden;
+  $('#listView').hidden = isP || !$('#detailView').hidden;
+  if (isP){ $('#detailView').hidden = true; if (location.hash) history.replaceState(null, '', location.pathname + location.search); tick(); renderPartner(); }
+  else renderGrid();
+  updateCount();
+  window.scrollTo(0, 0);
+}
+$('#tabPartner').onclick = () => setTab('partner');
+$('#tabIndex').onclick = () => { if (!$('#detailView').hidden) goList(); setTab('index'); };
+
+// ---------- index list ----------
 function renderRail(){
   const rail = $('#rail');
-  const opts = [['','All levels'], ...LEVELS.map(l => [l, LEVEL_EN[l] === l ? l : `${LEVEL_EN[l]}`])];
+  const opts = [['','All levels'], ...LEVELS.map(l => [l, LEVEL_EN[l]])];
   rail.innerHTML = opts.map(([v, label]) =>
     `<button class="chip" data-level="${esc(v)}" aria-pressed="${state.level === v}" title="${esc(v || 'All')}">${esc(label)}</button>`).join('');
 }
@@ -228,34 +401,39 @@ function filtered(){
   return state.all.filter(d =>
     (!set || set.has(d.id)) &&
     (!state.favOnly || state.favs.has(d.id)) &&
+    (!state.raisedOnly || raised(d.id)) &&
     (!q || d.name.toLowerCase().replace(/[\s\-_]/g, '').includes(q)));
 }
 
 function renderGrid(){
+  if (state.tab !== 'index' || !state.all.length) return;
   const list = filtered();
-  $('#count').textContent = `${list.length.toLocaleString()} / ${state.all.length.toLocaleString()}`;
+  updateCount();
   const g = $('#grid');
   if (!list.length){
     g.innerHTML = '';
-    showStatus(state.favOnly && !state.favs.size ? 'Tap ★ on any Digimon to save it here.' : 'No Digimon match that search.');
+    showStatus(state.raisedOnly && !Object.keys(G.col).length ? 'Digimon your partner becomes will show up here.'
+      : state.favOnly && !state.favs.size ? 'Tap ★ on any Digimon to save it here.' : 'No Digimon match that search.');
     return;
   }
   $('#status').hidden = true;
   g.innerHTML = list.map(d => `
-    <button class="card" data-id="${d.id}">
+    <button class="card${raised(d.id) ? ' raised' : ''}" data-id="${d.id}">
+      ${raised(d.id) ? '<span class="tick">✓</span>' : ''}
       <img class="pic" loading="lazy" decoding="async" alt="" src="${esc(d.image)}" onerror="this.style.visibility='hidden'">
       <span class="nm">${esc(d.name)}</span>
       <span class="no">#${String(d.id).padStart(4,'0')}${state.favs.has(d.id) ? ' ★' : ''}</span>
     </button>`).join('');
 }
 
-// ---------- detail ----------
+// ---------- index detail ----------
 function idFromUrl(u){ const m = String(u||'').match(/\/(\d+)\/?$/); return m ? +m[1] : null; }
 
 async function openDetail(id, fromEvo){
   id = +id;
+  if (state.tab !== 'index'){ state.tab = 'index'; store.set('dx_tab', 'index'); $('#tabPartner').setAttribute('aria-selected', false); $('#tabIndex').setAttribute('aria-selected', true); $('#partnerView').hidden = true; }
   const v = $('#detailView');
-  $('#listView').hidden = true; $('#searchRow').hidden = true; $('#rail').hidden = true;
+  $('#listView').hidden = true; $('#indexChrome').hidden = true;
   v.hidden = false;
   const base = state.byId.get(id);
   if (!fromEvo) state.trail = [];
@@ -263,12 +441,10 @@ async function openDetail(id, fromEvo){
     <div class="status">${base ? esc(base.name) + ' · ' : ''}loading…</div>`;
   $('#back').onclick = goList;
   window.scrollTo(0, 0);
-  let d = state.details.get(id);
-  try{
-    if (!d){ d = await getJSON(`${API}/digimon/${id}`); state.details.set(id, d); }
-  }catch(e){
-    v.innerHTML = `<button class="back" id="back">← All Digimon</button>`;
-    v.insertAdjacentHTML('beforeend', '<div class="status"></div>');
+  let d;
+  try{ d = await getDetail(id); }
+  catch(e){
+    v.innerHTML = `<button class="back" id="back">← All Digimon</button><div class="status"></div>`;
     $('#back').onclick = goList;
     const s = v.querySelector('.status');
     s.innerHTML = `<div class="err">Couldn't load this Digimon (${esc(e.message)}).</div><button class="retry">Try again</button>`;
@@ -282,14 +458,18 @@ async function openDetail(id, fromEvo){
   renderDetail(d);
 }
 
+const evoId = e => idFromUrl(e.url) ?? e.id;
+
 function evoCards(list, key){
   if (!list || !list.length) return `<p class="empty">None recorded.</p>`;
   const limit = 24;
   const card = (e, i) => {
-    const eid = idFromUrl(e.url) ?? e.id;
+    const eid = evoId(e);
     const known = eid && state.byId.has(eid);
     const img = e.image || (known ? state.byId.get(eid).image : '');
-    return `<button class="evo${known ? '' : ' nolink'}" ${known ? `data-evo="${eid}"` : 'disabled'} ${i >= limit ? `data-extra="${key}" hidden` : ''}>
+    const r = raised(eid);
+    return `<button class="evo${known ? '' : ' nolink'}${r ? ' raised' : ''}" ${known ? `data-evo="${eid}"` : 'disabled'} ${i >= limit ? `data-extra="${key}" hidden` : ''}>
+      ${r ? '<span class="tick">✓</span>' : ''}
       ${img ? `<img loading="lazy" alt="" src="${esc(img)}" onerror="this.style.visibility='hidden'">` : ''}
       <span class="t"><b>${esc(e.digimon)}</b>${e.condition ? `<small>${esc(e.condition)}</small>` : ''}</span>
     </button>`;
@@ -305,6 +485,8 @@ function renderDetail(d){
   const join = (arr, k) => (arr||[]).map(x => x[k]).filter(Boolean).join(', ');
   const descObj = (d.descriptions||[]).find(x => /^en/i.test(x.language)) || (d.descriptions||[])[0];
   const fav = state.favs.has(d.id);
+  const nexts = d.nextEvolutions || [], priors = d.priorEvolutions || [];
+  const rc = list => list.filter(e => raised(evoId(e))).length;
   const trail = state.trail.length > 1
     ? `<nav class="trail" aria-label="Evolution path">${state.trail.map((t, i) =>
         i === state.trail.length - 1 ? `<span>${esc(t.name)}</span>` : `<button data-trail="${i}">${esc(t.name)}</button><span>→</span>`).join('')}</nav>` : '';
@@ -312,13 +494,14 @@ function renderDetail(d){
   v.innerHTML = `
     <button class="back" id="back">← All Digimon</button>
     ${trail}
-    <h3>Evolves from <span>${(d.priorEvolutions||[]).length}</span></h3>
-    ${evoCards(d.priorEvolutions, 'prior')}
+    <h3>Evolves from <span>${priors.length}${rc(priors) ? ` · ${rc(priors)} raised` : ''}</span></h3>
+    ${evoCards(priors, 'prior')}
     <div class="hero" style="margin-top:18px">
       ${img ? `<img class="art" alt="${esc(d.name)}" src="${esc(img)}">` : '<div class="art"></div>'}
       <div>
         <h2>${esc(d.name)}</h2>
         <div class="idline">#${String(d.id).padStart(4,'0')}${d.releaseDate ? ' · debut ' + esc(d.releaseDate) : ''}${d.xAntibody ? ' · X-Antibody' : ''}</div>
+        ${raised(d.id) ? '<div class="raisedline">✓ Raised by you</div>' : ''}
         <button class="star" id="star" aria-pressed="${fav}">${fav ? '★ Saved' : '☆ Save'}</button>
         <dl class="stats">
           ${stat('Level', levels)}${stat('Attribute', join(d.attributes,'attribute'))}
@@ -327,8 +510,8 @@ function renderDetail(d){
       </div>
     </div>
     ${descObj ? `<p class="desc">${esc(descObj.description)}</p>` : ''}
-    <h3>Evolves into <span>${(d.nextEvolutions||[]).length}</span></h3>
-    ${evoCards(d.nextEvolutions, 'next')}
+    <h3>Evolves into <span>${nexts.length}${rc(nexts) ? ` · ${rc(nexts)} raised` : ''}</span></h3>
+    ${evoCards(nexts, 'next')}
     ${(d.skills||[]).length ? `<h3>Skills <span>${d.skills.length}</span></h3>
       <div class="skills">${d.skills.map(s => `<div class="skill"><b>${esc(s.skill)}${s.translation && s.translation !== s.skill ? ' · ' + esc(s.translation) : ''}</b>${s.description ? `<p>${esc(s.description)}</p>` : ''}</div>`).join('')}</div>` : ''}
   `;
@@ -343,7 +526,7 @@ function renderDetail(d){
 function goList(){
   state.trail = [];
   $('#detailView').hidden = true;
-  $('#listView').hidden = false; $('#searchRow').hidden = false; $('#rail').hidden = false;
+  $('#listView').hidden = false; $('#indexChrome').hidden = false;
   if (location.hash) history.pushState(null, '', location.pathname + location.search);
   renderGrid();
   window.scrollTo(0, state.scroll || 0);
@@ -353,6 +536,304 @@ function route(){
   const id = +location.hash.slice(1);
   if (id && state.all.length) openDetail(id, true);
   else if (!$('#detailView').hidden) goList();
+}
+
+// ================= PARTNER GAME =================
+const P = () => G.partner;
+let busy = false;
+
+function stageOf(id){ return state.levelOf.get(id); }
+
+function newPartner(id){
+  const b = state.byId.get(id);
+  const now = Date.now();
+  G.partner = { id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
+    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], final: false };
+  G.col[id] = 'raised';
+  saveGame();
+}
+
+// Time passes while you're away
+function tick(){
+  const p = P(); if (!p) return;
+  const now = Date.now();
+  const mins = Math.min((now - p.last) / 60000, 1440);
+  if (mins < 0.2) return;
+  p.hunger = clamp(p.hunger - mins / 4);
+  p.mood = clamp(p.mood - mins / 5);
+  p.energy = clamp(p.energy + mins / 6);
+  p.last = now;
+  checkNeglect();
+  saveGame();
+}
+function checkNeglect(){
+  const p = P();
+  for (const k of ['hunger', 'mood']){
+    if (p[k] <= 0 && !p.flags[k]){ p.flags[k] = true; p.mistakes++; p.stageMistakes++; p.msg = `${p.name} was ${k === 'hunger' ? 'starving' : 'miserable'} while you were gone. That's a care mistake.`; }
+    if (p[k] > 20) p.flags[k] = false;
+  }
+}
+
+function meterColor(v){ return v >= 50 ? 'var(--good)' : v >= 25 ? 'var(--warn)' : 'var(--bad)'; }
+function meter(label, v){
+  const n = Math.round(v);
+  return `<div class="meter"><label>${label}<b>${n}</b></label><div class="track"><i style="width:${n}%;background:${meterColor(n)}"></i></div></div>`;
+}
+function ageText(p){
+  const h = (Date.now() - p.born) / 3600000;
+  return h < 1 ? `${Math.max(1, Math.round(h*60))} min old` : h < 48 ? `${Math.round(h)} h old` : `${Math.round(h/24)} days old`;
+}
+function moodLine(p){
+  if (p.msg){ const m = p.msg; p.msg = ''; return m; }
+  if (p.hunger < 25) return `${p.name} is hungry.`;
+  if (p.energy < 20) return `${p.name} is worn out and needs rest.`;
+  if (p.mood < 25) return `${p.name} looks bored. Play with it!`;
+  if (canEvolve(p)) return `${p.name} is glowing… it's ready to digivolve!`;
+  return pick([`${p.name} is looking at you.`, `${p.name} is ready for anything.`, `${p.name} wants to get stronger.`, `${p.name} is wandering around.`]);
+}
+const canEvolve = p => p.stage < 5 && !p.final && p.evo >= EVO_NEED[p.stage];
+
+function renderPartner(){
+  if (state.tab !== 'partner') return;
+  const v = $('#partnerView');
+  if (!state.ready){ if (!v.querySelector('.status')) v.innerHTML = '<div class="status">Loading…</div>'; return; }
+  const p = P();
+  if (!p) return renderEgg();
+  const need = EVO_NEED[p.stage];
+  const atTop = p.stage >= 5 || p.final;
+  const lineImgs = p.line.map(id => state.byId.get(id)).filter(Boolean)
+    .map(b => `<img alt="${esc(b.name)}" title="${esc(b.name)}" src="${esc(b.image)}">`).join('<span>→</span>');
+  v.innerHTML = `
+    <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">${LEVEL_EN[STAGES[p.stage]]}</span>
+      <span class="stage">${ageText(p)}</span></div>
+    <div class="habitat"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
+      <img class="sprite" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}"></div>
+    <div class="meters">${meter('Hunger', p.hunger)}${meter('Energy', p.energy)}${meter('Mood', p.mood)}</div>
+    <div class="evobox">
+      <div class="row"><span>STRENGTH <b>${p.str}</b></span><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b></span><span>MISTAKES <b>${p.stageMistakes}</b></span></div>
+      ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
+        : `<div class="row"><span>DIGIVOLUTION</span><b>${Math.min(p.evo, need)} / ${need}</b></div>
+           <div class="evotrack"><i style="width:${Math.min(100, p.evo / need * 100)}%"></i></div>`}
+    </div>
+    ${canEvolve(p) ? `<button class="big" id="evolveBtn">Digivolve!</button>` : ''}
+    <div class="actions">
+      <button class="act" data-act="feed">🍖 Feed<small>+hunger</small></button>
+      <button class="act" data-act="play">⚽ Play<small>+mood</small></button>
+      <button class="act" data-act="rest">💤 Rest<small>+energy</small></button>
+      <button class="act" data-act="train" ${p.energy < 20 ? 'disabled' : ''}>💪 Train<small>${p.energy < 20 ? 'too tired' : '+strength'}</small></button>
+      <button class="act" data-act="battle" ${p.energy < 25 ? 'disabled' : ''}>⚔️ Battle<small>${p.energy < 25 ? 'too tired' : '+evo points'}</small></button>
+      <button class="act" data-act="line">🧬 Line<small>see evos</small></button>
+    </div>
+    <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
+    ${atTop ? `<button class="big" id="newEggBtn">Start a new egg</button>` : `<button class="ghost danger" id="retireBtn">Release partner & start over</button>`}
+  `;
+  updateCount();
+  const eb = $('#evolveBtn'); if (eb) eb.onclick = digivolve;
+  const ne = $('#newEggBtn'); if (ne) ne.onclick = retire;
+  const rb = $('#retireBtn'); if (rb) rb.onclick = () => {
+    if (rb.dataset.armed){ retire(); return; }
+    rb.dataset.armed = '1'; rb.textContent = `Tap again to release ${p.name}`;
+    setTimeout(() => { if (rb.isConnected){ delete rb.dataset.armed; rb.textContent = 'Release partner & start over'; } }, 3500);
+  };
+}
+
+function say(text, anim){
+  const p = P(); if (p) p.msg = text;
+  saveGame();
+  renderPartner();
+  if (anim){ const s = $('#sprite'); if (s) s.classList.add(anim); }
+}
+
+$('#partnerView').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || busy) return;
+  tick();
+  const p = P(); const k = b.dataset.act;
+  if (k === 'feed'){
+    if (p.hunger > 92){ p.mood = clamp(p.mood - 6); return say(`${p.name} is stuffed and pushes the food away.`); }
+    const low = p.hunger < 50;
+    p.hunger = clamp(p.hunger + 30); if (low) p.evo += 1;
+    return say(pick([`${p.name} gobbled it up!`, `Crunch crunch. ${p.name} looks satisfied.`, `${p.name} ate every last bite.`]), 'happy');
+  }
+  if (k === 'play'){
+    if (p.energy < 10) return say(`${p.name} is too tired to play.`);
+    const low = p.mood < 60;
+    p.mood = clamp(p.mood + 25); p.energy = clamp(p.energy - 10); p.hunger = clamp(p.hunger - 4); if (low) p.evo += 1;
+    return say(pick([`You and ${p.name} played tag. It's having a great time!`, `${p.name} chased the ball around and around.`, `${p.name} is laughing!`]), 'happy');
+  }
+  if (k === 'rest'){
+    if (p.energy > 90) return say(`${p.name} isn't sleepy.`);
+    p.energy = clamp(p.energy + 40); p.hunger = clamp(p.hunger - 5);
+    return say(`${p.name} curled up for a nap. Zzz…`);
+  }
+  if (k === 'train') return train();
+  if (k === 'battle') return battle();
+  if (k === 'line') return openDetail(p.id, false);
+});
+
+// ----- egg -----
+function renderEgg(){
+  const v = $('#partnerView');
+  const n = Object.values(G.col).filter(x => x === 'raised').length;
+  v.innerHTML = `
+    <div class="center" style="display:grid;gap:14px;padding-top:10px">
+      <h2 style="font:700 1.5rem var(--display);margin:0">${G.history.length ? 'A new Digi-Egg appeared' : 'Your first Digi-Egg'}</h2>
+      <p style="margin:0;color:var(--muted)">Tap the egg to hatch it. Raise your partner well and it will digivolve along its real evolution lines. Every form it reaches is added to your collection.</p>
+      <button class="egg" id="egg" aria-label="Tap to hatch"></button>
+      <p id="eggMsg" style="margin:0;font:600 .8rem var(--mono);color:var(--muted)">TAP 3 TIMES</p>
+      <p style="margin:0;font:600 .8rem var(--mono)">Collection: ${n} raised of ${state.all.length.toLocaleString()}</p>
+    </div>
+    ${G.history.length ? `<h3>Past partners <span>${G.history.length}</span></h3><div class="hist">${G.history.slice().reverse().map(h =>
+      `<div><b>${h.line.map(esc).join(' → ')}</b><br><small>${h.wins} wins · ${new Date(h.date).toLocaleDateString()}</small></div>`).join('')}</div>` : ''}
+  `;
+  let taps = 0;
+  $('#egg').onclick = async () => {
+    if (busy) return;
+    const egg = $('#egg'); taps++;
+    egg.classList.remove('shake'); void egg.offsetWidth; egg.classList.add('shake');
+    $('#eggMsg').textContent = taps < 3 ? ['', 'IT MOVED!', 'IT\'S CRACKING…'][taps] : 'HATCHING!';
+    if (taps < 3) return;
+    busy = true;
+    await sleep(600);
+    const pool = state.stageIds[0].filter(id => state.byId.has(id));
+    // favor ones you haven't raised yet
+    const fresh = pool.filter(id => !raised(id));
+    const id = pick(fresh.length ? fresh : pool);
+    newPartner(id);
+    busy = false;
+    say(`${P().name} hatched! Take good care of it.`, 'happy');
+  };
+}
+
+function retire(){
+  const p = P();
+  if (p) G.history.push({ line: p.line.map(id => state.byId.get(id)?.name || '?'), wins: p.wins, date: Date.now() });
+  G.partner = null;
+  saveGame();
+  renderPartner();
+}
+
+// ----- overlay helpers -----
+function openOv(html){ const o = $('#overlay'); o.innerHTML = `<div class="sheet">${html}</div>`; o.hidden = false; return o; }
+function closeOv(){ $('#overlay').hidden = true; $('#overlay').innerHTML = ''; busy = false; }
+
+// ----- training: tap when the marker is in the green zone -----
+function train(){
+  const p = P(); busy = true;
+  const zoneW = [28, 26, 23, 20, 17, 15][p.stage];
+  let round = 0, hits = 0, pos = 0, dir = 1, raf = 0, zoneL = 0, waiting = false;
+  const speed = () => 0.9 + round * 0.35 + p.stage * 0.12;
+  openOv(`<h4>Training · ${esc(p.name)}</h4>
+    <p style="margin:0;color:var(--muted)">Tap <b>Hit!</b> when the marker is inside the green zone.</p>
+    <div class="tmeter"><span class="zone" id="zone"></span><span class="mark" id="mark"></span></div>
+    <div class="dots" id="dots">○ ○ ○</div>
+    <button class="big" id="hit">Hit!</button>`);
+  const placeZone = () => { zoneL = rand(5, 95 - zoneW); const z = $('#zone'); z.style.left = zoneL + '%'; z.style.width = zoneW + '%'; };
+  const dots = () => { $('#dots').textContent = [0,1,2].map(i => i < round ? (results[i] ? '●' : '✕') : '○').join(' '); };
+  const results = [];
+  const loop = () => { pos += dir * speed(); if (pos >= 100){ pos = 100; dir = -1; } if (pos <= 0){ pos = 0; dir = 1; } $('#mark').style.left = pos + '%'; raf = requestAnimationFrame(loop); };
+  placeZone(); raf = requestAnimationFrame(loop);
+  $('#hit').onclick = async () => {
+    if (waiting) return;
+    const ok = pos >= zoneL && pos <= zoneL + zoneW;
+    results.push(ok); if (ok) hits++; round++; dots();
+    if (round < 3){ waiting = true; cancelAnimationFrame(raf); await sleep(350); placeZone(); waiting = false; raf = requestAnimationFrame(loop); return; }
+    cancelAnimationFrame(raf);
+    const gain = hits * 2 + (hits && p.mood > 60 ? 1 : 0);
+    p.str += gain; p.evo += hits; p.energy = clamp(p.energy - 20); p.hunger = clamp(p.hunger - 10);
+    if (!hits) p.mood = clamp(p.mood - 6);
+    $('#hit').textContent = 'Done';
+    $('#hit').onclick = () => { closeOv(); say(hits === 3 ? `Perfect training! ${p.name} gained ${gain} strength.` : hits ? `Good effort! ${p.name} gained ${gain} strength.` : `${p.name} missed every hit and looks discouraged.`, hits ? 'happy' : null); };
+  };
+}
+
+// ----- battle against a wild Digimon of the same stage -----
+async function battle(){
+  const p = P(); busy = true;
+  const pool = (state.stageIds[p.stage] || []).filter(id => id !== p.id && state.byId.has(id));
+  const foe = state.byId.get(pick(pool));
+  const foePow = FOE_BASE[p.stage] + rand(0, 10 + p.stage * 3);
+  const myPow = p.str + p.mood / 12 + p.energy / 20 + rand(0, 10 + p.stage * 3);
+  const win = myPow >= foePow;
+  G.col[foe.id] = G.col[foe.id] || 'seen';
+  openOv(`<h4>Wild battle!</h4>
+    <div class="arena">
+      <div class="fighter" id="fMe"><img alt="" src="${esc(p.image)}"><b>${esc(p.name)}</b><div class="hp"><i id="hpMe"></i></div></div>
+      <div class="vs">VS</div>
+      <div class="fighter" id="fFoe"><img alt="" src="${esc(foe.image)}"><b>${esc(foe.name)}</b><div class="hp"><i id="hpFoe"></i></div></div>
+    </div>
+    <div class="blog" id="blog">A wild ${esc(foe.name)} appeared!</div>
+    <button class="big" id="bDone" disabled>Fighting…</button>`);
+  let me = 100, them = 100;
+  const endMe = win ? rand(25, 75) : 0, endThem = win ? 0 : rand(25, 75);
+  const lines = [`${p.name} attacks!`, `${foe.name} strikes back!`, `${p.name} goes all out!`, `${foe.name} counters!`];
+  for (let t = 0; t < 4; t++){
+    await sleep(750);
+    const meTurn = t % 2 === 0;
+    if (meTurn){ them = t === 2 ? endThem : (100 + endThem) / 2; $('#hpFoe').style.width = them + '%'; $('#fFoe').classList.remove('hit'); void $('#fFoe').offsetWidth; $('#fFoe').classList.add('hit'); }
+    else { me = t === 3 ? endMe : (100 + endMe) / 2; $('#hpMe').style.width = me + '%'; $('#fMe').classList.remove('hit'); void $('#fMe').offsetWidth; $('#fMe').classList.add('hit'); }
+    $('#hpFoe').style.background = meterColor(them); $('#hpMe').style.background = meterColor(me);
+    $('#blog').textContent = lines[t];
+  }
+  await sleep(600);
+  p.energy = clamp(p.energy - 25); p.hunger = clamp(p.hunger - 10);
+  if (win){ p.wins++; p.evo += 3; p.str += 1; p.mood = clamp(p.mood + 8); }
+  else { p.losses++; p.mood = clamp(p.mood - 10); p.evo += 1; }
+  $('#blog').textContent = win ? `${p.name} won! +3 digivolution points.` : `${p.name} lost… Train more and try again.`;
+  const done = $('#bDone'); done.disabled = false; done.textContent = 'Continue';
+  done.onclick = () => { closeOv(); say(win ? `${p.name} beat ${foe.name}!` : `${p.name} lost to ${foe.name}.`, win ? 'happy' : null); };
+  saveGame();
+}
+
+// ----- digivolution along the real evo lines -----
+async function digivolve(){
+  const p = P(); if (busy || !canEvolve(p)) return;
+  busy = true;
+  openOv(`<h4>${esc(p.name)} is digivolving…</h4><div class="status">Reading its evolution line…</div>`);
+  let d;
+  try{ d = await getDetail(p.id); }
+  catch(e){ $('#overlay .sheet').innerHTML = `<h4>Connection problem</h4><p>Couldn't load ${esc(p.name)}'s evolutions (${esc(e.message)}).</p><button class="big" id="ovClose">Close</button>`; $('#ovClose').onclick = closeOv; return; }
+  const all = (d.nextEvolutions || []).map(e => ({ id: evoId(e), name: e.digimon, image: e.image })).filter(e => e.id && state.byId.has(e.id));
+  const seen = new Set();
+  const uniq = all.filter(e => !seen.has(e.id) && seen.add(e.id));
+  let cands = uniq.filter(e => stageOf(e.id) === p.stage + 1);
+  if (!cands.length) cands = uniq.filter(e => stageOf(e.id) > p.stage);
+  if (!cands.length){
+    p.final = true; saveGame();
+    $('#overlay .sheet').innerHTML = `<h4>No further forms</h4><p>${esc(p.name)} has no recorded evolution to the next stage, so this is its final form.</p><button class="big" id="ovClose">OK</button>`;
+    $('#ovClose').onclick = () => { closeOv(); renderPartner(); };
+    return;
+  }
+  const count = p.stageMistakes === 0 ? 3 : p.stageMistakes <= 2 ? 2 : 1;
+  // mix in forms you haven't raised so every line gets explored
+  const unraised = shuffle(cands.filter(c => !raised(c.id)));
+  const known = shuffle(cands.filter(c => raised(c.id)));
+  const options = shuffle([...unraised.slice(0, count), ...known].slice(0, count));
+  const careNote = count === 3 ? 'Great care! Choose its path.' : count === 2 ? 'Some care mistakes limited its paths.' : 'Neglect left only one path open.';
+  $('#overlay .sheet').innerHTML = `<h4>${esc(p.name)} is ready!</h4>
+    <p style="margin:0;color:var(--muted)">${careNote} ${cands.length} possible forms in total.</p>
+    <div class="choices">${options.map(o => {
+      const r = raised(o.id);
+      return `<button class="choice" data-pick="${o.id}"><img class="${r ? '' : 'sil'}" alt="" src="${esc(o.image || state.byId.get(o.id).image)}"><b>${r ? esc(o.name) : '???'}</b>${r ? '<small>✓ raised before</small>' : ''}</button>`;
+    }).join('')}</div>`;
+  $('#overlay').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => evolveTo(+b.dataset.pick));
+}
+
+async function evolveTo(id){
+  const p = P(); const b = state.byId.get(id);
+  const oldName = p.name;
+  $('#overlay .sheet').innerHTML = `<div class="reveal"><img id="evoImg" class="sprite flash" style="animation-iteration-count:8" alt="" src="${esc(p.image)}"><h4>${esc(oldName)} digivolve to…</h4></div>`;
+  await sleep(2900);
+  const firstTime = !raised(id);
+  p.id = id; p.name = b.name; p.image = b.image;
+  p.stage = Math.max(p.stage + 1, Math.min(5, stageOf(id) ?? p.stage + 1));
+  p.evo = 0; p.stageMistakes = 0; p.line.push(id);
+  p.mood = clamp(p.mood + 20); p.energy = clamp(p.energy + 20); p.str += 3;
+  G.col[id] = 'raised';
+  saveGame();
+  $('#overlay .sheet').innerHTML = `<div class="reveal"><img class="sprite happy" alt="" src="${esc(b.image)}">
+    <h4>${esc(b.name)}!</h4><p style="margin:0;color:var(--muted)">${LEVEL_EN[STAGES[p.stage]]} level${firstTime ? ' · new to your collection!' : ''}</p></div>
+    <button class="big" id="ovClose">Awesome</button>`;
+  $('#ovClose').onclick = () => { closeOv(); say(`${oldName} digivolved into ${b.name}!`, 'happy'); };
 }
 
 // ---------- events ----------
@@ -373,12 +854,14 @@ $('#detailView').addEventListener('click', e => {
 });
 $('#rail').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) setLevel(c.dataset.level); });
 let qt; $('#q').addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value; renderGrid(); }, 120); });
-$('#favOnly').addEventListener('click', e => {
-  state.favOnly = !state.favOnly; e.currentTarget.setAttribute('aria-pressed', state.favOnly); renderGrid();
-});
+$('#favOnly').addEventListener('click', e => { state.favOnly = !state.favOnly; e.currentTarget.setAttribute('aria-pressed', state.favOnly); renderGrid(); });
+$('#raisedOnly').addEventListener('click', e => { state.raisedOnly = !state.raisedOnly; e.currentTarget.setAttribute('aria-pressed', state.raisedOnly); renderGrid(); });
 window.addEventListener('popstate', route);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy){ tick(); renderPartner(); } });
+setInterval(() => { if (!busy && !document.hidden && state.tab === 'partner' && P()){ tick(); renderPartner(); } }, 60000);
 
 renderRail();
+setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
 </script>
 </body>
