@@ -275,13 +275,14 @@ async function pageAll(base, onProgress){
     out.push(...items);
     const p = d.pageable || {};
     if (onProgress && p.totalElements) onProgress(out.length / p.totalElements, p.totalElements);
-    if (!items.length || items.length < size || (p.totalPages && page >= p.totalPages - 1)) break;
+    // the API's page count can be one short, so keep going until a page comes back partly empty
+    if (!items.length || items.length < size) break;
   }
   return out;
 }
 
 async function loadAll(){
-  const cached = store.get('dx_list_v1', null);
+  const cached = store.get('dx_list_v2', null);
   if (cached && cached.t > Date.now() - 7*864e5 && cached.items?.length){ setAll(cached.items); }
   else {
     showStatus('Loading the database…', true);
@@ -289,7 +290,7 @@ async function loadAll(){
     try{
       const items = await pageAll(`${API}/digimon`, (f) => { const p = $('#prog'); if (p) p.style.width = Math.round(f*100) + '%'; });
       items.sort((a,b) => a.id - b.id);
-      store.set('dx_list_v1', {t: Date.now(), items});
+      store.set('dx_list_v2', {t: Date.now(), items});
       setAll(items);
     }catch(e){
       const msg = `Couldn't reach the Digimon database (${esc(e.message)}). Check your connection and try again.`;
@@ -304,14 +305,14 @@ async function loadAll(){
 
 // Which stage (0 = Fresh … 5 = Mega) every Digimon belongs to
 async function loadStages(){
-  let cached = store.get('dx_levels_v1', null);
+  let cached = store.get('dx_levels_v2', null);
   if (!(cached && cached.t > Date.now() - 7*864e5 && cached.sets)){
     $('#partnerView').innerHTML = '<div class="status">Learning every evolution stage…</div>';
     try{
       const sets = {};
       for (const lv of STAGES) sets[lv] = (await pageAll(`${API}/digimon?level=${encodeURIComponent(lv)}`)).map(d => d.id);
       cached = {t: Date.now(), sets};
-      store.set('dx_levels_v1', cached);
+      store.set('dx_levels_v2', cached);
     }catch(e){
       $('#partnerView').innerHTML = `<div class="status"><div class="err">Couldn't load evolution stages (${esc(e.message)}).</div><button class="retry" id="retryLv">Try again</button></div>`;
       $('#retryLv').onclick = loadStages;
