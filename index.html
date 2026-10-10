@@ -16,7 +16,7 @@
 :root{
   --bg:#eef1f7; --panel:#ffffff; --sunk:#e1e6f0; --fg:#141a2b; --muted:#5a6480; --line:#cfd6e4;
   --accent:#e0640f; --accent-ink:#ffffff; --link:#2346c7; --star:#d9a400;
-  --good:#1f9d55; --warn:#d48a00; --bad:#d23c3c; --grid:rgba(35,70,199,.07);
+  --good:#1f9d55; --warn:#d48a00; --bad:#d23c3c; --grid:rgba(35,70,199,.07); --silf:brightness(0) opacity(.5);
   --display:"Chakra Petch",ui-sans-serif,system-ui,sans-serif;
   --body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,-apple-system,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -26,7 +26,7 @@
 @media (prefers-color-scheme:dark){:root{
   --bg:#0d1120; --panel:#161c30; --sunk:#1e263f; --fg:#e6eaf5; --muted:#8f9ab8; --line:#2a3452;
   --accent:#ff8a3d; --accent-ink:#1a0d02; --link:#8fa8ff; --star:#ffd04d;
-  --good:#3ccf7a; --warn:#ffb534; --bad:#ff6b6b; --grid:rgba(143,168,255,.08); color-scheme:dark;
+  --good:#3ccf7a; --warn:#ffb534; --bad:#ff6b6b; --grid:rgba(143,168,255,.08); --silf:brightness(0) invert(1) opacity(.3); color-scheme:dark;
 }}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
@@ -185,7 +185,7 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
 .choice{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px;display:grid;justify-items:center;gap:4px;text-align:center}
 .choice img{width:84px;height:84px;object-fit:contain}
-.choice img.sil{filter:brightness(0);opacity:.55}
+img.sil{filter:var(--silf)}
 .choice b{font-size:.85rem;overflow-wrap:anywhere}
 .choice small{font:.66rem var(--mono);color:var(--good)}
 .reveal{display:grid;justify-items:center;gap:6px;text-align:center}
@@ -248,11 +248,13 @@ const store = {
 const state = {
   all: [], byId: new Map(), q: '', level: '', levelSets: {}, favOnly: false, raisedOnly: false,
   favs: new Set(store.get('dx_favs', [])), details: new Map(), trail: [],
-  tab: store.get('dx_tab', 'partner'), levelOf: new Map(), stageIds: {}, ready: false
+  tab: store.get('dx_tab', 'partner'), levelOf: new Map(), stagesOf: new Map(), stageIds: {}, ready: false
 };
 const G = store.get('dx_game_v1', null) || { partner: null, col: {}, history: [] };
 const saveGame = () => store.set('dx_game_v1', G);
 const raised = id => G.col[id] === 'raised';
+const known = id => !!G.col[id];
+const shown = (id, name) => known(id) ? name : '???';
 
 async function getJSON(url){
   const r = await fetch(url);
@@ -322,7 +324,10 @@ async function loadStages(){
   STAGES.forEach((lv, i) => {
     state.stageIds[i] = cached.sets[lv] || [];
     state.levelSets[lv] = new Set(cached.sets[lv] || []);
-    for (const id of cached.sets[lv] || []) if (!state.levelOf.has(id)) state.levelOf.set(id, i);
+    for (const id of cached.sets[lv] || []){
+      if (!state.levelOf.has(id)) state.levelOf.set(id, i);
+      state.stagesOf.set(id, [...(state.stagesOf.get(id) || []), i]);
+    }
   });
   state.ready = true;
   tick();
@@ -349,7 +354,7 @@ function showError(html, retry){
 }
 function updateCount(){
   const n = Object.values(G.col).filter(v => v === 'raised').length;
-  if (state.tab === 'partner') $('#count').innerHTML = `${n} raised<br>${state.all.length ? state.all.length.toLocaleString() : '—'} total`;
+  if (state.tab === 'partner') $('#count').innerHTML = `${Object.keys(G.col).length} / ${state.all.length ? state.all.length.toLocaleString() : '—'} found<br>${n} raised`;
   else { const list = filtered(); $('#count').textContent = `${list.length.toLocaleString()} / ${state.all.length.toLocaleString()}`; }
 }
 
@@ -403,7 +408,7 @@ function filtered(){
     (!set || set.has(d.id)) &&
     (!state.favOnly || state.favs.has(d.id)) &&
     (!state.raisedOnly || raised(d.id)) &&
-    (!q || d.name.toLowerCase().replace(/[\s\-_]/g, '').includes(q)));
+    (!q || (known(d.id) && d.name.toLowerCase().replace(/[\s\-_]/g, '').includes(q))));
 }
 
 function renderGrid(){
@@ -421,8 +426,8 @@ function renderGrid(){
   g.innerHTML = list.map(d => `
     <button class="card${raised(d.id) ? ' raised' : ''}" data-id="${d.id}">
       ${raised(d.id) ? '<span class="tick">✓</span>' : ''}
-      <img class="pic" loading="lazy" decoding="async" alt="" src="${esc(d.image)}" onerror="this.style.visibility='hidden'">
-      <span class="nm">${esc(d.name)}</span>
+      <img class="pic${known(d.id) ? '' : ' sil'}" loading="lazy" decoding="async" alt="" src="${esc(d.image)}" onerror="this.style.visibility='hidden'">
+      <span class="nm">${esc(shown(d.id, d.name))}</span>
       <span class="no">#${String(d.id).padStart(4,'0')}${state.favs.has(d.id) ? ' ★' : ''}</span>
     </button>`).join('');
 }
@@ -439,7 +444,7 @@ async function openDetail(id, fromEvo){
   const base = state.byId.get(id);
   if (!fromEvo) state.trail = [];
   v.innerHTML = `<button class="back" id="back">← All Digimon</button>
-    <div class="status">${base ? esc(base.name) + ' · ' : ''}loading…</div>`;
+    <div class="status">${base ? esc(shown(id, base.name)) + ' · ' : ''}loading…</div>`;
   $('#back').onclick = goList;
   window.scrollTo(0, 0);
   let d;
@@ -454,7 +459,7 @@ async function openDetail(id, fromEvo){
   }
   if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
   const last = state.trail[state.trail.length - 1];
-  if (!last || last.id !== id) state.trail.push({id, name: d.name});
+  if (!last || last.id !== id) state.trail.push({id, name: shown(id, d.name)});
   if (state.trail.length > 12) state.trail = state.trail.slice(-12);
   renderDetail(d);
 }
@@ -466,13 +471,13 @@ function evoCards(list, key){
   const limit = 24;
   const card = (e, i) => {
     const eid = evoId(e);
-    const known = eid && state.byId.has(eid);
-    const img = e.image || (known ? state.byId.get(eid).image : '');
-    const r = raised(eid);
-    return `<button class="evo${known ? '' : ' nolink'}${r ? ' raised' : ''}" ${known ? `data-evo="${eid}"` : 'disabled'} ${i >= limit ? `data-extra="${key}" hidden` : ''}>
+    const linkable = eid && state.byId.has(eid);
+    const img = e.image || (linkable ? state.byId.get(eid).image : '');
+    const r = raised(eid), k = known(eid);
+    return `<button class="evo${linkable ? '' : ' nolink'}${r ? ' raised' : ''}" ${linkable ? `data-evo="${eid}"` : 'disabled'} ${i >= limit ? `data-extra="${key}" hidden` : ''}>
       ${r ? '<span class="tick">✓</span>' : ''}
-      ${img ? `<img loading="lazy" alt="" src="${esc(img)}" onerror="this.style.visibility='hidden'">` : ''}
-      <span class="t"><b>${esc(e.digimon)}</b>${e.condition ? `<small>${esc(e.condition)}</small>` : ''}</span>
+      ${img ? `<img class="${k ? '' : 'sil'}" loading="lazy" alt="" src="${esc(img)}" onerror="this.style.visibility='hidden'">` : ''}
+      <span class="t"><b>${k ? esc(e.digimon) : '???'}</b>${k && e.condition ? `<small>${esc(e.condition)}</small>` : ''}</span>
     </button>`;
   };
   return `<div class="evos">${list.map(card).join('')}</div>` +
@@ -484,7 +489,8 @@ function renderDetail(d){
   const img = (d.images && d.images[0] && d.images[0].href) || state.byId.get(d.id)?.image || '';
   const levels = (d.levels||[]).map(l => LEVEL_EN[l.level] && LEVEL_EN[l.level] !== l.level ? `${LEVEL_EN[l.level]} (${l.level})` : l.level).join(', ');
   const join = (arr, k) => (arr||[]).map(x => x[k]).filter(Boolean).join(', ');
-  const descObj = (d.descriptions||[]).find(x => /^en/i.test(x.language)) || (d.descriptions||[])[0];
+  const k = known(d.id);
+  const descObj = k && ((d.descriptions||[]).find(x => /^en/i.test(x.language)) || (d.descriptions||[])[0]);
   const fav = state.favs.has(d.id);
   const nexts = d.nextEvolutions || [], priors = d.priorEvolutions || [];
   const rc = list => list.filter(e => raised(evoId(e))).length;
@@ -498,22 +504,22 @@ function renderDetail(d){
     <h3>Evolves from <span>${priors.length}${rc(priors) ? ` · ${rc(priors)} raised` : ''}</span></h3>
     ${evoCards(priors, 'prior')}
     <div class="hero" style="margin-top:18px">
-      ${img ? `<img class="art" alt="${esc(d.name)}" src="${esc(img)}">` : '<div class="art"></div>'}
+      ${img ? `<img class="art${k ? '' : ' sil'}" alt="${esc(shown(d.id, d.name))}" src="${esc(img)}">` : '<div class="art"></div>'}
       <div>
-        <h2>${esc(d.name)}</h2>
+        <h2>${esc(shown(d.id, d.name))}</h2>${k ? '' : '<div class="raisedline" style="color:var(--muted)">Not discovered yet. Battle it or raise it to reveal it.</div>'}
         <div class="idline">#${String(d.id).padStart(4,'0')}${d.releaseDate ? ' · debut ' + esc(d.releaseDate) : ''}${d.xAntibody ? ' · X-Antibody' : ''}</div>
         ${raised(d.id) ? '<div class="raisedline">✓ Raised by you</div>' : ''}
         <button class="star" id="star" aria-pressed="${fav}">${fav ? '★ Saved' : '☆ Save'}</button>
         <dl class="stats">
-          ${stat('Level', levels)}${stat('Attribute', join(d.attributes,'attribute'))}
-          ${stat('Type', join(d.types,'type'))}${stat('Field', join(d.fields,'field'))}
+          ${stat('Level', levels)}${k ? stat('Attribute', join(d.attributes,'attribute')) : ''}
+          ${k ? stat('Type', join(d.types,'type')) + stat('Field', join(d.fields,'field')) : ''}
         </dl>
       </div>
     </div>
     ${descObj ? `<p class="desc">${esc(descObj.description)}</p>` : ''}
     <h3>Evolves into <span>${nexts.length}${rc(nexts) ? ` · ${rc(nexts)} raised` : ''}</span></h3>
     ${evoCards(nexts, 'next')}
-    ${(d.skills||[]).length ? `<h3>Skills <span>${d.skills.length}</span></h3>
+    ${k && (d.skills||[]).length ? `<h3>Skills <span>${d.skills.length}</span></h3>
       <div class="skills">${d.skills.map(s => `<div class="skill"><b>${esc(s.skill)}${s.translation && s.translation !== s.skill ? ' · ' + esc(s.translation) : ''}</b>${s.description ? `<p>${esc(s.description)}</p>` : ''}</div>`).join('')}</div>` : ''}
   `;
   $('#back').onclick = goList;
@@ -544,12 +550,15 @@ const P = () => G.partner;
 let busy = false;
 
 function stageOf(id){ return state.levelOf.get(id); }
+// some Digimon are listed at two levels, so check membership instead of a single level
+const inStage = (id, s) => !!state.levelSets[STAGES[s]]?.has(id);
+const higherStage = (id, s) => (state.stagesOf.get(id) || []).find(x => x > s);
 
 function newPartner(id){
   const b = state.byId.get(id);
   const now = Date.now();
   G.partner = { id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
-    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], final: false };
+    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], stageLine: [0], final: false };
   G.col[id] = 'raised';
   saveGame();
 }
@@ -626,11 +635,17 @@ function renderPartner(){
       <button class="act" data-act="line">🧬 Line<small>see evos</small></button>
     </div>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
+    ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
     ${atTop ? `<button class="big" id="newEggBtn">Start a new egg</button>` : `<button class="ghost danger" id="retireBtn">Release partner & start over</button>`}
   `;
   updateCount();
   const eb = $('#evolveBtn'); if (eb) eb.onclick = digivolve;
   const ne = $('#newEggBtn'); if (ne) ne.onclick = retire;
+  const dd = $('#dedigiBtn'); if (dd) dd.onclick = () => {
+    if (dd.dataset.armed){ dedigivolve(); return; }
+    dd.dataset.armed = '1'; dd.textContent = 'Tap again to de-digivolve (evo points reset)';
+    setTimeout(() => { if (dd.isConnected){ delete dd.dataset.armed; renderPartner(); } }, 3500);
+  };
   const rb = $('#retireBtn'); if (rb) rb.onclick = () => {
     if (rb.dataset.armed){ retire(); return; }
     rb.dataset.armed = '1'; rb.textContent = `Tap again to release ${p.name}`;
@@ -711,6 +726,19 @@ function retire(){
   G.partner = null;
   saveGame();
   renderPartner();
+}
+
+// ----- de-digivolve: step back one form to try a different branch -----
+function dedigivolve(){
+  const p = P(); if (busy || p.line.length < 2) return;
+  const stages = p.stageLine || p.line.map((_, i) => i);
+  p.line.pop(); stages.pop();
+  const id = p.line[p.line.length - 1]; const b = state.byId.get(id);
+  const from = p.name;
+  p.id = id; p.name = b.name; p.image = b.image;
+  p.stage = stages[stages.length - 1] ?? Math.max(0, p.stage - 1);
+  p.stageLine = stages; p.evo = 0; p.stageMistakes = 0; p.final = false;
+  say(`${from} de-digivolved back into ${b.name}. Raise it again to try a different path!`, 'happy');
 }
 
 // ----- overlay helpers -----
@@ -796,8 +824,8 @@ async function digivolve(){
   const all = (d.nextEvolutions || []).map(e => ({ id: evoId(e), name: e.digimon, image: e.image })).filter(e => e.id && state.byId.has(e.id));
   const seen = new Set();
   const uniq = all.filter(e => !seen.has(e.id) && seen.add(e.id));
-  let cands = uniq.filter(e => stageOf(e.id) === p.stage + 1);
-  if (!cands.length) cands = uniq.filter(e => stageOf(e.id) > p.stage);
+  let cands = uniq.filter(e => inStage(e.id, p.stage + 1));
+  if (!cands.length) cands = uniq.filter(e => higherStage(e.id, p.stage) !== undefined);
   if (!cands.length){
     p.final = true; saveGame();
     $('#overlay .sheet').innerHTML = `<h4>No further forms</h4><p>${esc(p.name)} has no recorded evolution to the next stage, so this is its final form.</p><button class="big" id="ovClose">OK</button>`;
@@ -807,14 +835,14 @@ async function digivolve(){
   const count = p.stageMistakes === 0 ? 3 : p.stageMistakes <= 2 ? 2 : 1;
   // mix in forms you haven't raised so every line gets explored
   const unraised = shuffle(cands.filter(c => !raised(c.id)));
-  const known = shuffle(cands.filter(c => raised(c.id)));
-  const options = shuffle([...unraised.slice(0, count), ...known].slice(0, count));
+  const familiar = shuffle(cands.filter(c => raised(c.id)));
+  const options = shuffle([...unraised.slice(0, count), ...familiar].slice(0, count));
   const careNote = count === 3 ? 'Great care! Choose its path.' : count === 2 ? 'Some care mistakes limited its paths.' : 'Neglect left only one path open.';
   $('#overlay .sheet').innerHTML = `<h4>${esc(p.name)} is ready!</h4>
     <p style="margin:0;color:var(--muted)">${careNote} ${cands.length} possible forms in total.</p>
     <div class="choices">${options.map(o => {
-      const r = raised(o.id);
-      return `<button class="choice" data-pick="${o.id}"><img class="${r ? '' : 'sil'}" alt="" src="${esc(o.image || state.byId.get(o.id).image)}"><b>${r ? esc(o.name) : '???'}</b>${r ? '<small>✓ raised before</small>' : ''}</button>`;
+      const r = raised(o.id), k = known(o.id);
+      return `<button class="choice" data-pick="${o.id}"><img class="${k ? '' : 'sil'}" alt="" src="${esc(o.image || state.byId.get(o.id).image)}"><b>${k ? esc(o.name) : '???'}</b>${r ? '<small>✓ raised before</small>' : k ? '<small>seen in battle</small>' : ''}</button>`;
     }).join('')}</div>`;
   $('#overlay').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => evolveTo(+b.dataset.pick));
 }
@@ -826,8 +854,9 @@ async function evolveTo(id){
   await sleep(2900);
   const firstTime = !raised(id);
   p.id = id; p.name = b.name; p.image = b.image;
-  p.stage = Math.max(p.stage + 1, Math.min(5, stageOf(id) ?? p.stage + 1));
+  p.stage = inStage(id, p.stage + 1) ? p.stage + 1 : Math.min(5, higherStage(id, p.stage) ?? p.stage + 1);
   p.evo = 0; p.stageMistakes = 0; p.line.push(id);
+  p.stageLine = [...(p.stageLine || p.line.slice(0, -1).map((_, i) => i)), p.stage];
   p.mood = clamp(p.mood + 20); p.energy = clamp(p.energy + 20); p.str += 3;
   G.col[id] = 'raised';
   saveGame();
