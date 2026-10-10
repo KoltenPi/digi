@@ -879,47 +879,84 @@ function processArt(src, res, retro){
     const im = new Image(); im.crossOrigin = 'anonymous';
     im.onerror = () => done(null);
     im.onload = () => {
-      try{
-        const mid = document.createElement('canvas'); mid.width = mid.height = retro ? res * 4 : res;
-        const mx = mid.getContext('2d'); mx.imageSmoothingQuality = 'high'; mx.drawImage(im, 0, 0, mid.width, mid.height);
-        const c = document.createElement('canvas'); c.width = c.height = res;
-        const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(mid, 0, 0, res, res);
-        const d = x.getImageData(0, 0, res, res), p = d.data, N = res * res;
-        const bg = new Uint8Array(N), q = [];
-        const light = i => p[i*4+3] < 40 || (p[i*4] > 228 && p[i*4+1] > 228 && p[i*4+2] > 228);
-        for (let i = 0; i < res; i++) for (const j of [i, (res-1)*res + i, i*res, i*res + res - 1]) if (!bg[j] && light(j)){ bg[j] = 1; q.push(j); }
-        while (q.length){ const i = q.pop(), xx = i % res; for (const j of [i-1, i+1, i-res, i+res]){ if (j < 0 || j >= N || bg[j] || Math.abs((j % res) - xx) > 1) continue; if (light(j)){ bg[j] = 1; q.push(j); } } }
-        let out = new Uint8ClampedArray(p);
-        if (retro){
-          const px = []; for (let i = 0; i < N; i++) if (!bg[i]) px.push([p[i*4], p[i*4+1], p[i*4+2]]);
-          const k = 14; let cents = [];
-          for (let i = 0; i < k; i++){ const v = px[Math.floor((i + 0.5) / k * px.length)]; cents.push(v ? [...v] : [0,0,0]); }
-          const near = v => { let b = 0, bd = 1e9; cents.forEach((cc, ci) => { const dd = (v[0]-cc[0])**2*0.3 + (v[1]-cc[1])**2*0.59 + (v[2]-cc[2])**2*0.11; if (dd < bd){ bd = dd; b = ci; } }); return b; };
-          for (let it = 0; it < 10; it++){
-            const sum = cents.map(() => [0,0,0,0]);
-            for (const v of px){ const ci = near(v); sum[ci][0] += v[0]; sum[ci][1] += v[1]; sum[ci][2] += v[2]; sum[ci][3]++; }
-            cents = cents.map((cc, ci) => sum[ci][3] ? [sum[ci][0]/sum[ci][3], sum[ci][1]/sum[ci][3], sum[ci][2]/sum[ci][3]] : cc);
-          }
-          cents = cents.map(([r, g, b]) => { const l = 0.3*r + 0.59*g + 0.11*b; return [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(l + (v - l) * 1.18)))); });
-          for (let i = 0; i < N; i++){ if (bg[i]) continue; const cc = cents[near([p[i*4], p[i*4+1], p[i*4+2]])]; out[i*4] = cc[0]; out[i*4+1] = cc[1]; out[i*4+2] = cc[2]; out[i*4+3] = 255; }
-        }
-        for (let i = 0; i < N; i++) if (bg[i]) out[i*4+3] = 0;
-        if (retro){
-          const base = new Uint8ClampedArray(out);
-          for (let i = 0; i < N; i++){
-            if (!bg[i]) continue; const xx = i % res;
-            const nb = [i-1, i+1, i-res, i+res].find(j => j >= 0 && j < N && !bg[j] && Math.abs((j % res) - xx) <= 1);
-            if (nb !== undefined){ out[i*4] = base[nb*4] * 0.3; out[i*4+1] = base[nb*4+1] * 0.3; out[i*4+2] = base[nb*4+2] * 0.35 + 12; out[i*4+3] = 255; }
-          }
-        }
-        x.putImageData(new ImageData(out, res, res), 0, 0);
-        done(c.toDataURL());
-      }catch{ done(null); }
+      try{ done(retro ? pixelSprite(im, res) : cutout(im, res)); }catch{ done(null); }
     };
     im.src = src;
   });
   imgCache.set(key, job);
   return job;
+}
+// background = near-white pixels connected to the edges (inner whites like eyes and wings stay)
+function findBackground(p, S){
+  const N = S * S, bg = new Uint8Array(N), q = [];
+  const light = i => p[i*4+3] < 40 || (p[i*4] >= 250 && p[i*4+1] >= 250 && p[i*4+2] >= 250);
+  for (let i = 0; i < S; i++) for (const j of [i, (S-1)*S + i, i*S, i*S + S - 1]) if (!bg[j] && light(j)){ bg[j] = 1; q.push(j); }
+  while (q.length){ const i = q.pop(), xx = i % S; for (const j of [i-1, i+1, i-S, i+S]){ if (j < 0 || j >= N || bg[j] || Math.abs((j % S) - xx) > 1) continue; if (light(j)){ bg[j] = 1; q.push(j); } } }
+  return bg;
+}
+function cutout(im, res){
+  const c = document.createElement('canvas'); c.width = c.height = res;
+  const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, res, res);
+  const d = x.getImageData(0, 0, res, res), bg = findBackground(d.data, res);
+  for (let i = 0; i < res * res; i++) if (bg[i]) d.data[i*4+3] = 0;
+  x.putImageData(d, 0, 0);
+  return c.toDataURL();
+}
+// pixel sprite: palette from the art, majority colour per block, line art kept, 1px outline
+function pixelSprite(im, res){
+  const S = 320, k = 12, darkLum = 45, darkMin = 5;
+  const c0 = document.createElement('canvas'); c0.width = c0.height = S;
+  const x0 = c0.getContext('2d'); x0.drawImage(im, 0, 0, S, S);
+  const p = x0.getImageData(0, 0, S, S).data, N = S * S, bg = findBackground(p, S);
+  let x1 = S, y1 = S, x2 = 0, y2 = 0;
+  for (let i = 0; i < N; i++) if (!bg[i]){ const xx = i % S, yy = (i / S) | 0; if (xx < x1) x1 = xx; if (xx > x2) x2 = xx; if (yy < y1) y1 = yy; if (yy > y2) y2 = yy; }
+  if (x2 < x1) return null;
+  const side = (Math.max(x2 - x1, y2 - y1) + 1) * res / (res - 2), ox = (x1 + x2 + 1 - side) / 2, oy = (y1 + y2 + 1 - side) / 2;
+  const lum = c => c[0]*.3 + c[1]*.59 + c[2]*.11;
+  const px = []; for (let i = 0; i < N; i += 3) if (!bg[i]) px.push([p[i*4], p[i*4+1], p[i*4+2]]);
+  px.sort((a, b) => lum(a) - lum(b));
+  let cents = []; for (let i = 0; i < k; i++) cents.push([...px[Math.floor((i + .5) / k * px.length)]]);
+  const dist = (v, c) => (v[0]-c[0])**2*.3 + (v[1]-c[1])**2*.59 + (v[2]-c[2])**2*.11;
+  const near = v => { let b = 0, bd = 1e9; for (let ci = 0; ci < cents.length; ci++){ const dd = dist(v, cents[ci]); if (dd < bd){ bd = dd; b = ci; } } return b; };
+  for (let it = 0; it < 8; it++){
+    const sum = cents.map(() => [0,0,0,0]);
+    for (const v of px){ const s = sum[near(v)]; s[0] += v[0]; s[1] += v[1]; s[2] += v[2]; s[3]++; }
+    cents = cents.map((cc, ci) => sum[ci][3] ? sum[ci].slice(0, 3).map(t => t / sum[ci][3]) : cc);
+  }
+  const R = res * res, idx = new Int16Array(R).fill(-1), step = side / res;
+  for (let by = 0; by < res; by++) for (let bx = 0; bx < res; bx++){
+    const votes = new Map(); let total = 0, fg = 0, dark = 0, darkIdx = -1, darkL = 999;
+    for (let sy = 0; sy < 3; sy++) for (let sx = 0; sx < 3; sx++){
+      const X = Math.floor(ox + (bx + (sx + .5) / 3) * step), Y = Math.floor(oy + (by + (sy + .5) / 3) * step);
+      total++; if (X < 0 || Y < 0 || X >= S || Y >= S) continue; const i = Y * S + X; if (bg[i]) continue; fg++;
+      const ci = near([p[i*4], p[i*4+1], p[i*4+2]]); votes.set(ci, (votes.get(ci) || 0) + 1);
+      const L = lum(cents[ci]); if (L < darkLum){ dark++; if (L < darkL){ darkL = L; darkIdx = ci; } }
+    }
+    if (fg < total * 0.45) continue;
+    let best = -1, bv = -1; for (const [ci, v] of votes) if (v > bv){ bv = v; best = ci; }
+    if (dark >= darkMin) best = darkIdx;
+    idx[by * res + bx] = best;
+  }
+  const id2 = Int16Array.from(idx);
+  for (let o = 0; o < R; o++){
+    if (idx[o] < 0) continue; const xx = o % res;
+    const nb = [o-1, o+1, o-res, o+res].filter(j => j >= 0 && j < R && Math.abs((j % res) - xx) <= 1).map(j => idx[j]);
+    if (nb.length === 4 && nb.every(v => v >= 0 && v !== idx[o])){
+      const cnt = {}; nb.forEach(v => cnt[v] = (cnt[v] || 0) + 1);
+      const top = +Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
+      if (cnt[top] >= 3 && lum(cents[idx[o]]) >= darkLum) id2[o] = top;
+    }
+  }
+  const out = new Uint8ClampedArray(R * 4);
+  for (let o = 0; o < R; o++){ if (id2[o] < 0) continue; const c = cents[id2[o]]; out[o*4] = c[0]; out[o*4+1] = c[1]; out[o*4+2] = c[2]; out[o*4+3] = 255; }
+  for (let o = 0; o < R; o++){
+    if (id2[o] >= 0) continue; const xx = o % res;
+    const nb = [o-1, o+1, o-res, o+res].find(j => j >= 0 && j < R && id2[j] >= 0 && Math.abs((j % res) - xx) <= 1);
+    if (nb !== undefined){ const c = cents[id2[nb]]; out[o*4] = c[0]*.2 + 16; out[o*4+1] = c[1]*.2 + 16; out[o*4+2] = c[2]*.2 + 28; out[o*4+3] = 255; }
+  }
+  const c = document.createElement('canvas'); c.width = c.height = res;
+  c.getContext('2d').putImageData(new ImageData(out, res, res), 0, 0);
+  return c.toDataURL();
 }
 async function processImg(img){
   const orig = img.dataset.orig || img.getAttribute('src');
@@ -930,7 +967,7 @@ async function processImg(img){
   if (img.dataset.mode === mode) return;
   img.dataset.orig = orig; img.dataset.mode = mode;
   const big = img.matches('#sprite, .art, .reveal img');
-  const url = await processArt(orig, retroOn ? (big ? 48 : 32) : (big ? 160 : 96), retroOn);
+  const url = await processArt(orig, retroOn ? (big ? 48 : 40) : (big ? 160 : 96), retroOn);
   if (url && img.dataset.orig === orig && img.dataset.mode === mode){ img.src = url; img.style.imageRendering = retroOn ? 'pixelated' : ''; }
 }
 const imgIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ imgIO.unobserve(e.target); processImg(e.target); } }), {rootMargin: '300px'});
