@@ -167,7 +167,7 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .dbar{display:inline-block;width:40px;height:5px;border-radius:3px;background:var(--sunk);margin-left:4px;vertical-align:middle;overflow:hidden}
 .dbar i{display:block;height:100%;background:var(--good)}
 .dbar.s i{background:var(--link)}
-#dgc{display:block;margin:0 auto;border-radius:10px;touch-action:manipulation}
+#dgc{display:block;margin:0 auto;border-radius:10px;touch-action:manipulation;max-width:100%}
 .dlog{font-size:.78rem;color:var(--muted);min-height:3.6em;line-height:1.2}
 .dctl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center}
 .dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);gap:4px}
@@ -1408,7 +1408,8 @@ function dgDraw(){
   const dk = $('#dgDisk'); if (dk){ dk.innerHTML = 'SP Disk ×' + dg.bag.disk + '<small>+60% SP</small>'; dk.disabled = !dg.bag.disk; }
 
   const cs = getComputedStyle(document.documentElement), col = n => cs.getPropertyValue(n).trim();
-  const W = Math.min(cv.parentElement.clientWidth, 520), T = Math.floor(W / DG.VW);
+  const pcs = getComputedStyle(cv.parentElement), avail = cv.parentElement.clientWidth - parseFloat(pcs.paddingLeft) - parseFloat(pcs.paddingRight);
+  const W = Math.min(avail, 520), T = Math.floor(W / DG.VW);
   const dpr = window.devicePixelRatio || 1;
   cv.style.width = T * DG.VW + 'px'; cv.style.height = T * DG.VH + 'px';
   cv.width = T * DG.VW * dpr; cv.height = T * DG.VH * dpr;
