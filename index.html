@@ -198,7 +198,8 @@ img.sil{filter:var(--silf)}
   <div class="wrap">
     <div class="top">
       <h1 class="brand">Digimon Index<small id="tagline">raise · digivolve · collect</small></h1>
-      <span class="count" id="count"></span>
+      <button id="retroBtn" class="favbtn" aria-pressed="false" title="Show Digimon as pixel sprites" style="margin-left:auto;padding:6px 10px">▦ Retro</button>
+      <span class="count" id="count" style="margin-left:0"></span>
     </div>
     <div id="indexChrome" hidden>
       <div class="search" id="searchRow">
@@ -866,6 +867,86 @@ async function evolveTo(id){
   $('#ovClose').onclick = () => { closeOv(); say(`${oldName} digivolved into ${b.name}!`, 'happy'); };
 }
 
+// ---------- image processing: cut out the white background, optional retro pixel look ----------
+// Done on this device from the official art; silhouettes need the cutout so they show a shape, not a square.
+const IMG_SEL = '.pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
+let retroOn = !!store.get('dx_retro', false);
+const imgCache = new Map();
+function processArt(src, res, retro){
+  const key = src + '|' + res + '|' + retro;
+  if (imgCache.has(key)) return imgCache.get(key);
+  const job = new Promise(done => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onerror = () => done(null);
+    im.onload = () => {
+      try{
+        const mid = document.createElement('canvas'); mid.width = mid.height = retro ? res * 4 : res;
+        const mx = mid.getContext('2d'); mx.imageSmoothingQuality = 'high'; mx.drawImage(im, 0, 0, mid.width, mid.height);
+        const c = document.createElement('canvas'); c.width = c.height = res;
+        const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(mid, 0, 0, res, res);
+        const d = x.getImageData(0, 0, res, res), p = d.data, N = res * res;
+        const bg = new Uint8Array(N), q = [];
+        const light = i => p[i*4+3] < 40 || (p[i*4] > 228 && p[i*4+1] > 228 && p[i*4+2] > 228);
+        for (let i = 0; i < res; i++) for (const j of [i, (res-1)*res + i, i*res, i*res + res - 1]) if (!bg[j] && light(j)){ bg[j] = 1; q.push(j); }
+        while (q.length){ const i = q.pop(), xx = i % res; for (const j of [i-1, i+1, i-res, i+res]){ if (j < 0 || j >= N || bg[j] || Math.abs((j % res) - xx) > 1) continue; if (light(j)){ bg[j] = 1; q.push(j); } } }
+        let out = new Uint8ClampedArray(p);
+        if (retro){
+          const px = []; for (let i = 0; i < N; i++) if (!bg[i]) px.push([p[i*4], p[i*4+1], p[i*4+2]]);
+          const k = 14; let cents = [];
+          for (let i = 0; i < k; i++){ const v = px[Math.floor((i + 0.5) / k * px.length)]; cents.push(v ? [...v] : [0,0,0]); }
+          const near = v => { let b = 0, bd = 1e9; cents.forEach((cc, ci) => { const dd = (v[0]-cc[0])**2*0.3 + (v[1]-cc[1])**2*0.59 + (v[2]-cc[2])**2*0.11; if (dd < bd){ bd = dd; b = ci; } }); return b; };
+          for (let it = 0; it < 10; it++){
+            const sum = cents.map(() => [0,0,0,0]);
+            for (const v of px){ const ci = near(v); sum[ci][0] += v[0]; sum[ci][1] += v[1]; sum[ci][2] += v[2]; sum[ci][3]++; }
+            cents = cents.map((cc, ci) => sum[ci][3] ? [sum[ci][0]/sum[ci][3], sum[ci][1]/sum[ci][3], sum[ci][2]/sum[ci][3]] : cc);
+          }
+          cents = cents.map(([r, g, b]) => { const l = 0.3*r + 0.59*g + 0.11*b; return [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(l + (v - l) * 1.18)))); });
+          for (let i = 0; i < N; i++){ if (bg[i]) continue; const cc = cents[near([p[i*4], p[i*4+1], p[i*4+2]])]; out[i*4] = cc[0]; out[i*4+1] = cc[1]; out[i*4+2] = cc[2]; out[i*4+3] = 255; }
+        }
+        for (let i = 0; i < N; i++) if (bg[i]) out[i*4+3] = 0;
+        if (retro){
+          const base = new Uint8ClampedArray(out);
+          for (let i = 0; i < N; i++){
+            if (!bg[i]) continue; const xx = i % res;
+            const nb = [i-1, i+1, i-res, i+res].find(j => j >= 0 && j < N && !bg[j] && Math.abs((j % res) - xx) <= 1);
+            if (nb !== undefined){ out[i*4] = base[nb*4] * 0.3; out[i*4+1] = base[nb*4+1] * 0.3; out[i*4+2] = base[nb*4+2] * 0.35 + 12; out[i*4+3] = 255; }
+          }
+        }
+        x.putImageData(new ImageData(out, res, res), 0, 0);
+        done(c.toDataURL());
+      }catch{ done(null); }
+    };
+    im.src = src;
+  });
+  imgCache.set(key, job);
+  return job;
+}
+async function processImg(img){
+  const orig = img.dataset.orig || img.getAttribute('src');
+  if (!orig || orig.startsWith('data:')) return;
+  const sil = img.classList.contains('sil');
+  if (!retroOn && !sil){ if (img.dataset.orig){ img.src = orig; img.style.imageRendering = ''; delete img.dataset.orig; delete img.dataset.mode; } return; }
+  const mode = retroOn ? 'retro' : 'cut';
+  if (img.dataset.mode === mode) return;
+  img.dataset.orig = orig; img.dataset.mode = mode;
+  const big = img.matches('#sprite, .art, .reveal img');
+  const url = await processArt(orig, retroOn ? (big ? 48 : 32) : (big ? 160 : 96), retroOn);
+  if (url && img.dataset.orig === orig && img.dataset.mode === mode){ img.src = url; img.style.imageRendering = retroOn ? 'pixelated' : ''; }
+}
+const imgIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ imgIO.unobserve(e.target); processImg(e.target); } }), {rootMargin: '300px'});
+function scanImgs(root = document){
+  if (root.matches?.(IMG_SEL)) imgIO.observe(root);
+  root.querySelectorAll?.(IMG_SEL).forEach(img => imgIO.observe(img));
+}
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) scanImgs(n); })
+  .observe(document.body, {childList: true, subtree: true});
+function setRetro(on){
+  retroOn = on; store.set('dx_retro', on);
+  $('#retroBtn').setAttribute('aria-pressed', on);
+  document.querySelectorAll(IMG_SEL).forEach(img => { delete img.dataset.mode; imgIO.observe(img); });
+}
+$('#retroBtn').onclick = () => setRetro(!retroOn);
+
 // ---------- events ----------
 $('#grid').addEventListener('click', e => {
   const c = e.target.closest('.card'); if (!c) return;
@@ -891,6 +972,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && !b
 setInterval(() => { if (!busy && !document.hidden && state.tab === 'partner' && P()){ tick(); renderPartner(); } }, 60000);
 
 renderRail();
+setRetro(retroOn);
 setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
 </script>
