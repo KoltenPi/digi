@@ -178,6 +178,14 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .fighter img{width:96px;height:96px;object-fit:contain}
 .fighter b{font-size:.85rem;overflow-wrap:anywhere}
 .fighter.hit img{animation:shake .3s}
+.attr{font:600 .62rem var(--mono);letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.bars{display:grid;gap:2px;width:100%}
+.bars small{font:.62rem var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.hp.spb i{background:var(--link)}
+.statrow{display:flex;gap:4px 10px;flex-wrap:wrap;font:600 .72rem var(--mono);color:var(--muted)}
+.statrow b{color:var(--fg)}
+.bact{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.bact .act small{white-space:nowrap}
 .hp{width:100%;height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
 .hp i{display:block;height:100%;width:100%;background:var(--good);transition:width .5s}
 .vs{font:700 1rem var(--display);color:var(--muted)}
@@ -621,7 +629,8 @@ function renderPartner(){
       <img class="sprite" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}"></div>
     <div class="meters">${meter('Hunger', p.hunger)}${meter('Energy', p.energy)}${meter('Mood', p.mood)}</div>
     <div class="evobox">
-      <div class="row"><span>STRENGTH <b>${p.str}</b></span><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b></span><span>MISTAKES <b>${p.stageMistakes}</b></span></div>
+      <div class="row statrow">${statChips(partnerStats(p))}</div>
+      <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b></span><span>MISTAKES <b>${p.stageMistakes}</b></span></div>
       ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
         : `<div class="row"><span>DIGIVOLUTION</span><b>${Math.min(p.evo, need)} / ${need}</b></div>
            <div class="evotrack"><i style="width:${Math.min(100, p.evo / need * 100)}%"></i></div>`}
@@ -631,7 +640,7 @@ function renderPartner(){
       <button class="act" data-act="feed">🍖 Feed<small>+hunger</small></button>
       <button class="act" data-act="play">⚽ Play<small>+mood</small></button>
       <button class="act" data-act="rest">💤 Rest<small>+energy</small></button>
-      <button class="act" data-act="train" ${p.energy < 20 ? 'disabled' : ''}>💪 Train<small>${p.energy < 20 ? 'too tired' : '+strength'}</small></button>
+      <button class="act" data-act="train" ${p.energy < 20 ? 'disabled' : ''}>💪 Train<small>${p.energy < 20 ? 'too tired' : 'raise stats'}</small></button>
       <button class="act" data-act="battle" ${p.energy < 25 ? 'disabled' : ''}>⚔️ Battle<small>${p.energy < 25 ? 'too tired' : '+evo points'}</small></button>
       <button class="act" data-act="line">🧬 Line<small>see evos</small></button>
     </div>
@@ -746,20 +755,55 @@ function dedigivolve(){
 function openOv(html){ const o = $('#overlay'); o.innerHTML = `<div class="sheet">${html}</div>`; o.hidden = false; return o; }
 function closeOv(){ $('#overlay').hidden = true; $('#overlay').innerHTML = ''; busy = false; }
 
-// ----- training: tap when the marker is in the green zone -----
+// ----- stats: HP, SP, ATK, INT, SPD -----
+// Each Digimon gets base stats from its stage plus a fixed per-species lean (some hit hard, some are casters, some are fast).
+const STAT_BASE = { hp: [36, 60, 96, 150, 225, 315], sp: [10, 14, 20, 28, 38, 50], atk: [4, 7, 12, 19, 28, 40], int: [4, 7, 12, 19, 28, 40], spd: [4, 6, 10, 15, 21, 28] };
+const STAT_KEYS = ['hp', 'sp', 'atk', 'int', 'spd'];
+const STAT_LABEL = { hp: 'HP', sp: 'SP', atk: 'ATK', int: 'INT', spd: 'SPD' };
+function seeded(id, salt){ let h = (Math.imul(id, 2654435761) ^ Math.imul(salt, 40503)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0; h ^= h >>> 13; return (h % 1000) / 1000; }
+function baseStats(id, stage){
+  const s = Math.max(0, Math.min(5, stage | 0)), lean = seeded(id, 9);
+  const f = (k, i) => 0.82 + seeded(id, i) * 0.4;
+  const atkLean = 0.8 + lean * 0.4, intLean = 1.2 - lean * 0.4;
+  return { hp: Math.round(STAT_BASE.hp[s] * f('hp', 1)), sp: Math.round(STAT_BASE.sp[s] * f('sp', 2) * (0.9 + (1 - lean) * 0.25)),
+    atk: Math.round(STAT_BASE.atk[s] * f('atk', 3) * atkLean), int: Math.round(STAT_BASE.int[s] * f('int', 4) * intLean), spd: Math.round(STAT_BASE.spd[s] * f('spd', 5)) };
+}
+function growthOf(p){
+  if (!p.growth) p.growth = { hp: 0, sp: 0, atk: Math.max(0, Math.round(((p.str || 2) - 2) / 2)), int: 0, spd: 0 };
+  return p.growth;
+}
+function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p); const o = {}; STAT_KEYS.forEach(k => o[k] = b[k] + (g[k] || 0)); return o; }
+function statChips(st){ return STAT_KEYS.map(k => `<span>${STAT_LABEL[k]} <b>${st[k]}</b></span>`).join(''); }
+
+// ----- training: pick a stat, then tap when the marker is in the green zone -----
+const TRAININGS = [
+  { key: 'atk', icon: '💪', name: 'Power', desc: 'Raises ATK' },
+  { key: 'int', icon: '🔮', name: 'Mind', desc: 'Raises INT' },
+  { key: 'spd', icon: '💨', name: 'Agility', desc: 'Raises SPD' },
+  { key: 'hp', icon: '🛡️', name: 'Stamina', desc: 'Raises HP and SP' },
+];
 function train(){
   const p = P(); busy = true;
+  openOv(`<h4>Training · ${esc(p.name)}</h4>
+    <p style="margin:0;color:var(--muted)">What should ${esc(p.name)} work on?</p>
+    <div class="actions">${TRAININGS.map(t => `<button class="act" data-train="${t.key}">${t.icon} ${t.name}<small>${t.desc}</small></button>`).join('')}</div>
+    <button class="ghost" id="trCancel">Cancel</button>`);
+  $('#trCancel').onclick = closeOv;
+  $('#overlay').querySelectorAll('[data-train]').forEach(b => b.onclick = () => trainGame(b.dataset.train));
+}
+function trainGame(kind){
+  const p = P(); const t = TRAININGS.find(x => x.key === kind);
   const zoneW = [28, 26, 23, 20, 17, 15][p.stage];
   let round = 0, hits = 0, pos = 0, dir = 1, raf = 0, zoneL = 0, waiting = false;
+  const results = [];
   const speed = () => 0.9 + round * 0.35 + p.stage * 0.12;
-  openOv(`<h4>Training · ${esc(p.name)}</h4>
+  $('#overlay .sheet').innerHTML = `<h4>${t.icon} ${t.name} training</h4>
     <p style="margin:0;color:var(--muted)">Tap <b>Hit!</b> when the marker is inside the green zone.</p>
     <div class="tmeter"><span class="zone" id="zone"></span><span class="mark" id="mark"></span></div>
     <div class="dots" id="dots">○ ○ ○</div>
-    <button class="big" id="hit">Hit!</button>`);
+    <button class="big" id="hit">Hit!</button>`;
   const placeZone = () => { zoneL = rand(5, 95 - zoneW); const z = $('#zone'); z.style.left = zoneL + '%'; z.style.width = zoneW + '%'; };
   const dots = () => { $('#dots').textContent = [0,1,2].map(i => i < round ? (results[i] ? '●' : '✕') : '○').join(' '); };
-  const results = [];
   const loop = () => { pos += dir * speed(); if (pos >= 100){ pos = 100; dir = -1; } if (pos <= 0){ pos = 0; dir = 1; } $('#mark').style.left = pos + '%'; raf = requestAnimationFrame(loop); };
   placeZone(); raf = requestAnimationFrame(loop);
   $('#hit').onclick = async () => {
@@ -768,50 +812,148 @@ function train(){
     results.push(ok); if (ok) hits++; round++; dots();
     if (round < 3){ waiting = true; cancelAnimationFrame(raf); await sleep(350); placeZone(); waiting = false; raf = requestAnimationFrame(loop); return; }
     cancelAnimationFrame(raf);
-    const gain = hits * 2 + (hits && p.mood > 60 ? 1 : 0);
-    p.str += gain; p.evo += hits; p.energy = clamp(p.energy - 20); p.hunger = clamp(p.hunger - 10);
+    const g = growthOf(p), per = 1 + Math.floor(p.stage / 2), bonus = hits && p.mood > 60 ? 1 : 0;
+    let gained;
+    if (kind === 'hp'){ const h = hits * per * 3 + bonus * 2, s = hits * per + bonus; g.hp += h; g.sp += s; gained = `+${h} HP, +${s} SP`; }
+    else { const v = hits * per + bonus; g[kind] += v; gained = `+${v} ${STAT_LABEL[kind]}`; }
+    p.evo += hits; p.energy = clamp(p.energy - 20); p.hunger = clamp(p.hunger - 10);
     if (!hits) p.mood = clamp(p.mood - 6);
+    saveGame();
     $('#hit').textContent = 'Done';
-    $('#hit').onclick = () => { closeOv(); say(hits === 3 ? `Perfect training! ${p.name} gained ${gain} strength.` : hits ? `Good effort! ${p.name} gained ${gain} strength.` : `${p.name} missed every hit and looks discouraged.`, hits ? 'happy' : null); };
+    $('#hit').onclick = () => { closeOv(); say(hits === 3 ? `Perfect training! ${p.name} gained ${gained}.` : hits ? `Good effort! ${p.name} gained ${gained}.` : `${p.name} missed every hit and looks discouraged.`, hits ? 'happy' : null); };
   };
 }
 
-// ----- battle against a wild Digimon of the same stage -----
+// ----- battle: turn-based, order by SPD, attribute triangle Vaccine > Virus > Data > Vaccine -----
+const BEATS = { Vaccine: 'Virus', Virus: 'Data', Data: 'Vaccine' };
+function attrMult(a, d){ if (BEATS[a] === d) return 1.5; if (BEATS[d] === a) return 0.75; return 1; }
+function mainAttr(d){ const a = (d?.attributes || []).map(x => x.attribute).find(x => BEATS[x]); return a || (d?.attributes?.[0]?.attribute) || 'Free'; }
+function movesFor(d, stage){
+  const sk = (d?.skills || []).map(s => (s.translation && s.translation.trim()) || s.skill).filter(Boolean);
+  const a = sk[0] || 'Data Burst', b = sk.length > 1 ? sk[sk.length - 1] : (sk[0] ? sk[0] + ' Max' : 'Digital Storm');
+  return [
+    { kind: 'atk', name: 'Attack', cost: 0 },
+    { kind: 'skill', name: a, cost: 4 + stage * 2, power: 1.55 },
+    { kind: 'skill', name: b, cost: 8 + stage * 3, power: 2.3 },
+    { kind: 'guard', name: 'Guard', cost: 0 },
+  ];
+}
+function fighter(name, image, st, attr, moves, mood){
+  const m = mood === undefined ? 1 : (mood >= 70 ? 1.05 : mood < 25 ? 0.92 : 1);
+  const s = {}; STAT_KEYS.forEach(k => s[k] = Math.max(1, Math.round(st[k] * (k === 'hp' || k === 'sp' ? 1 : m))));
+  return { name, image, st: s, hp: s.hp, sp: s.sp, attr, moves, guard: false };
+}
+function doMove(att, def, mv){
+  if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: `${att.name} guards and recovers ${g} SP.` }; }
+  att.sp -= mv.cost;
+  const evade = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012));
+  if (Math.random() < evade) return { text: `${att.name} used ${mv.name}… but ${def.name} dodged!`, miss: true };
+  const crit = Math.random() < Math.max(0.04, Math.min(0.25, 0.06 + (att.st.spd - def.st.spd) * 0.01));
+  const am = attrMult(att.attr, def.attr);
+  const base = mv.kind === 'atk' ? att.st.atk : att.st.int * mv.power;
+  const dmg = Math.max(1, Math.round(base * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1)));
+  def.hp = Math.max(0, def.hp - dmg);
+  let text = `${att.name} used ${mv.name}! ${dmg} damage.`;
+  if (crit) text += ' Critical hit!';
+  if (am > 1) text += ' Super effective!'; else if (am < 1) text += ' Not very effective…';
+  if (def.guard) text += ' (guarded)';
+  return { text, dmg };
+}
+function foeChoice(f, me){
+  const [atk, sk, sp, guard] = f.moves;
+  if (f.hp < f.st.hp * 0.3 && Math.random() < 0.25) return guard;
+  const caster = f.st.int >= f.st.atk * 0.85;
+  if (f.sp >= sp.cost && Math.random() < (caster ? 0.45 : 0.25)) return sp;
+  if (f.sp >= sk.cost && Math.random() < (caster ? 0.7 : 0.35)) return sk;
+  if (f.sp < sk.cost && Math.random() < 0.3) return guard;
+  return atk;
+}
+
 async function battle(){
   const p = P(); busy = true;
+  openOv(`<h4>Searching for a wild Digimon…</h4><div class="status">Loading battle data…</div>`);
   const pool = (state.stageIds[p.stage] || []).filter(id => id !== p.id && state.byId.has(id));
-  const foe = state.byId.get(pick(pool));
-  const foePow = FOE_BASE[p.stage] + rand(0, 10 + p.stage * 3);
-  const myPow = p.str + p.mood / 12 + p.energy / 20 + rand(0, 10 + p.stage * 3);
-  const win = myPow >= foePow;
-  G.col[foe.id] = G.col[foe.id] || 'seen';
-  openOv(`<h4>Wild battle!</h4>
-    <div class="arena">
-      <div class="fighter" id="fMe"><img alt="" src="${esc(p.image)}"><b>${esc(p.name)}</b><div class="hp"><i id="hpMe"></i></div></div>
-      <div class="vs">VS</div>
-      <div class="fighter" id="fFoe"><img alt="" src="${esc(foe.image)}"><b>${esc(foe.name)}</b><div class="hp"><i id="hpFoe"></i></div></div>
-    </div>
-    <div class="blog" id="blog">A wild ${esc(foe.name)} appeared!</div>
-    <button class="big" id="bDone" disabled>Fighting…</button>`);
-  let me = 100, them = 100;
-  const endMe = win ? rand(25, 75) : 0, endThem = win ? 0 : rand(25, 75);
-  const lines = [`${p.name} attacks!`, `${foe.name} strikes back!`, `${p.name} goes all out!`, `${foe.name} counters!`];
-  for (let t = 0; t < 4; t++){
-    await sleep(750);
-    const meTurn = t % 2 === 0;
-    if (meTurn){ them = t === 2 ? endThem : (100 + endThem) / 2; $('#hpFoe').style.width = them + '%'; $('#fFoe').classList.remove('hit'); void $('#fFoe').offsetWidth; $('#fFoe').classList.add('hit'); }
-    else { me = t === 3 ? endMe : (100 + endMe) / 2; $('#hpMe').style.width = me + '%'; $('#fMe').classList.remove('hit'); void $('#fMe').offsetWidth; $('#fMe').classList.add('hit'); }
-    $('#hpFoe').style.background = meterColor(them); $('#hpMe').style.background = meterColor(me);
-    $('#blog').textContent = lines[t];
-  }
-  await sleep(600);
-  p.energy = clamp(p.energy - 25); p.hunger = clamp(p.hunger - 10);
-  if (win){ p.wins++; p.evo += 3; p.str += 1; p.mood = clamp(p.mood + 8); }
-  else { p.losses++; p.mood = clamp(p.mood - 10); p.evo += 1; }
-  $('#blog').textContent = win ? `${p.name} won! +3 digivolution points.` : `${p.name} lost… Train more and try again.`;
-  const done = $('#bDone'); done.disabled = false; done.textContent = 'Continue';
-  done.onclick = () => { closeOv(); say(win ? `${p.name} beat ${foe.name}!` : `${p.name} lost to ${foe.name}.`, win ? 'happy' : null); };
+  const foeBase = state.byId.get(pick(pool));
+  let myD = null, foeD = null;
+  try{ [myD, foeD] = await Promise.all([getDetail(p.id), getDetail(foeBase.id)]); }catch{}
+  const mine = partnerStats(p), myBase = baseStats(p.id, p.stage), fb = baseStats(foeBase.id, p.stage);
+  const foeSt = {}; STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round(fb[k] * rand(0.92, 1.1) + 0.55 * (mine[k] - myBase[k]))));
+  const me = fighter(p.name, p.image, mine, mainAttr(myD), movesFor(myD, p.stage), p.mood);
+  const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), movesFor(foeD, p.stage));
+  G.col[foeBase.id] = G.col[foeBase.id] || 'seen';
   saveGame();
+
+  const side = (f, id) => `<div class="fighter" id="${id}"><img alt="" src="${esc(f.image)}"><b>${esc(f.name)}</b>
+      <span class="attr">${esc(f.attr)}</span>
+      <div class="bars"><div class="hp"><i></i></div><small class="hpt"></small><div class="hp spb"><i></i></div><small class="spt"></small></div></div>`;
+  $('#overlay .sheet').innerHTML = `<h4>Wild battle!</h4>
+    <div class="arena">${side(me, 'fMe')}<div class="vs">VS</div>${side(foe, 'fFoe')}</div>
+    <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
+    <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
+    <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${m.kind === 'atk' ? 'ATK damage' : m.kind === 'guard' ? 'Halve damage, +SP' : `${m.cost} SP · INT damage`}</small></button>`).join('')}
+      <button class="act" data-mv="run">Run<small>Escape (SPD)</small></button></div>`;
+  const draw = () => {
+    for (const [f, id] of [[me, '#fMe'], [foe, '#fFoe']]){
+      const el = $(id); if (!el) continue;
+      const hp = f.hp / f.st.hp * 100, sp = f.sp / f.st.sp * 100;
+      el.querySelector('.hp:not(.spb) i').style.width = hp + '%'; el.querySelector('.hp:not(.spb) i').style.background = meterColor(hp);
+      el.querySelector('.spb i').style.width = sp + '%';
+      el.querySelector('.hpt').textContent = `HP ${f.hp}/${f.st.hp}`; el.querySelector('.spt').textContent = `SP ${f.sp}/${f.st.sp}`;
+    }
+  };
+  const log = t => { const b = $('#blog'); if (b) b.textContent = t; };
+  const hitFx = id => { const el = $(id); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); };
+  const setButtons = on => $('#overlay').querySelectorAll('[data-mv]').forEach(b => {
+    const m = me.moves[+b.dataset.mv]; b.disabled = !on || (m && m.cost > me.sp);
+  });
+  const playerMove = () => new Promise(res => { setButtons(true); $('#overlay').querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { setButtons(false); res(b.dataset.mv); }); });
+  draw(); setButtons(false);
+  await sleep(900);
+
+  let outcome = null;
+  for (let turn = 1; turn <= 40 && !outcome; turn++){
+    const order = me.st.spd > foe.st.spd || (me.st.spd === foe.st.spd && Math.random() < 0.5) ? [me, foe] : [foe, me];
+    for (const actor of order){
+      if (outcome) break;
+      actor.guard = false;
+      if (actor === me){
+        log(`Your move. What should ${me.name} do?`);
+        const choice = await playerMove();
+        if (choice === 'run'){
+          if (Math.random() < Math.max(0.2, Math.min(0.95, 0.55 + (me.st.spd - foe.st.spd) * 0.04))){ outcome = 'ran'; log(`${me.name} got away safely.`); break; }
+          log(`${me.name} couldn't get away!`); await sleep(800); continue;
+        }
+        const r = doMove(me, foe, me.moves[+choice]);
+        if (r.dmg) hitFx('#fFoe');
+        log(r.text);
+      } else {
+        await sleep(350);
+        const r = doMove(foe, me, foeChoice(foe, me));
+        if (r.dmg) hitFx('#fMe');
+        log(r.text);
+      }
+      draw();
+      await sleep(1000);
+      if (foe.hp <= 0) outcome = 'win'; else if (me.hp <= 0) outcome = 'lose';
+    }
+    // a little SP comes back every round
+    if (!outcome) for (const f of [me, foe]) f.sp = Math.min(f.st.sp, f.sp + 1);
+  }
+  if (!outcome) outcome = me.hp / me.st.hp >= foe.hp / foe.st.hp ? 'win' : 'lose';
+
+  p.energy = clamp(p.energy - 25); p.hunger = clamp(p.hunger - 10);
+  let summary;
+  if (outcome === 'win'){
+    const g = growthOf(p), k = pick(['atk', 'int', 'spd', 'hp']), v = k === 'hp' ? 3 + p.stage : 1 + Math.floor(p.stage / 2);
+    g[k] += v; if (k === 'hp') g.sp += 1;
+    p.wins++; p.evo += 3; p.mood = clamp(p.mood + 8);
+    summary = `${p.name} won! +3 digivolution points, +${v} ${STAT_LABEL[k]}.`;
+  } else if (outcome === 'lose'){ p.losses++; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.`; }
+  else summary = `${p.name} escaped from ${foe.name}.`;
+  saveGame();
+  $('#bact').innerHTML = `<button class="big" id="bDone">Continue</button>`;
+  log(summary);
+  $('#bDone').onclick = () => { closeOv(); say(outcome === 'win' ? `${p.name} beat ${foe.name}!` : outcome === 'lose' ? `${p.name} lost to ${foe.name}.` : `${p.name} ran from ${foe.name}.`, outcome === 'win' ? 'happy' : null); };
 }
 
 // ----- digivolution along the real evo lines -----
