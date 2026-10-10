@@ -160,6 +160,22 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 @keyframes wobble{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-6deg)}90%{transform:rotate(6deg)}95%{transform:rotate(-3deg)}}
 @keyframes shake{25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
 .center{text-align:center}
+.mvlist{display:grid;gap:6px}
+.mvrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px}
+.mvrow.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.mvrow.locked{opacity:.6}
+.mvt{display:grid;min-width:0}
+.mvt small{color:var(--muted);font-size:.75rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mvk{font:700 .58rem var(--mono);letter-spacing:.05em;padding:3px 6px;border-radius:6px;background:var(--sunk);color:var(--muted);min-width:42px;text-align:center}
+.mvk.phys{color:var(--bad)}
+.mvk.mag{color:var(--link)}
+.mvk.heal{color:var(--good)}
+.mvk.buff{color:var(--warn)}
+.mvk.drain{color:var(--accent)}
+.mvc{font-weight:700;color:var(--accent)}
+.linkbtn{border:0;background:none;color:var(--link);font-weight:700;padding:2px 0;justify-self:start;text-align:left}
+.xptrack{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden}
+.xptrack i{display:block;height:100%;background:var(--link);transition:width .4s}
 .act.wide{width:100%;flex-direction:row;justify-content:center;gap:8px;flex-wrap:wrap}
 .dsheet{gap:8px}
 .dhead{display:flex;flex-wrap:wrap;gap:4px 10px;font:600 .66rem var(--mono);color:var(--muted);align-items:center}
@@ -610,6 +626,7 @@ function newPartner(id){
   G.party.push({ id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
     evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], stageLine: [0], final: false });
   G.active = G.party.length - 1;
+  initMoves(G.party[G.active]); syncMoves(G.party[G.active]);
   G.col[id] = 'raised';
   saveGame();
 }
@@ -660,6 +677,7 @@ function renderPartner(){
   if (!state.ready){ if (!v.querySelector('.status')) v.innerHTML = '<div class="status">Loading…</div>'; return; }
   const p = P();
   if (!p) return renderEgg();
+  initMoves(p);
   const partyHtml = partyBar() + walletRow();
   const need = EVO_NEED[p.stage];
   const atTop = p.stage >= 5 || p.final;
@@ -667,13 +685,15 @@ function renderPartner(){
     .map(b => `<img alt="${esc(b.name)}" title="${esc(b.name)}" src="${esc(b.image)}">`).join('<span>→</span>');
   v.innerHTML = `
     ${partyHtml}
-    <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">${LEVEL_EN[STAGES[p.stage]]}</span>
+    <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">Lv ${p.level}</span><span class="stage">${LEVEL_EN[STAGES[p.stage]]}</span>
       <span class="stage">${ageText(p)}</span></div>
     <div class="habitat"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
       <img class="sprite" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}"></div>
     <div class="meters">${meter('Hunger', p.hunger)}${meter('Energy', p.energy)}${meter('Mood', p.mood)}</div>
     <div class="evobox">
       <div class="row statrow">${statChips(partnerStats(p))}</div>
+      <div class="row"><span>LEVEL <b>${p.level}</b></span><span>XP <b>${p.xp} / ${XP_NEED(p.level)}</b></span></div>
+      <div class="xptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div>
       <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b></span><span>MISTAKES <b>${p.stageMistakes}</b></span></div>
       ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
         : `<div class="row"><span>DIGIVOLUTION</span><b>${Math.min(p.evo, need)} / ${need}</b></div>
@@ -686,10 +706,11 @@ function renderPartner(){
       <button class="act" data-act="rest">💤 Rest<small>+energy</small></button>
       <button class="act" data-act="train" ${p.energy < 20 ? 'disabled' : ''}>💪 Train<small>${p.energy < 20 ? 'too tired' : 'raise stats'}</small></button>
       <button class="act" data-act="battle" ${p.energy < 25 ? 'disabled' : ''}>⚔️ Battle<small>${p.energy < 25 ? 'too tired' : '+evo points'}</small></button>
-      <button class="act" data-act="line">🧬 Line<small>see evos</small></button>
+      <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
     </div>
     <button class="act wide" data-act="dungeon" ${p.energy < 30 ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${p.energy < 30 ? 'too tired (needs 30 energy)' : '5 floors · items · DigiData'}</small></button>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
+    <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
     <button class="${atTop ? 'big' : 'ghost danger'}" id="retireBtn">${atTop ? 'Retire' : 'Release'} ${esc(p.name)} · +${releaseValue(p)} DigiData</button>
   `;
@@ -745,6 +766,7 @@ $('#partnerView').addEventListener('click', e => {
   if (k === 'train') return train();
   if (k === 'battle') return battle();
   if (k === 'dungeon') return dungeon();
+  if (k === 'moves') return movesScreen();
   if (k === 'line') return openDetail(p.id, false);
 });
 
@@ -960,7 +982,8 @@ function trainGame(kind){
     if (!hits) p.mood = clamp(p.mood - 6);
     saveGame();
     $('#hit').textContent = 'Done';
-    $('#hit').onclick = () => { closeOv(); say(hits === 3 ? `Perfect training! ${p.name} gained ${gained}.` : hits ? `Good effort! ${p.name} gained ${gained}.` : `${p.name} missed every hit and looks discouraged.`, hits ? 'happy' : null); };
+    const lvr = await gainXP(p, hits * 3 + 1);
+    $('#hit').onclick = () => { closeOv(); say((hits === 3 ? `Perfect training! ${p.name} gained ${gained}.` : hits ? `Good effort! ${p.name} gained ${gained}.` : `${p.name} missed every hit and looks discouraged.`) + levelText(lvr), hits ? 'happy' : null); };
   };
 }
 
@@ -978,35 +1001,172 @@ function movesFor(d, stage){
     { kind: 'guard', name: 'Guard', cost: 0 },
   ];
 }
+// ----- moves: each species gets its own moves from its real skills; partners learn them as they level -----
+const STAGE_MIN_LV = [1, 6, 12, 20, 30, 42];
+const XP_NEED = lv => 12 + lv * 6;
+const BASIC = { name: 'Tackle', kind: 'phys', power: 1, desc: 'A basic body attack. Costs no SP.' };
+const GUARD = { name: 'Guard', kind: 'guard', power: 0, cost: 0 };
+const KIND_LABEL = { phys: 'PHY', mag: 'MAG', heal: 'HEAL', buff: 'BUFF', drain: 'DRAIN', guard: 'GRD' };
+const GENERIC = [
+  { name: 'Data Shot', kind: 'mag', power: 1.3, desc: 'Fires a compact burst of data.' },
+  { name: 'Quick Strike', kind: 'phys', power: 1.3, desc: 'A fast physical hit.' },
+  { name: 'Patch Up', kind: 'heal', power: 0.35, desc: 'Repairs damaged data, restoring HP.' },
+  { name: 'Power Charge', kind: 'buff', power: 1.25, desc: 'Boosts all damage for the rest of the battle.' },
+  { name: 'Byte Drain', kind: 'drain', power: 1.2, desc: 'Steals data from the foe to restore HP.' },
+  { name: 'Heavy Slam', kind: 'phys', power: 1.9, desc: 'A crushing full-body slam.' },
+  { name: 'Pulse Wave', kind: 'mag', power: 1.9, desc: 'A wave of digital energy.' },
+];
+function moveKind(name, desc){
+  const t = (name + ' ' + (desc || '')).toLowerCase();
+  if (/(heals|healing|heal |recover|restores|cures|revive)/.test(t)) return 'heal';
+  if (/(drain|absorb|steals|leech)/.test(t)) return 'drain';
+  if (/(powers? up|boosts|strengthen|increases|raises|barrier|shield)/.test(t)) return 'buff';
+  if (/(punch|kick|claw|bite|tackle|slash|strike|horn|charge|fist|blade|sword|tail|ram|crush|smash|fang|head|lance|spear|axe|knuckle|chop|slam|stomp|body|cut|scratch|spin|drill|hammer|whip|jab|uppercut|talon)/.test(t)) return 'phys';
+  return 'mag';
+}
+const learnCache = new Map();
+function learnset(id, d, stage){
+  const key = id + '|' + stage + '|' + (d ? 1 : 0);
+  if (learnCache.has(key)) return learnCache.get(key);
+  const base = STAGE_MIN_LV[stage] || 1, offs = [0, 2, 4, 7, 10, 14];
+  const list = (d?.skills || []).filter(s => s.skill).slice(0, 6).map((s, i) => {
+    const name = (s.translation && s.translation.trim()) || s.skill;
+    const kind = moveKind(name, s.description);
+    const power = kind === 'heal' ? 0.3 + i * 0.03 : kind === 'buff' ? 1.25 : Math.min(2.8, 1.35 + i * 0.3 + stage * 0.05);
+    return { name, kind, power: Math.round(power * 100) / 100, learn: base + offs[i], desc: s.description || '' };
+  });
+  // species with few listed skills get a couple of generic moves picked for them
+  for (let i = 0; list.length < 3 && i < 4; i++){
+    const g = GENERIC[Math.floor(Math.abs(seeded(id, 20 + i + stage)) * GENERIC.length) % GENERIC.length];
+    if (!list.some(m => m.name === g.name)) list.push(Object.assign({}, g, { learn: base + 3 + i * 4 }));
+  }
+  list.sort((a, b) => a.learn - b.learn);
+  if (d) learnCache.set(key, list);
+  return list;
+}
+function moveCost(m, stage){
+  if (m.kind === 'guard' || (m.kind === 'phys' && m.power <= 1)) return 0;
+  const f = m.kind === 'heal' ? 2.2 : m.kind === 'buff' ? 1.6 : m.power;
+  return Math.max(2, Math.round(f * (3 + stage * 1.6)));
+}
+function toBattle(m, stage){ return { name: m.name, kind: m.kind, power: m.power, cost: moveCost(m, stage), desc: m.desc }; }
+function moveLabel(m){
+  const c = m.cost ? m.cost + ' SP · ' : 'free · ';
+  if (m.kind === 'phys') return c + 'ATK ×' + m.power;
+  if (m.kind === 'mag') return c + 'INT ×' + m.power;
+  if (m.kind === 'drain') return c + 'INT ×' + m.power + ', heals';
+  if (m.kind === 'heal') return c + 'heals ' + Math.round(m.power * 100) + '% HP';
+  if (m.kind === 'buff') return c + '+' + Math.round((m.power - 1) * 100) + '% damage';
+  return 'halve damage, +SP';
+}
+function initMoves(p){
+  if (!p.level){ p.level = STAGE_MIN_LV[p.stage] || 1; p.xp = 0; }
+  if (!Array.isArray(p.moves)){ p.moves = [Object.assign({}, BASIC)]; p.equip = [BASIC.name]; }
+  if (!Array.isArray(p.equip)) p.equip = [BASIC.name];
+}
+function partnerMoves(p){
+  initMoves(p);
+  const eq = p.equip.map(n => p.moves.find(m => m.name === n)).filter(Boolean);
+  if (!eq.length) eq.push(BASIC);
+  // the free move always comes first so walking into enemies uses it
+  eq.sort((a, b) => moveCost(a, p.stage) - moveCost(b, p.stage));
+  return eq.map(m => toBattle(m, p.stage)).concat([GUARD]);
+}
+async function syncMoves(p){
+  initMoves(p);
+  let d = null; try{ d = await getDetail(p.id); }catch{ return []; }
+  const learned = [];
+  for (const m of learnset(p.id, d, p.stage)){
+    if (m.learn > p.level || p.moves.some(k => k.name === m.name)) continue;
+    p.moves.push({ name: m.name, kind: m.kind, power: m.power, desc: m.desc });
+    if (p.equip.length < 4) p.equip.push(m.name);
+    learned.push(m.name);
+  }
+  if (learned.length) saveGame();
+  return learned;
+}
+async function gainXP(p, amount){
+  initMoves(p);
+  p.xp += Math.max(0, Math.round(amount)); const ups = [];
+  while (p.xp >= XP_NEED(p.level) && p.level < 99){
+    p.xp -= XP_NEED(p.level); p.level++;
+    const g = growthOf(p); g[pick(['atk', 'int', 'spd'])] += 1; g.hp += 2;
+    ups.push(p.level);
+  }
+  saveGame();
+  const learned = ups.length ? await syncMoves(p) : [];
+  return { ups, learned };
+}
+function levelText(r){
+  if (!r || !r.ups.length) return '';
+  return ' Level up! Now Lv ' + r.ups[r.ups.length - 1] + '.' + (r.learned.length ? ' Learned ' + r.learned.join(', ') + '!' : '');
+}
+function foeMoves(id, d, stage){
+  const lv = (STAGE_MIN_LV[stage] || 1) + Math.floor(Math.random() * 8);
+  const known = learnset(id, d, stage).filter(m => m.learn <= lv).sort((a, b) => b.power - a.power).slice(0, 3);
+  return [toBattle(BASIC, stage)].concat(known.map(m => toBattle(m, stage))).concat([GUARD]);
+}
+async function movesScreen(){
+  const p = P(); busy = true; initMoves(p);
+  openOv('<h4>Moves · ' + esc(p.name) + '</h4><div class="status">Loading moves…</div>');
+  await syncMoves(p);
+  let d = null; try{ d = await getDetail(p.id); }catch{}
+  const draw = () => {
+    const eq = new Set(p.equip);
+    const row = m => { const b = toBattle(m, p.stage), on = eq.has(m.name);
+      return '<button class="mvrow' + (on ? ' on' : '') + '" data-eq="' + esc(m.name) + '"><span class="mvk ' + m.kind + '">' + KIND_LABEL[m.kind] + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>' + esc(moveLabel(b)) + (m.desc ? ' · ' + esc(m.desc) : '') + '</small></span><span class="mvc">' + (on ? '✓' : '') + '</span></button>'; };
+    const next = d ? learnset(p.id, d, p.stage).filter(m => m.learn > p.level && !p.moves.some(k => k.name === m.name)) : [];
+    $('#overlay .sheet').innerHTML = '<h4>Moves · ' + esc(p.name) + ' <span class="stage">Lv ' + p.level + '</span></h4>' +
+      '<p style="margin:0;color:var(--muted);font-size:.85rem">Tap a move to equip or unequip it. Up to 4 equipped moves are used in battles and dungeons, and Guard is always available. Moves stay learned when your Digimon digivolves.</p>' +
+      '<div class="mvlist">' + p.moves.map(row).join('') + '</div>' +
+      (next.length ? '<h3 style="margin:6px 0 0">Coming up</h3><div class="mvlist">' + next.map(m => '<div class="mvrow locked"><span class="mvk ' + m.kind + '">' + KIND_LABEL[m.kind] + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>Learns at Lv ' + m.learn + '</small></span><span></span></div>').join('') + '</div>' : '') +
+      '<p id="mvMsg" style="margin:0;min-height:1.2em;font-size:.85rem;color:var(--bad)"></p><button class="big" id="mvDone">Done</button>';
+    $('#overlay').querySelectorAll('[data-eq]').forEach(b => b.onclick = () => {
+      const n = b.dataset.eq;
+      if (p.equip.includes(n)){ if (p.equip.length === 1){ $('#mvMsg').textContent = 'Keep at least one move equipped.'; return; } p.equip = p.equip.filter(x => x !== n); }
+      else { if (p.equip.length >= 4){ $('#mvMsg').textContent = 'You can equip 4 moves. Unequip one first.'; return; } p.equip.push(n); }
+      saveGame(); draw();
+    });
+    $('#mvDone').onclick = () => { closeOv(); renderPartner(); };
+  };
+  draw();
+}
+
 function fighter(name, image, st, attr, moves, mood){
   const m = mood === undefined ? 1 : (mood >= 70 ? 1.05 : mood < 25 ? 0.92 : 1);
   const s = {}; STAT_KEYS.forEach(k => s[k] = Math.max(1, Math.round(st[k] * (k === 'hp' || k === 'sp' ? 1 : m))));
   return { name, image, st: s, hp: s.hp, sp: s.sp, attr, moves, guard: false };
 }
 function doMove(att, def, mv){
+  if (mv.kind === 'heal'){ att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h); return { text: att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.' }; }
+  if (mv.kind === 'buff'){ att.sp -= mv.cost || 0; att.buff = Math.min(1.9, (att.buff || 1) * mv.power); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' }; }
   if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: `${att.name} guards and recovers ${g} SP.` }; }
-  att.sp -= mv.cost;
+  att.sp -= mv.cost || 0;
   const evade = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012));
   if (Math.random() < evade) return { text: `${att.name} used ${mv.name}… but ${def.name} dodged!`, miss: true };
   const crit = Math.random() < Math.max(0.04, Math.min(0.25, 0.06 + (att.st.spd - def.st.spd) * 0.01));
   const am = attrMult(att.attr, def.attr);
-  const base = mv.kind === 'atk' ? att.st.atk : att.st.int * mv.power;
+  const base = (mv.kind === 'phys' || mv.kind === 'atk' ? att.st.atk : att.st.int) * (mv.power || 1) * (att.buff || 1);
   const dmg = Math.max(1, Math.round(base * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1)));
   def.hp = Math.max(0, def.hp - dmg);
   let text = `${att.name} used ${mv.name}! ${dmg} damage.`;
+  if (mv.kind === 'drain'){ const h = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + h); text += ' Drained ' + h + ' HP.'; }
   if (crit) text += ' Critical hit!';
   if (am > 1) text += ' Super effective!'; else if (am < 1) text += ' Not very effective…';
   if (def.guard) text += ' (guarded)';
   return { text, dmg };
 }
 function foeChoice(f, me){
-  const [atk, sk, sp, guard] = f.moves;
-  if (f.hp < f.st.hp * 0.3 && Math.random() < 0.25) return guard;
-  const caster = f.st.int >= f.st.atk * 0.85;
-  if (f.sp >= sp.cost && Math.random() < (caster ? 0.45 : 0.25)) return sp;
-  if (f.sp >= sk.cost && Math.random() < (caster ? 0.7 : 0.35)) return sk;
-  if (f.sp < sk.cost && Math.random() < 0.3) return guard;
-  return atk;
+  const usable = f.moves.filter(m => m.kind !== 'guard' && (m.cost || 0) <= f.sp);
+  const guard = f.moves.find(m => m.kind === 'guard') || GUARD;
+  const heal = usable.find(m => m.kind === 'heal');
+  if (heal && f.hp < f.st.hp * 0.35 && Math.random() < 0.6) return heal;
+  const buff = usable.find(m => m.kind === 'buff');
+  if (buff && (f.buff || 1) < 1.3 && f.hp > f.st.hp * 0.6 && Math.random() < 0.3) return buff;
+  const dmg = usable.filter(m => m.kind === 'phys' || m.kind === 'mag' || m.kind === 'drain');
+  if (!dmg.length || (f.hp < f.st.hp * 0.3 && Math.random() < 0.15)) return guard;
+  const score = m => (m.kind === 'phys' ? f.st.atk : f.st.int) * m.power * (0.7 + Math.random() * 0.6);
+  return dmg.sort((a, b) => score(b) - score(a))[0];
 }
 
 async function battle(){
@@ -1016,10 +1176,11 @@ async function battle(){
   const foeBase = state.byId.get(pick(pool));
   let myD = null, foeD = null;
   try{ [myD, foeD] = await Promise.all([getDetail(p.id), getDetail(foeBase.id)]); }catch{}
+  await syncMoves(p);
   const mine = partnerStats(p), myBase = baseStats(p.id, p.stage), fb = baseStats(foeBase.id, p.stage);
   const foeSt = {}; STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round(fb[k] * rand(0.92, 1.1) + 0.55 * (mine[k] - myBase[k]))));
-  const me = fighter(p.name, p.image, mine, mainAttr(myD), movesFor(myD, p.stage), p.mood);
-  const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), movesFor(foeD, p.stage));
+  const me = fighter(p.name, p.image, mine, mainAttr(myD), partnerMoves(p), p.mood);
+  const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), foeMoves(foeBase.id, foeD, p.stage));
   G.col[foeBase.id] = G.col[foeBase.id] || 'seen';
   saveGame();
 
@@ -1030,7 +1191,7 @@ async function battle(){
     <div class="arena">${side(me, 'fMe')}<div class="vs">VS</div>${side(foe, 'fFoe')}</div>
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
     <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
-    <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${m.kind === 'atk' ? 'ATK damage' : m.kind === 'guard' ? 'Halve damage, +SP' : `${m.cost} SP · INT damage`}</small></button>`).join('')}
+    <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}</small></button>`).join('')}
       <button class="act" data-mv="run">Run<small>Escape (SPD)</small></button></div>`;
   const draw = () => {
     for (const [f, id] of [[me, '#fMe'], [foe, '#fFoe']]){
@@ -1091,6 +1252,8 @@ async function battle(){
   } else if (outcome === 'lose'){ p.losses++; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.`; }
   else summary = `${p.name} escaped from ${foe.name}.`;
   saveGame();
+  const xp = outcome === 'win' ? 10 + p.stage * 6 : outcome === 'lose' ? 3 + p.stage * 2 : 0;
+  if (xp){ const lv = await gainXP(p, xp); summary += ' +' + xp + ' XP.' + levelText(lv); }
   $('#bact').innerHTML = `<button class="big" id="bDone">Continue</button>`;
   log(summary);
   $('#bDone').onclick = () => { closeOv(); say(outcome === 'win' ? `${p.name} beat ${foe.name}!` : outcome === 'lose' ? `${p.name} lost to ${foe.name}.` : `${p.name} ran from ${foe.name}.`, outcome === 'win' ? 'happy' : null); };
@@ -1182,11 +1345,14 @@ async function dungeon(){
   const ally = G.party.length > 1 ? G.party[(G.active + 1) % G.party.length] : null;
   let myD = null, allyD = null;
   try{ [myD, allyD] = await Promise.all([getDetail(p.id), ally ? getDetail(ally.id) : null]); }catch{}
+  await syncMoves(p); if (ally) await syncMoves(ally);
   const st = partnerStats(p);
   dg = { stage: p.stage, floor: 0, data: 0, kos: 0, turn: 0, steps: 0, bag: { meat: 1, disk: 1 }, eggs: 0, over: false,
-    me: dgUnit(p.id, p.name, st, mainAttr(myD), movesFor(myD, p.stage), 1), ally: null, log: [] };
+    me: dgUnit(p.id, p.name, st, mainAttr(myD), partnerMoves(p), 1), ally: null, log: [], sel: 0 };
+  const firstSkill = dg.me.moves.findIndex(mv => mv.cost > 0 && mv.kind !== 'guard');
+  dg.sel = firstSkill >= 0 ? firstSkill : 0;
   dg.me.face = DIRS.down;
-  if (ally){ const ast = partnerStats(ally); dg.ally = dgUnit(ally.id, ally.name, ast, mainAttr(allyD), movesFor(allyD, ally.stage), 1); }
+  if (ally){ const ast = partnerStats(ally); dg.ally = dgUnit(ally.id, ally.name, ast, mainAttr(allyD), partnerMoves(ally), 1); }
   p.energy = clamp(p.energy - 30); saveGame();
   dgNextFloor();
   dgUI();
@@ -1223,10 +1389,10 @@ function dgSpawn(avoidRoom){
   const base = baseStats(id, dg.stage), mine = partnerStats(P()), myBase = baseStats(P().id, P().stage);
   const scale = 1 + 0.07 * (dg.floor - 1), st = {};
   STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round((base[k] + 0.4 * (mine[k] - myBase[k])) * scale)));
-  const e = dgUnit(id, b.name, st, 'Free', movesFor(null, dg.stage), 0.45);
+  const e = dgUnit(id, b.name, st, 'Free', foeMoves(id, null, dg.stage), 0.45);
   e.x = s.x; e.y = s.y; e.awake = false;
   dg.enemies.push(e);
-  getDetail(id).then(d => { e.attr = mainAttr(d); e.moves = movesFor(d, dg.stage); }).catch(() => {});
+  getDetail(id).then(d => { e.attr = mainAttr(d); e.moves = foeMoves(id, d, dg.stage); }).catch(() => {});
 }
 
 function dgVisible(x, y){
@@ -1243,17 +1409,10 @@ function dgReveal(){
 
 function dgLog(t){ dg.log.push(t); if (dg.log.length > 3) dg.log.shift(); const el = $('#dlog'); if (el) el.innerHTML = dg.log.map(esc).join('<br>'); }
 
-function dgHit(att, def, kind){
-  const evade = Math.max(0.03, Math.min(0.25, 0.05 + (def.st.spd - att.st.spd) * 0.012));
-  if (Math.random() < evade){ dgLog(def.name + ' dodged ' + att.name + '\'s attack!'); return; }
-  const crit = Math.random() < Math.max(0.04, Math.min(0.25, 0.06 + (att.st.spd - def.st.spd) * 0.01));
-  const am = attrMult(att.attr, def.attr);
-  const base = kind === 'skill' ? att.st.int * 1.55 : att.st.atk;
-  const dmg = Math.max(1, Math.round(base * rand(0.85, 1.15) * am * (crit ? 1.6 : 1)));
-  def.hp = Math.max(0, def.hp - dmg);
-  dgLog(att.name + (kind === 'skill' ? ' used ' + att.moves[1].name : ' attacked') + '! ' + dmg + ' damage to ' + def.name + '.' + (crit ? ' Critical!' : '') + (am > 1 ? ' Super effective!' : am < 1 ? ' Not very effective.' : ''));
-  def.flash = 3;
-  if (def.hp <= 0) dgDown(def, att);
+function dgHit(att, def, mv){
+  const r = doMove(att, def, mv);
+  dgLog(r.text);
+  if (r.dmg){ def.flash = 3; if (def.hp <= 0) dgDown(def, att); }
 }
 function dgDown(u, by){
   if (u === dg.me){ dgLog(dg.me.name + ' fainted…'); dgEnd('faint'); return; }
@@ -1268,10 +1427,11 @@ function dgDown(u, by){
 function dgAct(action, dir){
   if (!dg || dg.over || dg.busy) return;
   const m = dg.me;
+  m.guard = false;
   if (action === 'move'){
     m.face = dir;
     const nx = m.x + dir[0], ny = m.y + dir[1], occ = dgUnitAt(nx, ny);
-    if (occ && occ !== dg.ally) dgHit(m, occ, 'atk');
+    if (occ && occ !== dg.ally) dgHit(m, occ, m.moves[0]);
     else if (!dgFloor(nx, ny)) { dgDraw(); return; }
     else {
       if (occ === dg.ally){ dg.ally.x = m.x; dg.ally.y = m.y; }
@@ -1280,16 +1440,18 @@ function dgAct(action, dir){
       if (it){ dg.items = dg.items.filter(i => i !== it); dgPickup(it); }
     }
   } else if (action === 'skill'){
-    const mv = m.moves[1];
-    if (m.sp < mv.cost){ dgLog('Not enough SP for ' + mv.name + '.'); return; }
-    let target = null;
-    for (let k = 1; k <= 4; k++){
-      const x = m.x + m.face[0] * k, y = m.y + m.face[1] * k;
-      if (!dgFloor(x, y)) break;
-      const u = dgUnitAt(x, y); if (u && u !== dg.ally){ target = u; break; }
+    const mv = m.moves[dg.sel] || m.moves[0];
+    if ((mv.cost || 0) > m.sp){ dgLog('Not enough SP for ' + mv.name + '.'); return; }
+    if (mv.kind === 'heal' || mv.kind === 'buff' || mv.kind === 'guard') dgHit(m, m, mv);
+    else {
+      let target = null; const range = mv.cost ? 4 : 1;
+      for (let k = 1; k <= range; k++){
+        const x = m.x + m.face[0] * k, y = m.y + m.face[1] * k;
+        if (!dgFloor(x, y)) break;
+        const u = dgUnitAt(x, y); if (u && u !== dg.ally){ target = u; break; }
+      }
+      if (target) dgHit(m, target, mv); else { m.sp -= mv.cost || 0; dgLog(m.name + ' used ' + mv.name + ', but hit nothing.'); }
     }
-    m.sp -= mv.cost;
-    if (target) dgHit(m, target, 'skill'); else dgLog(m.name + ' used ' + mv.name + ', but hit nothing.');
   } else if (action === 'meat'){
     if (!dg.bag.meat) return;
     dg.bag.meat--; const h = Math.round(m.max * 0.4); m.hp = Math.min(m.max, m.hp + h); P().hunger = clamp(P().hunger + 25);
@@ -1321,18 +1483,20 @@ function dgWorld(){
   // ally: fight next to it, otherwise stay close to the leader
   if (a && a.hp > 0){
     const foe = dg.enemies.find(e => Math.abs(e.x - a.x) + Math.abs(e.y - a.y) === 1);
-    if (foe){ const useSkill = a.sp >= a.moves[1].cost && a.st.int > a.st.atk && Math.random() < 0.5; if (useSkill) a.sp -= a.moves[1].cost; dgHit(a, foe, useSkill ? 'skill' : 'atk'); }
+    a.guard = false;
+    if (foe) dgHit(a, foe, foeChoice(a, foe));
     else if (Math.abs(a.x - m.x) + Math.abs(a.y - m.y) > 1){ const s = dgStep(a, m.x, m.y, 20); if (s){ a.x = s.x; a.y = s.y; } }
   }
   if (dg.over) return;
   for (const e of dg.enemies.slice()){
     if (dg.over) return;
     if (!dg.enemies.includes(e)) continue;
+    e.guard = false;
     const targets = [m, a].filter(u => u && u.hp > 0);
     const t = targets.sort((u, v) => (Math.abs(u.x - e.x) + Math.abs(u.y - e.y)) - (Math.abs(v.x - e.x) + Math.abs(v.y - e.y)))[0];
     const dist = Math.abs(t.x - e.x) + Math.abs(t.y - e.y);
     if (dist <= 7 || dgRoomAt(e.x, e.y) && dgRoomAt(e.x, e.y) === dgRoomAt(m.x, m.y)) e.awake = true;
-    if (dist === 1){ const c = e.moves[1].cost, useSkill = e.st.int > e.st.atk && e.sp >= c && Math.random() < 0.4; if (useSkill) e.sp -= c; dgHit(e, t, useSkill ? 'skill' : 'atk'); continue; }
+    if (dist === 1){ dgHit(e, t, foeChoice(e, t)); continue; }
     if (e.awake){ const s = dgStep(e, t.x, t.y, 14); if (s){ e.x = s.x; e.y = s.y; } }
     else if (Math.random() < 0.5){ const d = pick(Object.values(DIRS)); if (dgFloor(e.x + d[0], e.y + d[1]) && !dgUnitAt(e.x + d[0], e.y + d[1])){ e.x += d[0]; e.y += d[1]; } }
   }
@@ -1359,11 +1523,13 @@ function dgEnd(result){
     note = p.name + ' fainted on floor ' + r.floor + '. Half the DigiData and any eggs were lost.';
   } else { title = 'Left the dungeon'; note = 'You escaped from floor ' + r.floor + ' with everything you found.'; }
   G.data += data; p.evo += evo; for (let i = 0; i < eggs; i++) G.eggs.push('mystery');
+  const xp = Math.round((r.kos * (3 + 2 * r.stage) + (result === 'clear' ? 20 + 10 * r.stage : 0)) * (result === 'faint' ? 0.5 : 1));
+  if (xp) gainXP(p, xp).then(lv => { const el = $('#dgLv'); if (el) el.textContent = '+' + xp + ' XP.' + levelText(lv); });
   saveGame();
   const sheet = $('#overlay .sheet');
   if (sheet) sheet.innerHTML = '<h4>' + title + '</h4><p style="margin:0;color:var(--muted)">' + esc(note) + '</p>' +
     '<div class="wallet" style="justify-content:space-between"><span>Defeated <b>' + r.kos + '</b></span><span>DigiData <b>+' + data + '</b></span><span>Evo <b>+' + evo + '</b></span>' + (eggs ? '<span>Eggs <b>+' + eggs + '</b></span>' : '') + '</div>' +
-    '<button class="big" id="dgDone">Continue</button>';
+    '<p id="dgLv" style="margin:0;font-size:.88rem"></p><button class="big" id="dgDone">Continue</button>';
   const b = $('#dgDone'); if (b) b.onclick = () => { closeOv(); dg = null; say(result === 'clear' ? p.name + ' cleared the dungeon!' : result === 'faint' ? p.name + ' needs some rest after the dungeon.' : p.name + ' came back from the dungeon.', result === 'clear' ? 'happy' : null); };
 }
 
@@ -1376,11 +1542,12 @@ function dgUI(){
       '<span></span><button data-d="up" aria-label="Move up">▲</button><span></span>' +
       '<button data-d="left" aria-label="Move left">◀</button><button data-d="wait" aria-label="Wait a turn">•</button><button data-d="right" aria-label="Move right">▶</button>' +
       '<span></span><button data-d="down" aria-label="Move down">▼</button><span></span></div>' +
-      '<div class="dside"><button class="act" id="dgSkill"></button><button class="act" id="dgMeat"></button><button class="act" id="dgDisk"></button><button class="ghost" id="dgQuit">Leave</button></div></div>';
+      '<div class="dside"><button class="act" id="dgSkill"></button><button class="act" id="dgMeat"></button><button class="act" id="dgDisk"></button><button class="ghost" id="dgNext">⇄ Switch move</button><button class="ghost" id="dgQuit">Leave</button></div></div>';
   sheet.querySelectorAll('[data-d]').forEach(b => b.onclick = () => b.dataset.d === 'wait' ? dgAct('wait') : dgAct('move', DIRS[b.dataset.d]));
   $('#dgSkill').onclick = () => dgAct('skill');
   $('#dgMeat').onclick = () => dgAct('meat');
   $('#dgDisk').onclick = () => dgAct('disk');
+  $('#dgNext').onclick = () => { dg.sel = (dg.sel + 1) % dg.me.moves.length; dgDraw(); };
   $('#dgQuit').onclick = () => { const q = $('#dgQuit'); if (q.dataset.armed) dgEnd('quit'); else { q.dataset.armed = '1'; q.textContent = 'Tap to leave'; } };
   dgLog(dg.log.pop() || '');
   dgDraw();
@@ -1403,7 +1570,8 @@ function dgDraw(){
     '<span>SP ' + m.sp + '/' + m.st.sp + bar(m.sp, m.st.sp, 's') + '</span>' +
     (a ? '<span>' + esc(a.name) + ' ' + (a.hp > 0 ? a.hp + '/' + a.max : 'out') + '</span>' : '') +
     '<span>Belly ' + Math.round(P().hunger) + '</span><span>Data +' + dg.data + '</span>';
-  const sk = $('#dgSkill'); if (sk){ sk.innerHTML = esc(m.moves[1].name) + '<small>' + m.moves[1].cost + ' SP · range 4</small>'; sk.disabled = m.sp < m.moves[1].cost; }
+  const smv = m.moves[dg.sel] || m.moves[0];
+  const sk = $('#dgSkill'); if (sk){ sk.innerHTML = esc(smv.name) + '<small>' + esc(moveLabel(smv)) + (smv.kind === 'phys' || smv.kind === 'mag' || smv.kind === 'drain' ? ' · range ' + (smv.cost ? 4 : 1) : '') + '</small>'; sk.disabled = (smv.cost || 0) > m.sp; }
   const mt = $('#dgMeat'); if (mt){ mt.innerHTML = 'Meat ×' + dg.bag.meat + '<small>+40% HP</small>'; mt.disabled = !dg.bag.meat; }
   const dk = $('#dgDisk'); if (dk){ dk.innerHTML = 'SP Disk ×' + dg.bag.disk + '<small>+60% SP</small>'; dk.disabled = !dg.bag.disk; }
 
@@ -1511,7 +1679,8 @@ async function evolveTo(id){
   $('#overlay .sheet').innerHTML = `<div class="reveal"><img class="sprite happy" alt="" src="${esc(b.image)}">
     <h4>${esc(b.name)}!</h4><p style="margin:0;color:var(--muted)">${LEVEL_EN[STAGES[p.stage]]} level${firstTime ? ' · new to your collection!' : ''}</p></div>
     <button class="big" id="ovClose">Awesome</button>`;
-  $('#ovClose').onclick = () => { closeOv(); say(`${oldName} digivolved into ${b.name}!`, 'happy'); };
+  const newMoves = await syncMoves(p);
+  $('#ovClose').onclick = () => { closeOv(); say(`${oldName} digivolved into ${b.name}!` + (newMoves.length ? ' Learned ' + newMoves.join(', ') + '!' : ''), 'happy'); };
 }
 
 // ---------- image processing: cut out the white background, optional retro pixel look ----------
