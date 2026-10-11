@@ -109,7 +109,7 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .skill p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
 
 /* tabs */
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:1fr 1fr;background:var(--panel);
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel);
   border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tabs button{border:0;background:none;padding:12px 0 10px;font:700 .8rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .tabs button[aria-selected="true"]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
@@ -289,11 +289,13 @@ img.sil{filter:var(--silf)}
     <div class="grid" id="grid"></div>
   </section>
   <section id="detailView" class="detail" hidden></section>
+  <section id="shopView" class="partner" hidden></section>
 </main>
 
 <nav class="tabs" role="tablist" aria-label="Sections">
   <button id="tabPartner" role="tab" aria-selected="true">Partner</button>
   <button id="tabIndex" role="tab" aria-selected="false">Index</button>
+  <button id="tabShop" role="tab" aria-selected="false">Shop</button>
 </nav>
 <div id="overlay" class="ov" hidden></div>
 
@@ -430,7 +432,8 @@ function showError(html, retry){
 }
 function updateCount(){
   const n = Object.values(G.col).filter(v => v === 'raised').length;
-  if (state.tab === 'partner') $('#count').innerHTML = `${Object.keys(G.col).length} / ${state.all.length ? state.all.length.toLocaleString() : '—'} found<br>${n} raised`;
+  if (state.tab === 'shop') $('#count').innerHTML = G.data.toLocaleString() + ' DigiData<br>' + G.eggs.length + ' egg' + (G.eggs.length === 1 ? '' : 's');
+  else if (state.tab === 'partner') $('#count').innerHTML = `${Object.keys(G.col).length} / ${state.all.length ? state.all.length.toLocaleString() : '—'} found<br>${n} raised`;
   else { const list = filtered(); $('#count').textContent = `${list.length.toLocaleString()} / ${state.all.length.toLocaleString()}`; }
 }
 
@@ -439,15 +442,20 @@ function setTab(t){
   state.tab = t; store.set('dx_tab', t);
   $('#tabPartner').setAttribute('aria-selected', t === 'partner');
   $('#tabIndex').setAttribute('aria-selected', t === 'index');
-  const isP = t === 'partner';
+  $('#tabShop').setAttribute('aria-selected', t === 'shop');
+  const isP = t === 'partner', isI = t === 'index', isS = t === 'shop';
   $('#partnerView').hidden = !isP;
-  $('#indexChrome').hidden = isP || !$('#detailView').hidden;
-  $('#listView').hidden = isP || !$('#detailView').hidden;
-  if (isP){ $('#detailView').hidden = true; if (location.hash) history.replaceState(null, '', location.pathname + location.search); tick(); renderPartner(); }
+  $('#shopView').hidden = !isS;
+  if (!isI){ $('#detailView').hidden = true; if (location.hash) history.replaceState(null, '', location.pathname + location.search); }
+  $('#indexChrome').hidden = !isI || !$('#detailView').hidden;
+  $('#listView').hidden = !isI || !$('#detailView').hidden;
+  if (isP){ tick(); renderPartner(); }
+  else if (isS) renderShop();
   else renderGrid();
   updateCount();
   window.scrollTo(0, 0);
 }
+$('#tabShop').onclick = () => setTab('shop');
 $('#tabPartner').onclick = () => setTab('partner');
 $('#tabIndex').onclick = () => { if (!$('#detailView').hidden) goList(); setTab('index'); };
 
@@ -513,7 +521,7 @@ function idFromUrl(u){ const m = String(u||'').match(/\/(\d+)\/?$/); return m ? 
 
 async function openDetail(id, fromEvo){
   id = +id;
-  if (state.tab !== 'index'){ state.tab = 'index'; store.set('dx_tab', 'index'); $('#tabPartner').setAttribute('aria-selected', false); $('#tabIndex').setAttribute('aria-selected', true); $('#partnerView').hidden = true; }
+  if (state.tab !== 'index'){ state.tab = 'index'; store.set('dx_tab', 'index'); $('#tabPartner').setAttribute('aria-selected', false); $('#tabIndex').setAttribute('aria-selected', true); $('#tabShop').setAttribute('aria-selected', false); $('#partnerView').hidden = true; $('#shopView').hidden = true; }
   const v = $('#detailView');
   $('#listView').hidden = true; $('#indexChrome').hidden = true;
   v.hidden = false;
@@ -753,7 +761,7 @@ $('#partnerView').addEventListener('click', e => {
   const slot = e.target.closest('[data-slot]');
   if (slot){ G.active = +slot.dataset.slot; saveGame(); renderPartner(); window.scrollTo(0, 0); return; }
   if (e.target.closest('[data-hatch]')) return hatchOverlay();
-  if (e.target.closest('[data-shop]')) return openShop();
+  if (e.target.closest('[data-shop]')) return setTab('shop');
   const b = e.target.closest('[data-act]'); if (!b) return;
   tick();
   const p = P(); const k = b.dataset.act;
@@ -838,7 +846,29 @@ function walletRow(){
   const eggs = G.eggs.length;
   return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
 }
-function openShop(){
+// the shop lives in its own tab; older buttons that opened it now switch tabs
+function openShop(){ setTab('shop'); }
+function renderShop(){
+  if (state.tab !== 'shop') return;
+  const v = $('#shopView'), room = G.party.length < PARTY_MAX;
+  v.innerHTML = '<div class="ptop"><h2>DigiData Shop</h2></div>' +
+    '<div class="wallet"><span>DigiData <b>' + G.data.toLocaleString() + '</b></span><span>Eggs <b>' + G.eggs.length + '</b></span><span>Party <b>' + G.party.length + ' / ' + PARTY_MAX + '</b></span></div>' +
+    '<p style="margin:0;color:var(--muted)">Earn DigiData by releasing Digimon, winning battles and clearing dungeons. Harder difficulties pay more.</p>' +
+    '<div class="shop">' + SHOP.map(it => '<div class="shopitem"><span class="egg mini ' + it.key + '" aria-hidden="true"></span>' +
+      '<div class="info"><b>' + it.name + '</b><small>' + it.desc + '</small><small>Owned: ' + G.eggs.filter(e => e === it.key).length + '</small></div>' +
+      '<button class="act" data-buy="' + it.key + '"' + (G.data < it.price ? ' disabled' : '') + '>' + it.price + '<small>DigiData</small></button></div>').join('') + '</div>' +
+    '<p id="shopMsg" style="margin:0;min-height:1.4em;font-size:.88rem"></p>' +
+    (G.eggs.length ? (room ? '<button class="big" id="shopHatch">Hatch an egg · ' + G.eggs.length + ' waiting</button>' : '<p style="margin:0;color:var(--muted)">Your party is full. Release a Digimon on the Partner tab to make room for your eggs.</p>') : '');
+  v.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
+    const it = SHOP.find(x => x.key === b.dataset.buy);
+    if (G.data < it.price) return;
+    G.data -= it.price; G.eggs.push(it.key); saveGame();
+    renderShop(); updateCount();
+    $('#shopMsg').textContent = 'Bought a ' + it.name + '! ' + (G.party.length < PARTY_MAX ? 'Hatch it below or from an empty party slot.' : 'It\'s stored until a party slot opens up.');
+  });
+  const sh = $('#shopHatch'); if (sh) sh.onclick = () => { setTab('partner'); hatchOverlay(); };
+}
+function openShopOverlay(){
   busy = true;
   const room = G.party.length < PARTY_MAX;
   openOv(`<h4>DigiData Shop</h4>
