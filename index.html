@@ -143,6 +143,7 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .evotrack{height:10px;border-radius:5px;background:var(--sunk);overflow:hidden}
 .evotrack i{display:block;height:100%;background:var(--accent);transition:width .4s}
 .actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.actions.two{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
 .act{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 6px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:2px}
 .act small{font:400 .66rem var(--mono);color:var(--muted)}
 .act:active:not(:disabled){transform:scale(.96)}
@@ -795,7 +796,7 @@ function renderPartner(){
       <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
     </div>
     <button class="act wide" data-act="dungeon" ${p.energy < 30 ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${p.energy < 30 ? 'too tired (needs 30 energy)' : 'choose a difficulty · 3–8 floors'}</small></button>
-    ${atTop ? '' : `<button class="act wide" data-act="paths">🧬 Evolution paths<small>what each next form needs</small></button>`}
+    <div class="actions two">${atTop ? '' : `<button class="act" data-act="paths">🧬 Evolution paths<small>what each form needs</small></button>`}<button class="act" data-act="bag">🎒 Bag<small>${['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].reduce((n, k) => n + (G.items[k] || 0), 0)} usable items</small></button></div>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
@@ -857,6 +858,7 @@ $('#partnerView').addEventListener('click', e => {
   if (k === 'dungeon') return pickDifficulty('dungeon');
   if (k === 'moves') return movesScreen();
   if (k === 'paths') return pathsScreen();
+  if (k === 'bag') return bagScreen();
   if (k === 'line') return openDetail(p.id, false);
 });
 
@@ -922,9 +924,9 @@ function walletRow(){
   return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
 }
 function itemTile(k){
-  const own = G.items[k] || 0, price = ITEM_PRICE[itemType(k)], kept = itemKept(k);
-  return '<div class="itile"><span class="ic" aria-hidden="true">' + itemIcon(k) + '</span><div class="nm"><b>' + esc(k === 'xab' ? 'X-Antibody' : k.split(':')[1]) + '</b><small>' + (kept ? (own ? 'Owned' : 'Not owned') : 'Owned: ' + own) + '</small></div>' +
-    (kept && own ? '<button class="act" disabled>✓</button>' : '<button class="act" data-item="' + k + '"' + (G.data < price ? ' disabled' : '') + '>Buy</button>') + '</div>';
+  const own = G.items[k] || 0, price = itemPrice(k), kept = itemKept(k);
+  return '<div class="itile"><span class="ic" aria-hidden="true">' + itemIcon(k) + '</span><div class="nm"><b>' + esc(/^(dm|crest):/.test(k) ? k.split(':')[1] : itemName(k)) + '</b><small>' + (kept ? (own ? 'Owned' : 'Not owned') : 'Owned: ' + own) + '</small></div>' +
+    (kept && own ? '<button class="act" disabled>✓</button>' : '<button class="act" data-item="' + k + '"' + (G.data < price ? ' disabled' : '') + '>' + (/^(dm|crest):/.test(k) ? 'Buy' : price) + '</button>') + '</div>';
 }
 // the shop lives in its own tab; older buttons that opened it now switch tabs
 function openShop(){ setTab('shop'); }
@@ -942,6 +944,9 @@ function renderShop(){
       '<div class="shopitem"><span class="upic" aria-hidden="true">🧭</span><div class="info"><b>Expedition team +1</b><small>Run more expeditions at once. You have ' + G.expSlots + '.</small></div>' + (G.expSlots >= 6 ? '<button class="act" disabled>Maxed</button>' : '<button class="act" data-up="exp"' + (G.data < upgradeCosts().exp ? ' disabled' : '') + '>' + upgradeCosts().exp + '<small>DigiData</small></button>') + '</div>' +
     '</div>' +
     '<p id="shopMsg" style="margin:0;min-height:1.4em;font-size:.88rem"></p>' +
+    '<h3 style="margin:4px 0 0">Care &amp; training items</h3><p class="ownline">Use them from 🎒 Bag on the Partner tab. Chips add more at higher stages.</p>' +
+    '<div class="itemgrid">' + ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].map(itemTile).join('') + '</div>' +
+    '<p class="ownline">🕊️ Clean Slate clears this stage\'s failures (care mistakes and lost battles). 💾 Chips raise one stat; 🌟 Ultimate Chip raises them all.</p>' +
     '<h3 style="margin:4px 0 0">Digimentals <small class="pricetag">' + ITEM_PRICE.dm + ' DigiData each</small></h3><p class="ownline">Unlock Armor digivolutions from Rookies. Used up when your Digimon armor-digivolves.</p>' +
     '<div class="itemgrid">' + VIRTUES.map(v => itemTile('dm:' + v)).join('') + '</div>' +
     '<h3 style="margin:4px 0 0">Crests <small class="pricetag">' + ITEM_PRICE.crest + ' DigiData each</small></h3><p class="ownline">Unlock special Ultimate and Mega forms. Kept forever once you have one.</p>' +
@@ -957,7 +962,7 @@ function renderShop(){
     $('#shopMsg').textContent = 'Bought a ' + it.name + '! ' + (G.party.length < PARTY_MAX ? 'Hatch it below or from an empty party slot.' : 'It\'s stored until a party slot opens up.');
   });
   v.querySelectorAll('[data-item]').forEach(b => b.onclick = () => {
-    const k = b.dataset.item, price = ITEM_PRICE[itemType(k)];
+    const k = b.dataset.item, price = itemPrice(k);
     if (G.data < price || (itemKept(k) && hasItem(k))) return;
     G.data -= price; giveItem(k); saveGame(); renderShop(); updateCount();
     $('#shopMsg').textContent = 'Got the ' + itemName(k) + '!';
@@ -976,15 +981,17 @@ function renderShop(){
 // ----- storage box and timed expeditions -----
 const BOX_MAX = 60;
 const EXPEDITIONS = [
-  { key: 'fields', name: 'Data Fields', mins: 30, data: 1, xp: 1, egg: 0, rare: 0, risk: 0, finds: 1, desc: 'A short trip across calm data plains. Always safe.' },
-  { key: 'ruins', name: 'Ancient Ruins', mins: 120, data: 3.2, xp: 3, egg: 0.06, rare: 0, risk: 0.12, finds: 2, relic: 0.2, desc: 'Crumbling code ruins with buried treasure.' },
-  { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, relic: 0.35, crest: 0.1, xab: 0.12, desc: 'Dangerous depths with the richest rewards.' },
+  { key: 'fields', name: 'Data Fields', mins: 30, data: 1, xp: 1, egg: 0, rare: 0, risk: 0, finds: 1, chip: 0.2, clean: 0.05, desc: 'A short trip across calm data plains. Always safe.' },
+  { key: 'ruins', name: 'Ancient Ruins', mins: 120, data: 3.2, xp: 3, egg: 0.06, rare: 0, risk: 0.12, finds: 2, relic: 0.2, chip: 0.4, clean: 0.12, desc: 'Crumbling code ruins with buried treasure.' },
+  { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, relic: 0.35, crest: 0.1, xab: 0.12, chip: 0.7, clean: 0.25, desc: 'Dangerous depths with the richest rewards.' },
 ];
 function expDone(m){ return !!(m.exp && Date.now() >= m.exp.end); }
 function expRunning(){ return G.box.filter(m => m.exp).length; }
 function fmtLeft(ms){ const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), mn = Math.floor(s % 3600 / 60); return h ? h + 'h ' + mn + 'm' : mn ? mn + 'm' : s + 's'; }
 function expOdds(m, ex){ return Math.max(0.5, 1 - ex.risk * Math.max(0.25, 1 - (m.level || 1) / 45)); }
 function expEstimate(m, ex){ return { data: Math.round((8 + m.stage * 6) * ex.data), xp: Math.round((6 + m.stage * 4) * ex.xp) }; }
+// finishing early costs about 1 DigiData per 2 minutes left (min 10)
+function rushCost(m){ return m.exp ? Math.max(10, Math.ceil((m.exp.end - Date.now()) / 120000) + 5) : 0; }
 function updateBoxBadge(){ const n = G.box.filter(expDone).length; const t = $('#tabBox'); if (t) t.textContent = n ? 'Box · ' + n : 'Box'; }
 function upgradeCosts(){ return { box: 150 + 100 * Math.round((G.boxCap - 10) / 5), exp: 300 * (G.expSlots - 2) }; }
 
@@ -1019,12 +1026,18 @@ function boxMenu(i){
     (away ? '<p style="margin:0">' + (done ? esc(m.name) + ' is back from ' + esc(exName) + '!' : 'Exploring ' + esc(exName) + '. Back in ' + fmtLeft(m.exp.end - Date.now()) + '.') + '</p>' : '') +
     '<div class="bactions">' +
       (done ? '<button class="big" id="bxCollect">Collect rewards</button>' : '') +
+      (away && !done ? '<button class="act" id="bxRush"' + (G.data < rushCost(m) ? ' disabled' : '') + '>⏩ Finish now · ' + rushCost(m) + ' DigiData<small>' + (G.data < rushCost(m) ? 'not enough DigiData (you have ' + G.data + ')' : 'brings ' + esc(m.name) + ' back right away') + '</small></button>' : '') +
       (!away ? '<button class="act" id="bxParty"' + (partyRoom ? '' : ' disabled') + '>Move to party<small>' + (partyRoom ? G.party.length + ' / ' + PARTY_MAX + ' in party' : 'party is full') + '</small></button>' +
         '<button class="act" id="bxExp"' + (expRunning() < G.expSlots ? '' : ' disabled') + '>Send on an expedition<small>' + expRunning() + ' / ' + G.expSlots + ' teams out</small></button>' +
         '<button class="ghost danger" id="bxRelease">Release · +' + releaseValue(m) + ' DigiData</button>' : '') +
       '<button class="ghost" id="bxClose">Close</button></div>');
   $('#bxClose').onclick = () => { closeOv(); renderBox(); };
   const c = $('#bxCollect'); if (c) c.onclick = () => collectExpeditions([m]);
+  const ru = $('#bxRush'); if (ru) ru.onclick = () => {
+    const cost = rushCost(m); if (!m.exp || expDone(m) || G.data < cost) return;
+    G.data -= cost; m.exp.end = Date.now() - 1; saveGame(); updateCount();
+    collectExpeditions([m]);
+  };
   const pb = $('#bxParty'); if (pb) pb.onclick = () => { G.box.splice(i, 1); m.last = Date.now(); G.party.push(m); saveGame(); closeOv(); renderBox(); };
   const eb = $('#bxExp'); if (eb) eb.onclick = () => expeditionPicker(m);
   const rb = $('#bxRelease'); if (rb) rb.onclick = () => {
@@ -1038,7 +1051,7 @@ function boxMenu(i){
 function expeditionPicker(m){
   const card = ex => { const est = expEstimate(m, ex), odds = Math.round(expOdds(m, ex) * 100);
     return '<button class="diff" data-ex="' + ex.key + '"><span class="dn">' + ex.name + '<small>' + fmtLeft(ex.mins * 60000) + '</small></span><span class="dd">' + ex.desc + '</span>' +
-      '<span class="dr">~' + est.data + ' DigiData · ~' + est.xp + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + (ex.relic ? ' · ' + Math.round(ex.relic * 100) + '% Digimental' : '') + (ex.crest ? ' · Crests' : '') + ' · ' + odds + '% smooth trip</span></button>'; };
+      '<span class="dr">~' + est.data + ' DigiData · ~' + est.xp + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + (ex.relic ? ' · ' + Math.round(ex.relic * 100) + '% Digimental' : '') + (ex.crest ? ' · Crests' : '') + (ex.chip ? ' · ' + Math.round(ex.chip * 100) + '% stat chip' : '') + (ex.clean ? ' · ' + Math.round(ex.clean * 100) + '% Clean Slate' : '') + ' · ' + odds + '% smooth trip</span></button>'; };
   $('#overlay .sheet').innerHTML = '<h4>Send ' + esc(m.name) + ' to…</h4><div class="diffs">' + EXPEDITIONS.map(card).join('') + '</div>' +
     '<p style="margin:0;color:var(--muted);font-size:.82rem">A rough trip brings back half the rewards. Higher levels make trips smoother. Each trip may also spot undiscovered Digimon for your Index.</p>' +
     '<button class="ghost" id="exCancel">Cancel</button>';
@@ -1064,6 +1077,8 @@ async function collectExpeditions(list){
     if (ok && ex.relic && Math.random() < ex.relic){ const k = randomDigimental(); giveItem(k); extra += ' Found a ' + itemName(k) + '!'; }
     if (ok && ex.crest && Math.random() < ex.crest){ const k = randomCrest(); if (k){ giveItem(k); extra += ' Found the ' + itemName(k) + '!'; } }
     if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); extra += ' Found an X-Antibody!'; }
+    if (ex.chip && Math.random() < ex.chip * (ok ? 1 : 0.5)){ const k = randomChip(); giveItem(k); extra += (k === 'vit:def' ? ' Found a ' : ' Found an ') + itemName(k) + '!'; }
+    if (ex.clean && Math.random() < ex.clean * (ok ? 1 : 0.5)){ giveItem('clean'); extra += ' Found a Clean Slate!'; }
     const pool = (state.stageIds[m.stage] || []).filter(id => state.byId.has(id) && !known(id));
     const found = [];
     for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; found.push(state.byId.get(id).name); } }
@@ -1945,11 +1960,17 @@ const DIGIMENTAL_OF = { Fladramon: 'Courage', Lighdramon: 'Friendship', Nefertim
 const JUNK_RE = /^(Numemon|Sukamon|Raremon|Geremon|Nanimon|Platinum Sukamon|Gold Numemon|Platinum Numemon|Etemon)$/;
 const DARK_RE = /Skull|Black|Chaos|Death|Dark|Devi|Venom|Evil|Vamdemon|Piemon|Lilithmon|Belial|Falldown|Daemon|Demon|Zombie|Undead|Bakemon|Phantomon|Mummymon|Ogudomon/;
 const HOLY_RE = /Ange|Holy|Seraph|Ofani|Saint|Magnamon|Cherubi|Kerubi|Dominimon|Clavis|Darcmon|Pidmon|Sleipmon|Hououmon|Unimon|Pegasmon|Nefertimon/;
-const ITEM_PRICE = { dm: 120, crest: 450, xab: 200 };
+const ITEM_PRICE = { dm: 120, crest: 450, xab: 200, clean: 150, vit: 90, all: 400 };
+const CHIP_KEYS = ['atk', 'int', 'def', 'spd', 'hp', 'sp'];
+// how much a stat chip adds, scaled to the Digimon's stage
+function chipGain(k, stage){ return { atk: 2 + stage, int: 2 + stage, def: 2 + stage, spd: 1 + stage, hp: 10 + 5 * stage, sp: 3 + stage }[k]; }
+const itemPrice = k => k === 'vit:all' ? ITEM_PRICE.all : ITEM_PRICE[itemType(k)];
+const randomChip = () => Math.random() < 0.08 ? 'vit:all' : 'vit:' + pick(CHIP_KEYS);
 const virtue = w => { w = String(w || '').replace(/[^A-Za-z]/g, ''); w = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); return VIRTUE_ALIAS[w] || (VIRTUES.includes(w) ? w : 'Miracles'); };
 const itemType = k => k.split(':')[0];
-const itemName = k => k === 'xab' ? 'X-Antibody' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
-const itemIcon = k => k === 'xab' ? '🧬' : itemType(k) === 'dm' ? '🥚' : '🔰';
+const itemName = k => k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
+const itemIcon = k => k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
+const itemUsable = k => k === 'clean' || itemType(k) === 'vit';
 const itemKept = k => itemType(k) === 'crest';
 const hasItem = k => (G.items[k] || 0) > 0;
 function giveItem(k, n){ G.items[k] = (G.items[k] || 0) + (n || 1); }
@@ -2051,6 +2072,40 @@ function ownedItemsLine(){
   const owned = Object.keys(G.items).filter(hasItem);
   return owned.length ? '<p class="ownline">Your items: ' + owned.map(k => esc(itemIcon(k) + ' ' + itemName(k) + (itemKept(k) ? '' : ' ×' + G.items[k]))).join(' · ') + '</p>'
     : '<p class="ownline">No evolution items yet. Digimentals and Crests come from the Shop, dungeons and expeditions.</p>';
+}
+
+// bag: use care and training items on the active partner
+function bagScreen(msg){
+  const p = P(); if (!p) return;
+  busy = true;
+  const usable = ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].filter(hasItem);
+  const evoItems = Object.keys(G.items).filter(k => hasItem(k) && !itemUsable(k));
+  const effect = k => k === 'clean' ? 'Clears ' + failures(p) + ' failure' + (failures(p) === 1 ? '' : 's') + ' this stage'
+    : k === 'vit:all' ? 'All stats up' : '+' + chipGain(k.split(':')[1], p.stage) + ' ' + STAT_LABEL[k.split(':')[1]];
+  const html = '<h4>🎒 Bag · ' + esc(p.name) + '</h4>' +
+    '<div class="row statrow pstats">' + statChips(partnerStats(p)) + '</div>' +
+    '<div class="wallet"><span>Failures this stage <b>' + failures(p) + '</b></span></div>' +
+    (usable.length ? '<div class="shop">' + usable.map(k => '<div class="shopitem"><span class="upic" aria-hidden="true">' + itemIcon(k) + '</span><div class="info"><b>' + esc(itemName(k)) + ' ×' + G.items[k] + '</b><small>' + esc(effect(k)) + '</small></div>' +
+      '<button class="act" data-use="' + k + '"' + (k === 'clean' && !failures(p) ? ' disabled' : '') + '>Use</button></div>').join('') + '</div>'
+      : '<p class="ownline">No usable items. Buy Clean Slates and stat chips in the Shop, or find them on expeditions.</p>') +
+    (evoItems.length ? '<p class="ownline">Evolution items: ' + evoItems.map(k => esc(itemIcon(k) + ' ' + itemName(k) + (itemKept(k) ? '' : ' ×' + G.items[k]))).join(' · ') + '. These are used automatically when your Digimon digivolves.</p>' : '') +
+    '<p id="bagMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>' +
+    '<button class="ghost" id="bagShop">Go to the Shop</button><button class="ghost" id="bagClose">Close</button>';
+  if ($('#overlay').hidden) openOv(html); else $('#overlay .sheet').innerHTML = html;
+  $('#bagClose').onclick = () => { closeOv(); renderPartner(); };
+  $('#bagShop').onclick = () => { closeOv(); setTab('shop'); };
+  $('#overlay').querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+    const k = b.dataset.use; if (!hasItem(k)) return;
+    let note;
+    if (k === 'clean'){ if (!failures(p)) return; const n = failures(p); p.stageMistakes = 0; p.stageLosses = 0; note = 'Cleared ' + n + ' failure' + (n === 1 ? '' : 's') + '. ' + p.name + ' gets a fresh start this stage.'; }
+    else {
+      const g = growthOf(p), keys = k === 'vit:all' ? CHIP_KEYS : [k.split(':')[1]], parts = [];
+      for (const s of keys){ const v = k === 'vit:all' ? Math.ceil(chipGain(s, p.stage) / 2) : chipGain(s, p.stage); g[s] = (g[s] || 0) + v; parts.push('+' + v + ' ' + STAT_LABEL[s]); }
+      note = p.name + ' used the ' + itemName(k) + ': ' + parts.join(', ') + '.';
+    }
+    G.items[k]--; saveGame();
+    bagScreen(note);
+  });
 }
 
 // planner: every next form and what it needs, so you can aim for one
