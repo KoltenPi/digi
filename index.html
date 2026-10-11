@@ -271,6 +271,32 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 img.sil{filter:var(--silf)}
 .choice b{font-size:.85rem;overflow-wrap:anywhere}
 .choice small{font:.66rem var(--mono);color:var(--good)}
+.choice.special{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.reqs{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.choice .reqs{justify-content:center}
+.rq{font:600 .66rem/1.3 var(--mono);padding:2px 6px;border-radius:6px;border:1px solid var(--line);color:var(--muted);background:var(--panel)}
+.rq.ok{color:var(--good);border-color:var(--good)}
+.rq.no{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 55%,transparent)}
+.lockh{margin:4px 0 0;font:700 .8rem var(--mono);color:var(--muted)}
+.lrows{display:grid;gap:6px;max-height:42vh;overflow:auto}
+.lrows.tall{max-height:52vh}
+.lrow{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:.86rem}
+.lrow.open{border-color:var(--good)}
+.lrow img{width:44px;height:44px;object-fit:contain}
+.lrow b{overflow-wrap:anywhere}
+.okt{font:600 .62rem var(--mono);color:var(--good);margin-left:6px}
+.okt.free{color:var(--muted)}
+.ownline{margin:0;color:var(--muted);font-size:.8rem;line-height:1.4}
+.pstats{display:flex;flex-wrap:wrap;gap:6px 10px;font:600 .72rem var(--mono);color:var(--muted)}
+.pstats b{color:var(--fg)}
+.pricetag{font:600 .7rem var(--mono);color:var(--muted);margin-left:6px}
+.itemgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.itile{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:6px 8px}
+.itile .ic{font-size:1.2rem}
+.itile .nm{display:grid;min-width:0}
+.itile .nm b{font-size:.84rem;overflow-wrap:anywhere}
+.itile .nm small{font:.64rem var(--mono);color:var(--muted)}
+.itile .act{padding:6px 10px;min-width:0}
 .reveal{display:grid;justify-items:center;gap:6px;text-align:center}
 .reveal img{width:160px;height:160px;object-fit:contain}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.card:active,.act:active{transform:none}}
@@ -336,7 +362,7 @@ const store = {
 const state = {
   all: [], byId: new Map(), q: '', level: '', levelSets: {}, favOnly: false, raisedOnly: false,
   favs: new Set(store.get('dx_favs', [])), details: new Map(), trail: [],
-  tab: store.get('dx_tab', 'partner'), levelOf: new Map(), stagesOf: new Map(), stageIds: {}, ready: false
+  tab: store.get('dx_tab', 'partner'), armor: new Set((store.get('dx_armor_v1', null) || {}).ids || []), levelOf: new Map(), stagesOf: new Map(), stageIds: {}, ready: false
 };
 const G = store.get('dx_game_v1', null) || { partner: null, col: {}, history: [] };
 // older saves had a single partner; move it into the party
@@ -347,6 +373,7 @@ if (!Array.isArray(G.eggs)) G.eggs = [];
 if (!Array.isArray(G.box)) G.box = [];
 if (!G.boxCap) G.boxCap = 10;
 if (!G.expSlots) G.expSlots = 3;
+if (!G.items || typeof G.items !== 'object') G.items = {};
 const saveGame = () => store.set('dx_game_v1', G);
 const raised = id => G.col[id] === 'raised';
 const known = id => !!G.col[id];
@@ -429,6 +456,16 @@ async function loadStages(){
   tick();
   renderPartner();
   updateCount();
+  loadArmor();
+}
+// Armor-level Digimon (Digimental forms) aren't one of the six stages, so they're tracked on their own
+async function loadArmor(){
+  let c = store.get('dx_armor_v1', null);
+  if (!(c && c.t > Date.now() - 7*864e5 && Array.isArray(c.ids))){
+    try{ c = { t: Date.now(), ids: (await pageAll(`${API}/digimon?level=Armor`)).map(d => d.id) }; store.set('dx_armor_v1', c); }
+    catch{ return; }
+  }
+  state.armor = new Set(c.ids);
 }
 
 function setAll(items){
@@ -574,7 +611,7 @@ async function openDetail(id, fromEvo){
 
 const evoId = e => idFromUrl(e.url) ?? e.id;
 
-function evoCards(list, key){
+function evoCards(list, key, reqMap, rp){
   if (!list || !list.length) return `<p class="empty">None recorded.</p>`;
   const limit = 24;
   const card = (e, i) => {
@@ -585,7 +622,7 @@ function evoCards(list, key){
     return `<button class="evo${linkable ? '' : ' nolink'}${r ? ' raised' : ''}" ${linkable ? `data-evo="${eid}"` : 'disabled'} ${i >= limit ? `data-extra="${key}" hidden` : ''}>
       ${r ? '<span class="tick">✓</span>' : ''}
       ${img ? `<img class="${k ? '' : 'sil'}" loading="lazy" alt="" src="${esc(img)}" onerror="this.style.visibility='hidden'">` : ''}
-      <span class="t"><b>${k ? esc(e.digimon) : '???'}</b>${k && e.condition ? `<small>${esc(e.condition)}</small>` : ''}</span>
+      <span class="t"><b>${k ? esc(e.digimon) : '???'}</b>${k && e.condition ? `<small>${esc(e.condition)}</small>` : ''}${reqMap && reqMap.has(eid) ? reqChips(reqMap.get(eid), rp) : ''}</span>
     </button>`;
   };
   return `<div class="evos">${list.map(card).join('')}</div>` +
@@ -601,6 +638,8 @@ function renderDetail(d){
   const descObj = k && ((d.descriptions||[]).find(x => /^en/i.test(x.language)) || (d.descriptions||[])[0]);
   const fav = state.favs.has(d.id);
   const nexts = d.nextEvolutions || [], priors = d.priorEvolutions || [];
+  const me = P() && P().id === d.id ? P() : null, fromS = me ? me.stage : stageOf(d.id);
+  const nextReq = state.ready && fromS !== undefined && fromS < 5 ? pathReqs(d.id, fromS, nextCands(d, fromS)) : null;
   const rc = list => list.filter(e => raised(evoId(e))).length;
   const trail = state.trail.length > 1
     ? `<nav class="trail" aria-label="Evolution path">${state.trail.map((t, i) =>
@@ -626,7 +665,8 @@ function renderDetail(d){
     </div>
     ${descObj ? `<p class="desc">${esc(descObj.description)}</p>` : ''}
     <h3>Evolves into <span>${nexts.length}${rc(nexts) ? ` · ${rc(nexts)} raised` : ''}</span></h3>
-    ${evoCards(nexts, 'next')}
+    ${nextReq && [...nextReq.values()].some(r => r.length) ? `<p class="ownline" style="margin:0 0 8px">Tags show what it takes to digivolve${me ? ' for your ' + esc(me.name) : ''}.</p>` : ''}
+    ${evoCards(nexts, 'next', nextReq, me)}
     ${k && (d.skills||[]).length ? `<h3>Skills <span>${d.skills.length}</span></h3>
       <div class="skills">${d.skills.map(s => `<div class="skill"><b>${esc(s.skill)}${s.translation && s.translation !== s.skill ? ' · ' + esc(s.translation) : ''}</b>${s.description ? `<p>${esc(s.description)}</p>` : ''}</div>`).join('')}</div>` : ''}
   `;
@@ -740,7 +780,7 @@ function renderPartner(){
       <div class="row statrow">${statChips(partnerStats(p))}</div>
       <div class="row"><span>LEVEL <b>${p.level}</b></span><span>XP <b>${p.xp} / ${XP_NEED(p.level)}</b></span></div>
       <div class="xptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div>
-      <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b></span><span>MISTAKES <b>${p.stageMistakes}</b></span></div>
+      <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b></span><span>THIS STAGE <b>${p.stageWins || 0}W · ${failures(p)} fail${failures(p) === 1 ? '' : 's'}</b></span></div>
       ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
         : `<div class="row"><span>DIGIVOLUTION</span><b>${Math.min(p.evo, need)} / ${need}</b></div>
            <div class="evotrack"><i style="width:${Math.min(100, p.evo / need * 100)}%"></i></div>`}
@@ -755,6 +795,7 @@ function renderPartner(){
       <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
     </div>
     <button class="act wide" data-act="dungeon" ${p.energy < 30 ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${p.energy < 30 ? 'too tired (needs 30 energy)' : 'choose a difficulty · 3–8 floors'}</small></button>
+    ${atTop ? '' : `<button class="act wide" data-act="paths">🧬 Evolution paths<small>what each next form needs</small></button>`}
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
@@ -815,6 +856,7 @@ $('#partnerView').addEventListener('click', e => {
   if (k === 'battle') return pickDifficulty('battle');
   if (k === 'dungeon') return pickDifficulty('dungeon');
   if (k === 'moves') return movesScreen();
+  if (k === 'paths') return pathsScreen();
   if (k === 'line') return openDetail(p.id, false);
 });
 
@@ -879,6 +921,11 @@ function walletRow(){
   const eggs = G.eggs.length;
   return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
 }
+function itemTile(k){
+  const own = G.items[k] || 0, price = ITEM_PRICE[itemType(k)], kept = itemKept(k);
+  return '<div class="itile"><span class="ic" aria-hidden="true">' + itemIcon(k) + '</span><div class="nm"><b>' + esc(k === 'xab' ? 'X-Antibody' : k.split(':')[1]) + '</b><small>' + (kept ? (own ? 'Owned' : 'Not owned') : 'Owned: ' + own) + '</small></div>' +
+    (kept && own ? '<button class="act" disabled>✓</button>' : '<button class="act" data-item="' + k + '"' + (G.data < price ? ' disabled' : '') + '>Buy</button>') + '</div>';
+}
 // the shop lives in its own tab; older buttons that opened it now switch tabs
 function openShop(){ setTab('shop'); }
 function renderShop(){
@@ -895,6 +942,12 @@ function renderShop(){
       '<div class="shopitem"><span class="upic" aria-hidden="true">🧭</span><div class="info"><b>Expedition team +1</b><small>Run more expeditions at once. You have ' + G.expSlots + '.</small></div>' + (G.expSlots >= 6 ? '<button class="act" disabled>Maxed</button>' : '<button class="act" data-up="exp"' + (G.data < upgradeCosts().exp ? ' disabled' : '') + '>' + upgradeCosts().exp + '<small>DigiData</small></button>') + '</div>' +
     '</div>' +
     '<p id="shopMsg" style="margin:0;min-height:1.4em;font-size:.88rem"></p>' +
+    '<h3 style="margin:4px 0 0">Digimentals <small class="pricetag">' + ITEM_PRICE.dm + ' DigiData each</small></h3><p class="ownline">Unlock Armor digivolutions from Rookies. Used up when your Digimon armor-digivolves.</p>' +
+    '<div class="itemgrid">' + VIRTUES.map(v => itemTile('dm:' + v)).join('') + '</div>' +
+    '<h3 style="margin:4px 0 0">Crests <small class="pricetag">' + ITEM_PRICE.crest + ' DigiData each</small></h3><p class="ownline">Unlock special Ultimate and Mega forms. Kept forever once you have one.</p>' +
+    '<div class="itemgrid">' + CREST_VIRTUES.map(v => itemTile('crest:' + v)).join('') + '</div>' +
+    '<h3 style="margin:4px 0 0">Other</h3><div class="itemgrid">' + itemTile('xab') + '</div>' +
+    '<p class="ownline">X-Antibody (' + ITEM_PRICE.xab + ') unlocks X-Antibody forms and is used up. Items also turn up in dungeons on Hard and Nightmare and on Ruins and Dark Area expeditions.</p>' +
     (G.eggs.length ? (room ? '<button class="big" id="shopHatch">Hatch an egg · ' + G.eggs.length + ' waiting</button>' : G.box.length < G.boxCap ? '<button class="big" id="shopHatchBox">Hatch into the Box · ' + G.eggs.length + ' waiting</button>' : '<p style="margin:0;color:var(--muted)">Your party and Box are full. Release a Digimon or buy more Box slots.</p>') : '');
   v.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
     const it = SHOP.find(x => x.key === b.dataset.buy);
@@ -902,6 +955,12 @@ function renderShop(){
     G.data -= it.price; G.eggs.push(it.key); saveGame();
     renderShop(); updateCount();
     $('#shopMsg').textContent = 'Bought a ' + it.name + '! ' + (G.party.length < PARTY_MAX ? 'Hatch it below or from an empty party slot.' : 'It\'s stored until a party slot opens up.');
+  });
+  v.querySelectorAll('[data-item]').forEach(b => b.onclick = () => {
+    const k = b.dataset.item, price = ITEM_PRICE[itemType(k)];
+    if (G.data < price || (itemKept(k) && hasItem(k))) return;
+    G.data -= price; giveItem(k); saveGame(); renderShop(); updateCount();
+    $('#shopMsg').textContent = 'Got the ' + itemName(k) + '!';
   });
   const sh = $('#shopHatch'); if (sh) sh.onclick = () => { setTab('partner'); hatchOverlay(); };
   const shb = $('#shopHatchBox'); if (shb) shb.onclick = () => { const m = hatchNew(G.eggs.shift(), true); renderShop(); updateCount(); $('#shopMsg').textContent = m.name + ' hatched and went into the Box!'; };
@@ -918,8 +977,8 @@ function renderShop(){
 const BOX_MAX = 60;
 const EXPEDITIONS = [
   { key: 'fields', name: 'Data Fields', mins: 30, data: 1, xp: 1, egg: 0, rare: 0, risk: 0, finds: 1, desc: 'A short trip across calm data plains. Always safe.' },
-  { key: 'ruins', name: 'Ancient Ruins', mins: 120, data: 3.2, xp: 3, egg: 0.06, rare: 0, risk: 0.12, finds: 2, desc: 'Crumbling code ruins with buried treasure.' },
-  { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, desc: 'Dangerous depths with the richest rewards.' },
+  { key: 'ruins', name: 'Ancient Ruins', mins: 120, data: 3.2, xp: 3, egg: 0.06, rare: 0, risk: 0.12, finds: 2, relic: 0.2, desc: 'Crumbling code ruins with buried treasure.' },
+  { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, relic: 0.35, crest: 0.1, xab: 0.12, desc: 'Dangerous depths with the richest rewards.' },
 ];
 function expDone(m){ return !!(m.exp && Date.now() >= m.exp.end); }
 function expRunning(){ return G.box.filter(m => m.exp).length; }
@@ -979,7 +1038,7 @@ function boxMenu(i){
 function expeditionPicker(m){
   const card = ex => { const est = expEstimate(m, ex), odds = Math.round(expOdds(m, ex) * 100);
     return '<button class="diff" data-ex="' + ex.key + '"><span class="dn">' + ex.name + '<small>' + fmtLeft(ex.mins * 60000) + '</small></span><span class="dd">' + ex.desc + '</span>' +
-      '<span class="dr">~' + est.data + ' DigiData · ~' + est.xp + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + ' · ' + odds + '% smooth trip</span></button>'; };
+      '<span class="dr">~' + est.data + ' DigiData · ~' + est.xp + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + (ex.relic ? ' · ' + Math.round(ex.relic * 100) + '% Digimental' : '') + (ex.crest ? ' · Crests' : '') + ' · ' + odds + '% smooth trip</span></button>'; };
   $('#overlay .sheet').innerHTML = '<h4>Send ' + esc(m.name) + ' to…</h4><div class="diffs">' + EXPEDITIONS.map(card).join('') + '</div>' +
     '<p style="margin:0;color:var(--muted);font-size:.82rem">A rough trip brings back half the rewards. Higher levels make trips smoother. Each trip may also spot undiscovered Digimon for your Index.</p>' +
     '<button class="ghost" id="exCancel">Cancel</button>';
@@ -1002,6 +1061,9 @@ async function collectExpeditions(list){
     G.data += data;
     let extra = '';
     if (ok && ex.egg && Math.random() < ex.egg){ const rare = Math.random() < ex.rare / ex.egg; G.eggs.push(rare ? 'rare' : 'mystery'); extra += ' Found a ' + (rare ? 'Rare Mystery Egg' : 'Mystery Egg') + '!'; }
+    if (ok && ex.relic && Math.random() < ex.relic){ const k = randomDigimental(); giveItem(k); extra += ' Found a ' + itemName(k) + '!'; }
+    if (ok && ex.crest && Math.random() < ex.crest){ const k = randomCrest(); if (k){ giveItem(k); extra += ' Found the ' + itemName(k) + '!'; } }
+    if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); extra += ' Found an X-Antibody!'; }
     const pool = (state.stageIds[m.stage] || []).filter(id => state.byId.has(id) && !known(id));
     const found = [];
     for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; found.push(state.byId.get(id).name); } }
@@ -1106,7 +1168,7 @@ function dedigivolve(){
   const from = p.name;
   p.id = id; p.name = b.name; p.image = b.image;
   p.stage = stages[stages.length - 1] ?? Math.max(0, p.stage - 1);
-  p.stageLine = stages; p.evo = 0; p.stageMistakes = 0; p.final = false;
+  p.stageLine = stages; p.evo = 0; p.stageMistakes = 0; p.stageWins = 0; p.stageLosses = 0; p.final = false;
   say(`${from} de-digivolved back into ${b.name}. Raise it again to try a different path!`, 'happy');
 }
 
@@ -1478,10 +1540,11 @@ async function battle(diff){
     const g = growthOf(p), k = pick(['atk', 'int', 'def', 'spd', 'hp', 'sp']), v = k === 'hp' ? 3 + p.stage : k === 'sp' ? 2 : 1 + Math.floor(p.stage / 2);
     g[k] = (g[k] || 0) + v;
     const ev = Math.max(1, Math.round(3 * diff.reward)), dd = Math.round((4 + 3 * p.stage) * diff.reward);
-    p.wins++; p.evo += ev; p.mood = clamp(p.mood + 8); G.data += dd;
+    p.wins++; p.stageWins = (p.stageWins || 0) + 1; p.evo += ev; p.mood = clamp(p.mood + 8); G.data += dd;
     summary = p.name + ' won! +' + ev + ' digivolution points, +' + v + ' ' + STAT_LABEL[k] + ', +' + dd + ' DigiData.';
     if (diff.battleEgg && Math.random() < diff.battleEgg){ G.eggs.push(diff.rare ? 'rare' : 'mystery'); summary += ' It dropped ' + (diff.rare ? 'a Rare Mystery Egg!' : 'a Mystery Egg!'); }
-  } else if (outcome === 'lose'){ p.losses++; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.`; }
+    if (diff.battleEgg && Math.random() < diff.battleEgg * 0.8){ const it = randomDigimental(); giveItem(it); summary += ' Found a ' + itemName(it) + '!'; }
+  } else if (outcome === 'lose'){ p.losses++; p.stageLosses = (p.stageLosses || 0) + 1; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.`; }
   else summary = `${p.name} escaped from ${foe.name}.`;
   saveGame();
   const xp = Math.round((outcome === 'win' ? 10 + p.stage * 6 : outcome === 'lose' ? 3 + p.stage * 2 : 0) * diff.reward);
@@ -1608,7 +1671,7 @@ function dgNextFloor(){
   for (let i = 0; i < ni; i++){
     const s = dgFreeSpot(); if (!s) continue;
     const r = Math.random();
-    const type = dg.floor >= 3 && r < 0.04 * dg.diff.reward ? 'egg' : r < 0.45 ? 'chip' : r < 0.75 ? 'meat' : 'disk';
+    const type = dg.floor >= 3 && r < 0.04 * dg.diff.reward ? 'egg' : dg.floor >= 2 && r > 1 - 0.05 * dg.diff.reward ? 'relic' : r < 0.45 ? 'chip' : r < 0.75 ? 'meat' : 'disk';
     dg.items.push({ x: s.x, y: s.y, type });
   }
   dgReveal();
@@ -1708,6 +1771,7 @@ function dgPickup(it){
   else if (it.type === 'meat'){ dg.bag.meat++; dgLog('Picked up some meat.'); }
   else if (it.type === 'disk'){ dg.bag.disk++; dgLog('Picked up an SP Disk.'); }
   else if (it.type === 'egg'){ dg.eggs++; dgLog('Found a Mystery Egg!'); }
+  else if (it.type === 'relic'){ const k = randomDigimental(); (dg.relics = dg.relics || []).push(k); dgLog('Found a ' + itemName(k) + '!'); }
 }
 
 function dgWorld(){
@@ -1749,14 +1813,18 @@ function dgEnd(result){
   if (result === 'clear'){
     data += Math.round((30 * (r.stage + 1) + 10 * r.floors) * r.diff.reward); evo += Math.round(5 * r.diff.reward);
     if (Math.random() < r.diff.egg){ if (r.diff.rare && Math.random() < 0.5) r.rareEgg = true; else eggs++; }
-    p.mood = clamp(p.mood + 15); title = 'Dungeon cleared!';
+    p.mood = clamp(p.mood + 15); title = 'Dungeon cleared!'; p.stageWins = (p.stageWins || 0) + 1;
+    const crestOdds = { hard: 0.2, nightmare: 0.4 }[r.diff.key] || 0;
+    if (Math.random() < crestOdds){ const ck = randomCrest() || randomDigimental(); (r.relics = r.relics || []).push(ck); }
     note = 'You made it through all ' + r.floors + ' floors on ' + r.diff.name + '.' + (r.rareEgg ? ' You found a Rare Mystery Egg!' : '');
   } else if (result === 'faint'){
-    data = Math.floor(data / 2); eggs = 0; p.mood = clamp(p.mood - 15); title = 'Knocked out';
-    note = p.name + ' fainted on floor ' + r.floor + '. Half the DigiData and any eggs were lost.';
+    data = Math.floor(data / 2); eggs = 0; p.mood = clamp(p.mood - 15); title = 'Knocked out'; p.stageLosses = (p.stageLosses || 0) + 1; r.relics = [];
+    note = p.name + ' fainted on floor ' + r.floor + '. Half the DigiData and any eggs or items were lost.';
   } else { title = 'Left the dungeon'; note = 'You escaped from floor ' + r.floor + ' with everything you found.'; }
   G.data += data; p.evo += evo; for (let i = 0; i < eggs; i++) G.eggs.push('mystery');
   if (r.rareEgg && result === 'clear'){ G.eggs.push('rare'); eggs++; }
+  const relics = r.relics || []; relics.forEach(k => giveItem(k));
+  if (relics.length) note += ' Items: ' + relics.map(itemName).join(', ') + '.';
   const xp = Math.round((r.kos * (3 + 2 * r.stage) + (result === 'clear' ? 20 + 10 * r.stage : 0)) * (result === 'faint' ? 0.5 : 1) * r.diff.reward);
   if (xp) gainXP(p, xp).then(lv => { const el = $('#dgLv'); if (el) el.textContent = '+' + xp + ' XP.' + levelText(lv); });
   saveGame();
@@ -1863,55 +1931,207 @@ function dgDraw(){
   x.fillStyle = '#ffffff'; x.fillRect(mx + m.x * s - 1, my + m.y * s - 1, s + 2, s + 2);
 }
 
+// ----- digivolution requirements: stats, items (Digimentals, Crests, X-Antibody), DNA partners and care -----
+const VIRTUES = ['Courage', 'Friendship', 'Love', 'Knowledge', 'Sincerity', 'Reliability', 'Hope', 'Light', 'Kindness', 'Miracles', 'Fate'];
+const CREST_VIRTUES = VIRTUES.slice(0, 9);
+const VIRTUE_ALIAS = { Purity: 'Sincerity', Destiny: 'Fate', Faith: 'Reliability', Trust: 'Reliability' };
+// the Adventure partners' crest forms, so the classics need the right crest
+const CREST_OF = { 'Metal Greymon': ['Courage'], 'War Greymon': ['Courage'], 'Were Garurumon': ['Friendship'], 'Metal Garurumon': ['Friendship'],
+  'Garudamon': ['Love'], 'Hououmon': ['Love'], 'Atlur Kabuterimon (Red)': ['Knowledge'], 'Herakle Kabuterimon': ['Knowledge'],
+  'Lilimon': ['Sincerity'], 'Rosemon': ['Sincerity'], 'Zudomon': ['Reliability'], 'Vikemon': ['Reliability'], 'Holy Angemon': ['Hope'],
+  'Seraphimon': ['Hope'], 'Angewomon': ['Light'], 'Ofanimon': ['Light'], 'Omegamon': ['Courage', 'Friendship'] };
+const DIGIMENTAL_OF = { Fladramon: 'Courage', Lighdramon: 'Friendship', Nefertimon: 'Light', Pegasmon: 'Hope', Digmon: 'Knowledge', Submarimon: 'Sincerity',
+  Shurimon: 'Sincerity', Holsmon: 'Love', Magnamon: 'Miracles', 'Gold V-dramon': 'Fate', 'Rapidmon Armor': 'Miracles' };
+const JUNK_RE = /^(Numemon|Sukamon|Raremon|Geremon|Nanimon|Platinum Sukamon|Gold Numemon|Platinum Numemon|Etemon)$/;
+const DARK_RE = /Skull|Black|Chaos|Death|Dark|Devi|Venom|Evil|Vamdemon|Piemon|Lilithmon|Belial|Falldown|Daemon|Demon|Zombie|Undead|Bakemon|Phantomon|Mummymon|Ogudomon/;
+const HOLY_RE = /Ange|Holy|Seraph|Ofani|Saint|Magnamon|Cherubi|Kerubi|Dominimon|Clavis|Darcmon|Pidmon|Sleipmon|Hououmon|Unimon|Pegasmon|Nefertimon/;
+const ITEM_PRICE = { dm: 120, crest: 450, xab: 200 };
+const virtue = w => { w = String(w || '').replace(/[^A-Za-z]/g, ''); w = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); return VIRTUE_ALIAS[w] || (VIRTUES.includes(w) ? w : 'Miracles'); };
+const itemType = k => k.split(':')[0];
+const itemName = k => k === 'xab' ? 'X-Antibody' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
+const itemIcon = k => k === 'xab' ? '🧬' : itemType(k) === 'dm' ? '🥚' : '🔰';
+const itemKept = k => itemType(k) === 'crest';
+const hasItem = k => (G.items[k] || 0) > 0;
+function giveItem(k, n){ G.items[k] = (G.items[k] || 0) + (n || 1); }
+const randomDigimental = () => 'dm:' + pick(VIRTUES);
+function randomCrest(){ const left = CREST_VIRTUES.filter(v => !hasItem('crest:' + v)); return left.length ? 'crest:' + pick(left) : null; }
+function nameId(n){
+  if (!state.nameMap || state.nameMap.size === 0) state.nameMap = new Map((state.all || []).map(d => [d.name.toLowerCase(), d.id]));
+  return state.nameMap.get(String(n).trim().replace(/^(the|a|an) /i, '').toLowerCase());
+}
+// a stat goal that matches what the next form is good at
+function statReq(to, s){
+  const b = baseStats(to, s + 1);
+  const k = ['atk', 'int', 'def', 'spd', 'hp', 'sp'].sort((x, y) => b[y] / STAT_BASE[y][s + 1] - b[x] / STAT_BASE[x][s + 1])[0];
+  const extra = { atk: 3 + 3 * s, int: 3 + 3 * s, def: 3 + 3 * s, spd: 2 + 2 * s, hp: 15 + 10 * s, sp: 4 + 2 * s }[k];
+  return { t: 'stat', k, v: STAT_BASE[k][s] + extra };
+}
+// requirements for evolving into `to` from stage `s`, built from the API's evolution conditions plus a fixed per-species roll
+function reqsFor(to, cond, s){
+  const name = state.byId.get(to)?.name || '', c = String(cond || ''), q = [];
+  if (s < 2) return q;                       // Fresh and In-Training digivolve freely
+  if (state.armor.has(to) && !inStage(to, s + 1)){
+    const m = c.match(/Digimentals? of (\w+)/i);
+    q.push({ t: 'item', key: 'dm:' + (m ? virtue(m[1]) : DIGIMENTAL_OF[name] || VIRTUES[Math.floor(seeded(to, 31) * VIRTUES.length)]) });
+    return q;                                // Armor forms just need their Digimental
+  }
+  const bad = /Dark Evolution|Death Evolution/i.test(c);
+  if (CREST_OF[name]) CREST_OF[name].forEach(v => q.push({ t: 'item', key: 'crest:' + v }));
+  else { const m = !bad && c.match(/Crest of (\w+)/i); if (m) q.push({ t: 'item', key: 'crest:' + virtue(m[1]) }); }
+  if (/\(X-Antibody\)/.test(name)) q.push({ t: 'item', key: 'xab' });
+  // DNA digivolution: "with Tailmon" means a Tailmon has to be with you
+  if (/^with (?!or without)/i.test(c) && !/Digimental|Crest|Spirit|X-Antibody|Card Game|Vital Bracelet|Pendulum|Every Digimon|Evolution|certain/i.test(c)){
+    const ids = [...new Set(c.replace(/^with /i, '').split(/,\s*(?:or |and )?|\s+or\s+|\s+and\s+/).map(nameId).filter(id => id && id !== to))];
+    if (ids.length) q.push({ t: 'dna', ids: ids.slice(0, 4) });
+  }
+  const r = seeded(to, 41);
+  if (JUNK_RE.test(name) || bad) q.push({ t: 'bad', n: 3 });
+  else if (DARK_RE.test(name)) q.push({ t: 'bad', n: 2 });
+  else if (HOLY_RE.test(name)) q.push({ t: 'clean' });
+  else if (r < 0.36) q.push(statReq(to, s));
+  else if (r < 0.48) q.push({ t: 'wins', n: [0, 0, 3, 5, 7, 10][s] });
+  else if (r < 0.56) q.push({ t: 'clean' });
+  else if (r < 0.6) q.push({ t: 'bad', n: 2 });
+  if (s >= 4 && !q.some(x => x.t === 'stat')) q.push(statReq(to, s));   // Megas always need real strength
+  return q;
+}
+// the forms a Digimon can reach next (Rookies can also armor-digivolve)
+function nextCands(d, stage){
+  const seen = new Set();
+  const all = (d.nextEvolutions || []).map(e => ({ id: evoId(e), name: e.digimon, image: e.image, cond: e.condition || '' }))
+    .filter(e => e.id && state.byId.has(e.id) && !seen.has(e.id) && seen.add(e.id));
+  let c = all.filter(e => inStage(e.id, stage + 1) || (stage === 2 && state.armor.has(e.id)));
+  if (!c.length) c = all.filter(e => higherStage(e.id, stage) !== undefined);
+  return c;
+}
+// every line keeps at least one open path so a partner can never get stuck
+function pathReqs(fromId, s, cands){
+  const m = new Map();
+  for (const c of cands) m.set(c.id, reqsFor(c.id, c.cond, s));
+  if (cands.length && !cands.some(c => !m.get(c.id).length)){
+    const pool = cands.filter(c => !(state.armor.has(c.id) && !inStage(c.id, s + 1))).sort((a, b) => seeded(a.id, 43) - seeded(b.id, 43));
+    if (pool[0]) m.set(pool[0].id, []);
+  }
+  return m;
+}
+function failures(p){ return (p.stageMistakes || 0) + (p.stageLosses || 0); }
+function reqMet(q, p){
+  if (q.t === 'item') return hasItem(q.key);
+  if (!p) return null;
+  if (q.t === 'stat') return partnerStats(p)[q.k] >= q.v;
+  if (q.t === 'dna') return [...G.party, ...G.box].some(m => m !== p && q.ids.includes(m.id));
+  if (q.t === 'wins') return (p.stageWins || 0) >= q.n;
+  if (q.t === 'clean') return failures(p) === 0;
+  if (q.t === 'bad') return failures(p) >= q.n;
+  return true;
+}
+function reqText(q, p){
+  if (q.t === 'stat') return STAT_LABEL[q.k] + ' ' + q.v + '+' + (p ? ' (' + partnerStats(p)[q.k] + ')' : '');
+  if (q.t === 'item') return itemIcon(q.key) + ' ' + itemName(q.key) + (!itemKept(q.key) && G.items[q.key] ? ' ×' + G.items[q.key] : '');
+  if (q.t === 'dna') return '🤝 ' + q.ids.map(id => shown(id, state.byId.get(id)?.name || '?')).join(' or ') + ' in party/Box';
+  if (q.t === 'wins') return '🏆 ' + q.n + ' wins this stage' + (p ? ' (' + (p.stageWins || 0) + ')' : '');
+  if (q.t === 'clean') return '✨ No failures this stage' + (p && failures(p) ? ' (' + failures(p) + ')' : '');
+  if (q.t === 'bad') return '💀 ' + q.n + '+ failures this stage' + (p ? ' (' + failures(p) + ')' : '');
+  return '';
+}
+function reqChips(list, p){
+  if (!list || !list.length) return '';
+  return '<span class="reqs">' + list.map(q => { const ok = reqMet(q, p); return '<span class="rq' + (ok === true ? ' ok' : ok === false ? ' no' : '') + '">' + esc(reqText(q, p)) + '</span>'; }).join('') + '</span>';
+}
+function pathRows(p, cands, reqMap){
+  return cands.map(c => { const rq = reqMap.get(c.id) || []; return { c, rq, miss: rq.filter(q => !reqMet(q, p)).length }; });
+}
+function pathImg(c){ return '<img class="' + (known(c.id) ? '' : 'sil') + '" alt="" src="' + esc(c.image || state.byId.get(c.id)?.image || '') + '">'; }
+function pathRow(x, p, planner){
+  const k = known(x.c.id), tag = !planner ? '' : x.miss ? '' : x.rq.length ? '<small class="okt">✓ Unlocked</small>' : '<small class="okt free">Open path</small>';
+  return '<div class="lrow' + (planner && !x.miss ? ' open' : '') + '">' + pathImg(x.c) + '<div><b>' + (k ? esc(x.c.name) : '???') + '</b>' +
+    (raised(x.c.id) ? ' <small class="okt">raised</small>' : '') + tag + reqChips(x.rq, p) + '</div></div>';
+}
+function ownedItemsLine(){
+  const owned = Object.keys(G.items).filter(hasItem);
+  return owned.length ? '<p class="ownline">Your items: ' + owned.map(k => esc(itemIcon(k) + ' ' + itemName(k) + (itemKept(k) ? '' : ' ×' + G.items[k]))).join(' · ') + '</p>'
+    : '<p class="ownline">No evolution items yet. Digimentals and Crests come from the Shop, dungeons and expeditions.</p>';
+}
+
+// planner: every next form and what it needs, so you can aim for one
+async function pathsScreen(){
+  const p = P(); if (!p || busy) return;
+  busy = true;
+  openOv('<h4>Evolution paths</h4><div class="status">Reading ' + esc(p.name) + '\'s evolution line…</div>');
+  const done = () => { const b = $('#ovClose'); if (b) b.onclick = () => { closeOv(); renderPartner(); }; };
+  if (p.stage >= 5 || p.final){ $('#overlay .sheet').innerHTML = '<h4>Evolution paths</h4><p style="margin:0">' + esc(p.name) + ' has reached its final form.</p><button class="big" id="ovClose">OK</button>'; return done(); }
+  let d;
+  try{ d = await getDetail(p.id); }
+  catch(e){ $('#overlay .sheet').innerHTML = '<h4>Connection problem</h4><p>Couldn\'t load ' + esc(p.name) + '\'s evolutions (' + esc(e.message) + ').</p><button class="big" id="ovClose">Close</button>'; return done(); }
+  const cands = nextCands(d, p.stage), reqMap = pathReqs(p.id, p.stage, cands);
+  const rows = pathRows(p, cands, reqMap).sort((a, b) => a.miss - b.miss || b.rq.length - a.rq.length);
+  const open = rows.filter(x => !x.miss).length;
+  $('#overlay .sheet').innerHTML = '<h4>' + esc(p.name) + '\'s next forms</h4>' +
+    '<div class="wallet"><span>Open <b>' + open + ' / ' + rows.length + '</b></span><span>Wins this stage <b>' + (p.stageWins || 0) + '</b></span><span>Failures <b>' + failures(p) + '</b></span></div>' +
+    '<div class="row statrow pstats">' + statChips(partnerStats(p)) + '</div>' +
+    (p.stage < 2 ? '<p class="ownline">Fresh and In-Training Digimon digivolve freely. Requirements start at Rookie.</p>'
+      : '<p class="ownline">Open paths with no requirements are a random draw: you\'ll be offered up to 3 (fewer after care mistakes). Unlocked special paths are always offered. Failures are care mistakes plus lost battles; wins count battles and dungeon clears. Both reset when it digivolves.</p>') +
+    (rows.length ? '<div class="lrows tall">' + rows.map(x => pathRow(x, p, true)).join('') + '</div>' : '<p style="margin:0">No recorded evolutions from here.</p>') +
+    ownedItemsLine() +
+    '<button class="ghost" id="ovClose">Close</button>';
+  done();
+}
+
 // ----- digivolution along the real evo lines -----
 async function digivolve(){
   const p = P(); if (busy || !canEvolve(p)) return;
   busy = true;
-  openOv(`<h4>${esc(p.name)} is digivolving…</h4><div class="status">Reading its evolution line…</div>`);
+  openOv('<h4>' + esc(p.name) + ' is digivolving…</h4><div class="status">Reading its evolution line…</div>');
   let d;
   try{ d = await getDetail(p.id); }
-  catch(e){ $('#overlay .sheet').innerHTML = `<h4>Connection problem</h4><p>Couldn't load ${esc(p.name)}'s evolutions (${esc(e.message)}).</p><button class="big" id="ovClose">Close</button>`; $('#ovClose').onclick = closeOv; return; }
-  const all = (d.nextEvolutions || []).map(e => ({ id: evoId(e), name: e.digimon, image: e.image })).filter(e => e.id && state.byId.has(e.id));
-  const seen = new Set();
-  const uniq = all.filter(e => !seen.has(e.id) && seen.add(e.id));
-  let cands = uniq.filter(e => inStage(e.id, p.stage + 1));
-  if (!cands.length) cands = uniq.filter(e => higherStage(e.id, p.stage) !== undefined);
+  catch(e){ $('#overlay .sheet').innerHTML = '<h4>Connection problem</h4><p>Couldn\'t load ' + esc(p.name) + '\'s evolutions (' + esc(e.message) + ').</p><button class="big" id="ovClose">Close</button>'; $('#ovClose').onclick = closeOv; return; }
+  const cands = nextCands(d, p.stage);
   if (!cands.length){
     p.final = true; saveGame();
-    $('#overlay .sheet').innerHTML = `<h4>No further forms</h4><p>${esc(p.name)} has no recorded evolution to the next stage, so this is its final form.</p><button class="big" id="ovClose">OK</button>`;
+    $('#overlay .sheet').innerHTML = '<h4>No further forms</h4><p>' + esc(p.name) + ' has no recorded evolution to the next stage, so this is its final form.</p><button class="big" id="ovClose">OK</button>';
     $('#ovClose').onclick = () => { closeOv(); renderPartner(); };
     return;
   }
+  const reqMap = pathReqs(p.id, p.stage, cands);
+  const rows = pathRows(p, cands, reqMap);
   const count = p.stageMistakes === 0 ? 3 : p.stageMistakes <= 2 ? 2 : 1;
-  // mix in forms you haven't raised so every line gets explored
-  const unraised = shuffle(cands.filter(c => !raised(c.id)));
-  const familiar = shuffle(cands.filter(c => raised(c.id)));
-  const options = shuffle([...unraised.slice(0, count), ...familiar].slice(0, count));
-  const careNote = count === 3 ? 'Great care! Choose its path.' : count === 2 ? 'Some care mistakes limited its paths.' : 'Neglect left only one path open.';
-  $('#overlay .sheet').innerHTML = `<h4>${esc(p.name)} is ready!</h4>
-    <p style="margin:0;color:var(--muted)">${careNote} ${cands.length} possible forms in total.</p>
-    <div class="choices">${options.map(o => {
-      const r = raised(o.id), k = known(o.id);
-      return `<button class="choice" data-pick="${o.id}"><img class="${k ? '' : 'sil'}" alt="" src="${esc(o.image || state.byId.get(o.id).image)}"><b>${k ? esc(o.name) : '???'}</b>${r ? '<small>✓ raised before</small>' : k ? '<small>seen in battle</small>' : ''}</button>`;
-    }).join('')}</div>`;
-  $('#overlay').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => evolveTo(+b.dataset.pick));
+  // free paths are a random draw (care mistakes shrink it); special paths you've unlocked always show
+  const free = rows.filter(x => !x.rq.length);
+  const special = shuffle(rows.filter(x => x.rq.length && !x.miss)).slice(0, 6);
+  const unraised = shuffle(free.filter(x => !raised(x.c.id))), familiar = shuffle(free.filter(x => raised(x.c.id)));
+  const options = shuffle([...unraised, ...familiar].slice(0, count)).concat(special);
+  const locked = rows.filter(x => x.miss).sort((a, b) => a.miss - b.miss);
+  const careNote = count === 3 ? 'Great care! Choose its path.' : count === 2 ? 'Some care mistakes limited its paths.' : 'Neglect left only a few paths open.';
+  const choice = x => { const r = raised(x.c.id), k = known(x.c.id);
+    return '<button class="choice' + (x.rq.length ? ' special' : '') + '" data-pick="' + x.c.id + '">' + pathImg(x.c) + '<b>' + (k ? esc(x.c.name) : '???') + '</b>' +
+      (r ? '<small>✓ raised before</small>' : k ? '<small>seen in battle</small>' : '') + reqChips(x.rq, p) + '</button>'; };
+  $('#overlay .sheet').innerHTML = '<h4>' + esc(p.name) + ' is ready!</h4>' +
+    '<p style="margin:0;color:var(--muted)">' + careNote + (special.length ? ' ' + special.length + ' special path' + (special.length === 1 ? '' : 's') + ' unlocked!' : '') + ' ' + cands.length + ' possible forms in total.</p>' +
+    (options.length ? '<div class="choices">' + options.map(choice).join('') + '</div>' : '<p style="margin:0">No path is open yet. Meet one of the requirements below, then try again.</p>') +
+    (locked.length ? '<h5 class="lockh">🔒 Locked paths · ' + locked.length + '</h5><div class="lrows">' + locked.slice(0, 6).map(x => pathRow(x, p)).join('') + '</div>' +
+      (locked.length > 6 ? '<p class="ownline">See all ' + locked.length + ' in 🧬 Evolution paths.</p>' : '') : '') +
+    '<button class="ghost" id="evoLater">Not yet</button>';
+  $('#evoLater').onclick = () => { closeOv(); renderPartner(); };
+  $('#overlay').querySelectorAll('[data-pick]').forEach(b => b.onclick = () => evolveTo(+b.dataset.pick, reqMap.get(+b.dataset.pick)));
 }
 
-async function evolveTo(id){
+async function evolveTo(id, reqs){
   const p = P(); const b = state.byId.get(id);
+  const used = [];
+  for (const q of reqs || []) if (q.t === 'item' && !itemKept(q.key) && hasItem(q.key)){ G.items[q.key]--; used.push(itemName(q.key)); }
   const oldName = p.name;
   $('#overlay .sheet').innerHTML = `<div class="reveal"><img id="evoImg" class="sprite flash" style="animation-iteration-count:8" alt="" src="${esc(p.image)}"><h4>${esc(oldName)} digivolve to…</h4></div>`;
   await sleep(2900);
   const firstTime = !raised(id);
   p.id = id; p.name = b.name; p.image = b.image;
   p.stage = inStage(id, p.stage + 1) ? p.stage + 1 : Math.min(5, higherStage(id, p.stage) ?? p.stage + 1);
-  p.evo = 0; p.stageMistakes = 0; p.line.push(id);
+  p.evo = 0; p.stageMistakes = 0; p.stageWins = 0; p.stageLosses = 0; p.line.push(id);
   p.stageLine = [...(p.stageLine || p.line.slice(0, -1).map((_, i) => i)), p.stage];
   p.mood = clamp(p.mood + 20); p.energy = clamp(p.energy + 20); p.str += 3;
   G.col[id] = 'raised';
   saveGame();
   $('#overlay .sheet').innerHTML = `<div class="reveal"><img class="sprite happy" alt="" src="${esc(b.image)}">
-    <h4>${esc(b.name)}!</h4><p style="margin:0;color:var(--muted)">${LEVEL_EN[STAGES[p.stage]]} level${firstTime ? ' · new to your collection!' : ''}</p></div>
+    <h4>${esc(b.name)}!</h4><p style="margin:0;color:var(--muted)">${LEVEL_EN[STAGES[p.stage]]} level${firstTime ? ' · new to your collection!' : ''}${used.length ? ' · used ' + esc(used.join(', ')) : ''}</p></div>
     <button class="big" id="ovClose">Awesome</button>`;
   const newMoves = await syncMoves(p);
   $('#ovClose').onclick = () => { closeOv(); say(`${oldName} digivolved into ${b.name}!` + (newMoves.length ? ' Learned ' + newMoves.join(', ') + '!' : ''), 'happy'); };
@@ -1919,7 +2139,7 @@ async function evolveTo(id){
 
 // ---------- image processing: cut out the white background, optional retro pixel look ----------
 // Done on this device from the official art; silhouettes need the cutout so they show a shape, not a square.
-const IMG_SEL = '.bcell img, .bhead img, .slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
+const IMG_SEL = '.lrow img, .bcell img, .bhead img, .slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
 let retroOn = !!store.get('dx_retro', false);
 const imgCache = new Map();
 function processArt(src, res, retro){
