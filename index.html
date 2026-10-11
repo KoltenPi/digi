@@ -3581,18 +3581,90 @@ function careAction(k, p){
   return false;
 }
 
-// ----- auto-battle: picks a sensible move each turn -----
+// ----- auto-battle: predicts each move's real damage (DEF, attribute, element, weather, accuracy, crits) and reads the danger -----
+function estHit(att, def, m){
+  if (!m || !['phys', 'mag', 'drain', 'atk'].includes(m.kind)) return { avg: 0, low: 0, hit: 1 };
+  const phys = m.kind === 'phys' || m.kind === 'atk', a = phys ? att.st.atk : att.st.int, dS = def.st.def || 0;
+  const defF = 1.35 * (2 * a) / (2 * a + dS);
+  const mult = attrMult(att.attr, def.attr) * elemMult(att.elem, def.elem) * skyMult(att) * (att.tdm || 1) * (def.ttk || 1) * (def.guard ? 0.5 : 1);
+  const ev = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (curWeather().evade || 0);
+  const cr = Math.max(0.04, Math.min(0.33, 0.06 + (att.critBonus || 0) + (att.st.spd - def.st.spd) * 0.01));
+  const raw = a * (m.power || 1) * (att.buff || 1) * defF * mult;
+  return { avg: raw * (1 - ev) * (1 + 0.6 * cr), low: raw * 0.85, hit: 1 - ev };
+}
+function autoHeur(me, foe, modes, modeCost){
+  const moves = me.moves.map((m, i) => ({ m, i, cost: m.cost || 0 }));
+  const can = moves.filter(x => x.cost <= me.sp);
+  const atk = can.filter(x => ['phys', 'mag', 'drain', 'atk'].includes(x.m.kind)).map(x => {
+    const e = estHit(me, foe, x.m), st = moveStatus(x.m);
+    const statusBonus = st && !foe.status && !foe.noStatus ? e.avg * (st === 'slp' ? 0.35 : st === 'par' ? 0.25 : 0.2) * 0.3 : 0;
+    return Object.assign(x, { e, val: e.avg + statusBonus + (x.m.kind === 'drain' && me.hp < me.st.hp * 0.7 ? e.avg * 0.3 : 0) });
+  });
+  const heal = can.find(x => x.m.kind === 'heal'), buff = can.find(x => x.m.kind === 'buff'), guard = moves.find(x => x.m.kind === 'guard');
+  // how hard can the foe hit back next turn?
+  const foeMoves = (foe.moves || []).filter(m => (m.cost || 0) <= foe.sp + 1);
+  const threat = Math.max(1, ...foeMoves.map(m => estHit(foe, Object.assign({}, me, { guard: false }), m).avg)) * 1.15;
+  const poison = me.status && me.status.k === 'psn' ? Math.max(1, Math.round(me.st.hp / 12)) : 0;
+  const foeAsleep = foe.status && foe.status.k === 'slp';
+  const best = atk.slice().sort((a, b) => b.val - a.val)[0];
+  const bestDmg = best ? best.e.avg : 1, turnsToKill = foe.hp / Math.max(1, bestDmg);
+  // 1. finish it: the cheapest move whose weak roll still knocks the foe out
+  const kos = atk.filter(x => x.e.low >= foe.hp).sort((a, b) => a.cost - b.cost || b.e.hit - a.e.hit);
+  if (kos.length) return String(kos[0].i);
+  // 2. about to go down: heal, or drain, if that keeps us alive; otherwise swing for the fences
+  const danger = !foeAsleep && me.hp <= threat + poison;
+  if (danger && heal && me.st.hp * heal.m.power > threat * 0.7 && turnsToKill > 1) return String(heal.i);
+  if (me.hp < me.st.hp * 0.4 && heal && !danger && turnsToKill > 2) return String(heal.i);
+  // 3. set-up moves when the fight will be long and it's safe
+  const safe = foeAsleep || me.hp > threat * 2.5;
+  if (modes && modes.length && !me.moded && me.sp >= modeCost && turnsToKill >= 2.5 && safe) return 'mode';
+  if (buff && (me.buff || 1) < 1.5 && turnsToKill >= 3.5 && safe) return String(buff.i);
+  if (!best) return String(guard ? guard.i : 0);
+  // 4. prefer a cheaper move when it's nearly as good, to save SP
+  const pickCheap = atk.filter(x => x.cost < best.cost && x.val >= best.val * 0.88).sort((a, b) => a.cost - b.cost)[0];
+  const choice = pickCheap || best;
+  // 5. if only a weak free hit is affordable but a big move is one guard away, guard to recharge (when safe)
+  if (choice.cost === 0 && guard && !danger && turnsToKill > 2) {
+    const gain = Math.max(2, Math.ceil(me.st.sp * 0.2)) + 1;
+    const big = moves.filter(x => ['phys', 'mag', 'drain'].includes(x.m.kind) && x.cost > me.sp && x.cost <= me.sp + gain)
+      .map(x => estHit(me, foe, x.m).avg).sort((a, b) => b - a)[0] || 0;
+    if (big > choice.e.avg * 2.2) return String(guard.i);
+  }
+  return String(choice.i);
+}
+// look ahead: try every option in many quick imaginary fights (both sides played sensibly) and pick the one that wins most
 function autoChoice(me, foe, modes, modeCost){
-  if (modes && modes.length && !me.moded && me.sp >= modeCost) return 'mode';
-  const idx = me.moves.map((m, i) => [m, i]).filter(([m]) => (m.cost || 0) <= me.sp);
-  const heal = idx.find(([m]) => m.kind === 'heal');
-  if (heal && me.hp < me.st.hp * 0.35) return String(heal[1]);
-  const buff = idx.find(([m]) => m.kind === 'buff');
-  if (buff && (me.buff || 1) < 1.2 && me.hp > me.st.hp * 0.6 && foe.hp > foe.st.hp * 0.5) return String(buff[1]);
-  const dmg = idx.filter(([m]) => m.kind === 'phys' || m.kind === 'mag' || m.kind === 'drain' || m.kind === 'atk');
-  if (!dmg.length){ const g = idx.find(([m]) => m.kind === 'guard'); return String(g ? g[1] : 0); }
-  const score = m => (m.kind === 'phys' || m.kind === 'atk' ? me.st.atk : me.st.int) * (m.power || 1) * (m.kind === 'drain' && me.hp < me.st.hp * 0.6 ? 1.25 : 1) - (m.cost || 0) * 0.15 * (me.sp < me.st.sp * 0.3 ? 2 : 1);
-  return String(dmg.sort((a, b) => score(b[0]) - score(a[0]))[0][1]);
+  const opts = me.moves.map((m, i) => i).filter(i => (me.moves[i].cost || 0) <= me.sp).map(String);
+  if (modes && modes.length && !me.moded && me.sp >= modeCost) opts.push('mode');
+  if (opts.length <= 1) return opts[0] || autoHeur(me, foe, modes, modeCost);
+  const clone = u => Object.assign({}, u, { st: Object.assign({}, u.st), status: u.status ? Object.assign({}, u.status) : null });
+  const act = (a, d, c) => { if (c === 'mode'){ a.sp -= modeCost; a.moded = true; ['atk', 'int', 'def', 'spd'].forEach(k => a.st[k] = Math.round(a.st[k] * 1.25)); } else doMove(a, d, a.moves[+c]); };
+  const meFirst = me.st.spd >= foe.st.spd;
+  const play = first => {
+    const m = clone(me), f = clone(foe);
+    const done = () => f.hp <= 0 ? 1 : m.hp <= 0 ? 0 : null;
+    act(m, f, first); let r = done(); if (r !== null) return r;
+    if (meFirst){ f.guard = false; const s = statusTurn(f); if ((r = done()) !== null) return r; if (!s.skip) doMove(f, m, foeChoice(f, m)); if ((r = done()) !== null) return r; }
+    for (const u of [m, f]) u.sp = Math.min(u.st.sp, u.sp + 1);
+    for (let t = 0; t < 14; t++){
+      const order = m.st.spd > f.st.spd || (m.st.spd === f.st.spd && Math.random() < 0.5) ? [m, f] : [f, m];
+      for (const u of order){
+        u.guard = false; const s = statusTurn(u); if ((r = done()) !== null) return r; if (s.skip) continue;
+        if (u === m) act(m, f, autoHeur(m, f, modes, modeCost)); else doMove(f, m, foeChoice(f, m));
+        if ((r = done()) !== null) return r;
+      }
+      for (const u of [m, f]) u.sp = Math.min(u.st.sp, u.sp + 1);
+    }
+    return m.hp / m.st.hp >= f.hp / f.st.hp ? 0.6 : 0.2;
+  };
+  const N = Math.max(12, Math.min(40, Math.floor(240 / opts.length)));
+  let best = opts[0], bestScore = -1;
+  for (const o of opts){
+    let sc = 0; for (let k = 0; k < N; k++) sc += play(o);
+    sc = sc / N + (o === autoHeur(me, foe, modes, modeCost) ? 0.03 : 0);   // small nudge toward the sensible pick on ties
+    if (sc > bestScore){ bestScore = sc; best = o; }
+  }
+  return best;
 }
 function expMs(ex){ return Math.round(ex.mins * 60000 * (1 - 0.1 * perk('path'))); }
 
