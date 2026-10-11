@@ -921,7 +921,7 @@ function renderPartner(){
       <div class="xptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div>
       <div class="row"><span>BOND <b>♥ ${p.bond || 0}</b> · ${BOND_TIERS[bondTier(p)].name}</span><span>${esc(persOf(p).name)}: ${esc(persOf(p).desc)}</span></div>
       <div class="evotrack bondtrack"><i style="width:${p.bond || 0}%"></i></div>
-      <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b></span><span>THIS STAGE <b>${p.stageWins || 0}W · ${failures(p)} fail${failures(p) === 1 ? '' : 's'}</b></span></div>
+      <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b>${(p.streak || 0) >= 2 ? ` · 🔥 STREAK <b>${p.streak}</b>` : ''}</span><span>THIS STAGE <b>${p.stageWins || 0}W · ${failures(p)} fail${failures(p) === 1 ? '' : 's'}</b></span></div>
       ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
         : `<div class="row"><span>DIGIVOLUTION</span><b>${Math.min(p.evo, need)} / ${need}</b></div>
            <div class="evotrack"><i style="width:${Math.min(100, p.evo / need * 100)}%"></i></div>`}
@@ -1662,12 +1662,16 @@ const DIFFS = [
   { key: 'hard', name: 'Hard', foe: 1.22, reward: 1.8, floors: 6, lv: 4, egg: 0.45, battleEgg: 0.05, desc: 'Tougher foes that know more moves' },
   { key: 'nightmare', name: 'Nightmare', foe: 1.45, reward: 2.8, floors: 8, lv: 8, egg: 0.7, battleEgg: 0.1, rare: true, desc: 'Brutal foes, with a shot at Rare eggs' },
 ];
+// win streaks: every win in a row adds +15% evo points (up to +150%) and +5% DigiData (up to +50%)
+const streakMul = s => 1 + 0.15 * Math.min(Math.max(0, s || 0), 10);
+const evoWin = (p, d) => Math.max(1, Math.round((3 + Math.floor(p.stage / 2)) * d.reward * streakMul(p.streak)));
+const STREAK_GIFTS = { 5: 50, 10: 150, 20: 400, 30: 700, 50: 1500 };
 function pickDifficulty(kind){
   const p = P(); busy = true;
   const last = store.get('dx_diff_' + kind, 'normal');
   const card = d => {
     const rw = kind === 'battle'
-      ? 'Win: +' + Math.max(1, Math.round(3 * d.reward)) + ' evo · +' + Math.round((4 + 3 * p.stage) * d.reward) + ' DigiData · +' + Math.round((10 + p.stage * 6) * d.reward) + ' XP' + (d.battleEgg ? ' · ' + Math.round(d.battleEgg * 100) + '% egg' : '')
+      ? 'Win: +' + evoWin(p, d) + ' evo · +' + Math.round((4 + 3 * p.stage) * d.reward) + ' DigiData · +' + Math.round((10 + p.stage * 6) * d.reward) + ' XP' + (d.battleEgg ? ' · ' + Math.round(d.battleEgg * 100) + '% egg' : '')
       : d.floors + ' floors · clear bonus ~' + Math.round((30 * (p.stage + 1) + 10 * d.floors) * d.reward) + ' DigiData · ' + Math.round(d.egg * 100) + '% egg' + (d.rare ? ' (can be Rare)' : '');
     return '<button class="diff ' + d.key + (d.key === last ? ' on' : '') + '" data-diff="' + d.key + '"><span class="dn">' + d.name + '<small>×' + d.reward + ' rewards</small></span><span class="dd">' + d.desc + ' · foe stats ×' + d.foe + '</span><span class="dr">' + rw + '</span></button>';
   };
@@ -1704,7 +1708,7 @@ async function battle(diff, opts){
   const side = (f, id) => `<div class="fighter" id="${id}"><img alt="" src="${esc(f.image)}"><b>${esc(f.name)}</b>
       <span class="attr">${esc(f.attr)} · ${elemTag(f.elem)}</span>
       <div class="bars"><div class="hp"><i></i></div><small class="hpt"></small><div class="hp spb"><i></i></div><small class="spt"></small></div></div>`;
-  $('#overlay .sheet').innerHTML = `<h4>${opts.title ? esc(opts.title) : 'Wild battle! <span class="stage">' + diff.name + '</span>' + (R.key !== 'file' ? ' <span class="stage">' + R.icon + ' ' + esc(R.name) + '</span>' : '') + (rareUp ? ' <span class="stage">🌟 Rare</span>' : '')}</h4>
+  $('#overlay .sheet').innerHTML = `<h4>${opts.title ? esc(opts.title) : 'Wild battle! <span class="stage">' + diff.name + '</span>' + (R.key !== 'file' ? ' <span class="stage">' + R.icon + ' ' + esc(R.name) + '</span>' : '') + (rareUp ? ' <span class="stage">🌟 Rare</span>' : '') + ((p.streak || 0) >= 2 ? ' <span class="stage">🔥 ' + p.streak + ' streak</span>' : '')}</h4>
     <div class="arena">${side(me, 'fMe')}<div class="vs">VS</div>${side(foe, 'fFoe')}</div>
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
     <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
@@ -1797,16 +1801,19 @@ async function battle(diff, opts){
   if (outcome === 'win'){
     const g = growthOf(p), k = pick(['atk', 'int', 'def', 'spd', 'hp', 'sp']), v = k === 'hp' ? 3 + p.stage : k === 'sp' ? 2 : 1 + Math.floor(p.stage / 2);
     g[k] = (g[k] || 0) + v;
-    const ev = Math.max(1, Math.round(3 * diff.reward)), dd = Math.round((4 + 3 * p.stage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1) * (1 + 0.1 * perk('scav')));
+    const ev = evoWin(p, diff), dd = Math.round((1 + 0.05 * Math.min(p.streak || 0, 10)) * (4 + 3 * p.stage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1) * (1 + 0.1 * perk('scav')));
     bump('wins'); addBond(p, 2);
     questProgress('win'); if (diff.key === 'hard' || diff.key === 'nightmare') questProgress('winHard');
     p.wins++; p.stageWins = (p.stageWins || 0) + 1; p.evo += ev + perk('evo'); p.mood = clamp(p.mood + 8); G.data += dd;
+    p.streak = (p.streak || 0) + 1; G.stats = G.stats || {}; G.stats.bestStreak = Math.max(G.stats.bestStreak || 0, p.streak);
     summary = p.name + ' won! +' + ev + ' digivolution points, +' + v + ' ' + STAT_LABEL[k] + ', +' + dd + ' DigiData.';
+    if (p.streak >= 2) summary += ' 🔥 ' + p.streak + '-win streak! Next win: +' + Math.round((streakMul(p.streak) - 1) * 100) + '% evo points.';
+    if (STREAK_GIFTS[p.streak]){ G.data += STREAK_GIFTS[p.streak]; summary += ' Streak bonus: +' + STREAK_GIFTS[p.streak] + ' DigiData!'; }
     if (diff.battleEgg && Math.random() < diff.battleEgg * (1 + 0.15 * perk('eggs'))){ G.eggs.push(diff.rare ? 'rare' : 'mystery'); summary += ' It dropped ' + (diff.rare ? 'a Rare Mystery Egg!' : 'a Mystery Egg!'); }
     if (diff.battleEgg && Math.random() < diff.battleEgg * 0.8){ const it = randomDigimental(); giveItem(it); summary += ' Found a ' + itemName(it) + '!'; }
     const rd = regionDrop(); if (rd){ grantItem(rd); summary += ' Found ' + itemIcon(rd) + ' ' + itemName(rd) + '!'; }
     if (evOn('eggs') && Math.random() < 0.12){ G.eggs.push('mystery'); summary += ' Egg Hunt: found a Mystery Egg!'; }
-  } else if (outcome === 'lose'){ p.losses++; p.stageLosses = (p.stageLosses || 0) + 1; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.`; }
+  } else if (outcome === 'lose'){ const lost = p.streak || 0; p.streak = 0; p.losses++; p.stageLosses = (p.stageLosses || 0) + 1; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.` + (lost >= 2 ? ` Its ${lost}-win streak ended.` : ''); }
   else summary = `${p.name} escaped from ${foe.name}.`;
   saveGame();
   const xp = Math.round((outcome === 'win' ? 10 + p.stage * 6 : outcome === 'lose' ? 3 + p.stage * 2 : 0) * diff.reward * (rareUp && outcome === 'win' ? 3 : 1) * (curWeather().xp || 1));
@@ -3007,6 +3014,7 @@ const ACH = [
   { id: 'colo10', name: 'Colosseum Legend', desc: 'Clear the Colosseum\'s Legend rank', stat: 'colo', n: 10, data: 1500, item: 'h:band' },
   { id: 'travel6', name: 'World Traveler', desc: 'Visit every region of the Digital World', stat: 'regions', n: 6, data: 800, item: 'egg:golden' },
   { id: 'farm25', name: 'DigiFarmer', desc: 'Harvest 25 crops', stat: 'harvests', n: 25, data: 300 },
+  { id: 'streak10w', name: 'Unstoppable', desc: 'Win 10 wild battles in a row with one Digimon', stat: 'bestStreak', n: 10, data: 400 },
   { id: 'tamer10', name: 'Seasoned Tamer', desc: 'Reach Tamer level 10', stat: 'tamer', n: 10, data: 500 },
   { id: 'tamer25', name: 'Legendary Tamer', desc: 'Reach Tamer level 25', stat: 'tamer', n: 25, data: 2000, item: 'egg:golden' },
   { id: 'clean50', name: 'Clean Freak', desc: 'Clean up 50 messes', stat: 'cleans', n: 50, data: 300 },
