@@ -1961,8 +1961,8 @@ function nameId(n){
 }
 // a stat goal that matches what the next form is good at
 function statReq(to, s){
-  const b = baseStats(to, s + 1), r = seeded(to, 47);
-  const k = r < 0.3 ? (b.atk / STAT_BASE.atk[s + 1] >= b.int / STAT_BASE.int[s + 1] ? 'atk' : 'int') : r < 0.5 ? 'def' : r < 0.67 ? 'spd' : r < 0.84 ? 'hp' : 'sp';
+  const r = Math.abs(seeded(to, 47));
+  const k = r < 0.15 ? 'atk' : r < 0.3 ? 'int' : r < 0.5 ? 'def' : r < 0.67 ? 'spd' : r < 0.84 ? 'hp' : 'sp';
   const extra = { atk: 3 + 3 * s, int: 3 + 3 * s, def: 3 + 3 * s, spd: 2 + 2 * s, hp: 15 + 10 * s, sp: 4 + 2 * s }[k];
   return { t: 'stat', k, v: STAT_BASE[k][s] + extra };
 }
@@ -1972,7 +1972,7 @@ function reqsFor(to, cond, s){
   if (s < 2) return q;                       // Fresh and In-Training digivolve freely
   if (state.armor.has(to) && s === 2){
     const m = c.match(/Digimentals? of (\w+)/i);
-    q.push({ t: 'item', key: 'dm:' + (m ? virtue(m[1]) : DIGIMENTAL_OF[name] || VIRTUES[Math.floor(seeded(to, 31) * VIRTUES.length)]) });
+    q.push({ t: 'item', key: 'dm:' + (m ? virtue(m[1]) : DIGIMENTAL_OF[name] || VIRTUES[Math.floor(Math.abs(seeded(to, 31)) * VIRTUES.length)]) });
     return q;                                // Armor forms just need their Digimental
   }
   const bad = /Dark Evolution|Death Evolution/i.test(c);
@@ -1984,7 +1984,7 @@ function reqsFor(to, cond, s){
     const ids = [...new Set(c.replace(/^with /i, '').split(/,\s*(?:or |and )?|\s+or\s+|\s+and\s+/).map(nameId).filter(id => id && id !== to))];
     if (ids.length) q.push({ t: 'dna', ids: ids.slice(0, 4) });
   }
-  const r = seeded(to, 41);
+  const r = Math.abs(seeded(to, 41));
   if (JUNK_RE.test(name) || bad) q.push({ t: 'bad', n: 3 });
   else if (DARK_RE.test(name)) q.push({ t: 'bad', n: 2 });
   else if (HOLY_RE.test(name)) q.push({ t: 'clean' });
