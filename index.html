@@ -266,7 +266,7 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .hp i{display:block;height:100%;width:100%;background:var(--good);transition:width .5s}
 .vs{font:700 1rem var(--display);color:var(--muted)}
 .blog{font-size:.88rem;min-height:2.8em;color:var(--muted)}
-.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;max-height:52vh;overflow:auto}
 .choice{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px;display:grid;justify-items:center;gap:4px;text-align:center}
 .choice img{width:84px;height:84px;object-fit:contain}
 img.sil{filter:var(--silf)}
@@ -2241,7 +2241,7 @@ async function pathsScreen(){
     '<div class="wallet"><span>Open <b>' + open + ' / ' + rows.length + '</b></span><span>Wins this stage <b>' + (p.stageWins || 0) + '</b></span><span>Failures <b>' + failures(p) + '</b></span></div>' +
     '<div class="row statrow pstats">' + statChips(partnerStats(p)) + '</div>' +
     (p.stage < 2 ? '<p class="ownline">Fresh and In-Training Digimon digivolve freely. Requirements start at Rookie.</p>'
-      : '<p class="ownline">Open paths with no requirements are a random draw: you\'ll be offered up to 3 (fewer after care mistakes). Unlocked special paths are always offered. Failures are care mistakes plus lost battles; wins count battles and dungeon clears. Both reset when it digivolves.</p>') +
+      : '<p class="ownline">Every open path (green) can be chosen when it digivolves. Failures are care mistakes plus lost battles; wins count battles and dungeon clears. Both reset when it digivolves.</p>') +
     (rows.length ? '<div class="lrows tall">' + rows.map(x => pathRow(x, p, true)).join('') + '</div>' : '<p style="margin:0">No recorded evolutions from here.</p>') +
     ownedItemsLine() +
     '<button class="ghost" id="ovClose">Close</button>';
@@ -2265,19 +2265,18 @@ async function digivolve(){
   }
   const reqMap = pathReqs(p.id, p.stage, cands);
   const rows = pathRows(p, cands, reqMap);
-  const count = p.stageMistakes === 0 ? 3 : p.stageMistakes <= 2 ? 2 : 1;
-  // free paths are a random draw (care mistakes shrink it); special paths you've unlocked always show
+  // every path whose requirements are met can be chosen: unlocked special paths first, then new forms, then ones you've raised
   const free = rows.filter(x => !x.rq.length);
-  const special = shuffle(rows.filter(x => x.rq.length && !x.miss)).slice(0, 6);
-  const unraised = shuffle(free.filter(x => !raised(x.c.id))), familiar = shuffle(free.filter(x => raised(x.c.id)));
-  const options = shuffle([...unraised, ...familiar].slice(0, count)).concat(special);
+  const special = rows.filter(x => x.rq.length && !x.miss);
+  const rank = x => (known(x.c.id) ? 0 : 1) + (raised(x.c.id) ? 2 : 0);
+  const options = [...special, ...free.sort((a, b) => rank(a) - rank(b) || a.c.name.localeCompare(b.c.name))];
   const locked = rows.filter(x => x.miss).sort((a, b) => a.miss - b.miss);
-  const careNote = count === 3 ? 'Great care! Choose its path.' : count === 2 ? 'Some care mistakes limited its paths.' : 'Neglect left only a few paths open.';
+  const careNote = options.length + ' path' + (options.length === 1 ? '' : 's') + ' open. Choose its form!';
   const choice = x => { const r = raised(x.c.id), k = known(x.c.id);
     return '<button class="choice' + (x.rq.length ? ' special' : '') + '" data-pick="' + x.c.id + '">' + pathImg(x.c) + '<b>' + (k ? esc(x.c.name) : '???') + '</b>' +
       (r ? '<small>✓ raised before</small>' : k ? '<small>seen in battle</small>' : '') + reqChips(x.rq, p) + '</button>'; };
   $('#overlay .sheet').innerHTML = '<h4>' + esc(p.name) + ' is ready!</h4>' +
-    '<p style="margin:0;color:var(--muted)">' + careNote + (special.length ? ' ' + special.length + ' special path' + (special.length === 1 ? '' : 's') + ' unlocked!' : '') + ' ' + cands.length + ' possible forms in total.</p>' +
+    '<p style="margin:0;color:var(--muted)">' + careNote + (special.length ? ' ' + special.length + ' special path' + (special.length === 1 ? '' : 's') + ' unlocked (highlighted).' : '') + ' ' + cands.length + ' possible forms in total.</p>' +
     (options.length ? '<div class="choices">' + options.map(choice).join('') + '</div>' : '<p style="margin:0">No path is open yet. Meet one of the requirements below, then try again.</p>') +
     (locked.length ? '<h5 class="lockh">🔒 Locked paths · ' + locked.length + '</h5><div class="lrows">' + locked.slice(0, 6).map(x => pathRow(x, p)).join('') + '</div>' +
       (locked.length > 6 ? '<p class="ownline">See all ' + locked.length + ' in 🧬 Evolution paths.</p>' : '') : '') +
