@@ -1439,13 +1439,15 @@ function trainGame(kind, hard){
     <button class="big" id="hit">Hit!</button>`;
   const placeZone = () => { zoneL = rand(5, 95 - zoneW); const z = $('#zone'); z.style.left = zoneL + '%'; z.style.width = zoneW + '%'; };
   const dots = () => { $('#dots').textContent = [0,1,2].map(i => i < round ? (results[i] ? '●' : '✕') : '○').join(' '); };
-  const loop = () => { pos += dir * speed(); if (pos >= 100){ pos = 100; dir = -1; } if (pos <= 0){ pos = 0; dir = 1; } $('#mark').style.left = pos + '%'; raf = requestAnimationFrame(loop); };
+  // move by elapsed time, not per frame, so 120/144 Hz screens aren't faster than 60 Hz phones
+  let lastT = 0;
+  const loop = t => { const dt = lastT ? Math.min(50, t - lastT) : 16.67; lastT = t; pos += dir * speed() * dt / 16.67; if (pos >= 100){ pos = 100; dir = -1; } if (pos <= 0){ pos = 0; dir = 1; } $('#mark').style.left = pos + '%'; raf = requestAnimationFrame(loop); };
   placeZone(); raf = requestAnimationFrame(loop);
   $('#hit').onclick = async () => {
     if (waiting) return;
     const ok = pos >= zoneL && pos <= zoneL + zoneW;
     results.push(ok); if (ok) hits++; round++; dots();
-    if (round < 3){ waiting = true; cancelAnimationFrame(raf); await sleep(350); placeZone(); waiting = false; raf = requestAnimationFrame(loop); return; }
+    if (round < 3){ waiting = true; cancelAnimationFrame(raf); await sleep(350); placeZone(); waiting = false; lastT = 0; raf = requestAnimationFrame(loop); return; }
     cancelAnimationFrame(raf);
     const g = growthOf(p), per = 1 + Math.floor(p.stage / 2), bonus = hits && p.mood > 60 ? 1 : 0;
     const mult = hard ? 2 : 1, boost = x => hits ? Math.max(x * mult, Math.round(x * mult * (1 + 0.15 * perk('drill')))) : 0;
