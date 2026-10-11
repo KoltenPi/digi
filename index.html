@@ -869,7 +869,7 @@ function renderPartner(){
       <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
     </div>
     <button class="act wide" data-act="dungeon" ${p.energy < 30 ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${p.energy < 30 ? 'too tired (needs 30 energy)' : 'choose a difficulty · 3–8 floors'}</small></button>
-    <div class="actions two">${atTop ? '' : `<button class="act" data-act="paths">🧭 Evolution paths<small>what each form needs</small></button>`}<button class="act" data-act="tree">🌳 Evolution tree<small>branches you've found</small></button><button class="act" data-act="jogress">🧬 Jogress<small>DNA fusion</small></button><button class="act" data-act="bag">🎒 Bag<small>${['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].reduce((n, k) => n + (G.items[k] || 0), 0)} usable items</small></button></div>
+    <div class="actions two">${atTop ? '' : `<button class="act" data-act="paths">🧭 Evolution paths<small>what each form needs</small></button>`}<button class="act" data-act="tree">🌳 Evolution tree<small>branches you've found</small></button><button class="act" data-act="jogress">🧬 Jogress<small>DNA fusion</small></button><button class="act" data-act="bag">🎒 Bag<small>${USABLE_KEYS().reduce((n, k) => n + (G.items[k] || 0), 0)} usable items</small></button></div>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
@@ -1023,6 +1023,8 @@ function renderShop(){
     '<p id="shopMsg" style="margin:0;min-height:1.4em;font-size:.88rem"></p>' +
     '<h3 style="margin:4px 0 0">Care &amp; training items</h3><p class="ownline">Use them from 🎒 Bag on the Partner tab. Chips add more at higher stages.</p>' +
     '<div class="itemgrid">' + ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].map(itemTile).join('') + '</div>' +
+    '<h3 style="margin:4px 0 0">Personality Mints</h3><p class="ownline">Change a Digimon\'s personality from 🎒 Bag. 🎲 Mystery Mint picks a random new one (150); 🌿 each named Mint sets that exact personality (350).</p>' +
+    '<div class="itemgrid">' + MINT_KEYS().map(itemTile).join('') + '</div>' +
     '<p class="ownline">🕊️ Clean Slate clears this stage\'s failures (care mistakes and lost battles). 💾 Chips raise one stat; 🌟 Ultimate Chip raises them all.</p>' +
     '<h3 style="margin:4px 0 0">Digimentals <small class="pricetag">' + ITEM_PRICE.dm + ' DigiData each</small></h3><p class="ownline">Unlock Armor digivolutions from Rookies. Used up when your Digimon armor-digivolves.</p>' +
     '<div class="itemgrid">' + VIRTUES.map(v => itemTile('dm:' + v)).join('') + '</div>' +
@@ -1163,6 +1165,7 @@ async function collectExpeditions(list){
     if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); extra += ' Found an X-Antibody!'; }
     if (ex.chip && Math.random() < ex.chip * (ok ? 1 : 0.5)){ const k = randomChip(); giveItem(k); extra += (k === 'vit:def' ? ' Found a ' : ' Found an ') + itemName(k) + '!'; }
     if (ex.clean && Math.random() < ex.clean * (ok ? 1 : 0.5)){ giveItem('clean'); extra += ' Found a Clean Slate!'; }
+    if (ok && ex.key !== 'fields' && Math.random() < (ex.key === 'dark' ? 0.15 : 0.06)){ giveItem('pers:?'); extra += ' Found a Mystery Mint!'; }
     const pool = (state.stageIds[m.stage] || []).filter(id => state.byId.has(id) && !known(id));
     const found = [];
     for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; found.push(state.byId.get(id).name); } }
@@ -2172,13 +2175,15 @@ const ITEM_PRICE = { dm: 120, crest: 450, xab: 200, clean: 150, vit: 90, all: 40
 const CHIP_KEYS = ['atk', 'int', 'def', 'spd', 'hp', 'sp'];
 // how much a stat chip adds, scaled to the Digimon's stage
 function chipGain(k, stage){ return { atk: 2 + stage, int: 2 + stage, def: 2 + stage, spd: 1 + stage, hp: 10 + 5 * stage, sp: 3 + stage }[k]; }
-const itemPrice = k => k.startsWith('h:') ? (HELD[k].price || 600) : k === 'vit:all' ? ITEM_PRICE.all : ITEM_PRICE[itemType(k)];
+const itemPrice = k => k === 'pers:?' ? 150 : k.startsWith('pers:') ? 350 : k.startsWith('h:') ? (HELD[k].price || 600) : k === 'vit:all' ? ITEM_PRICE.all : ITEM_PRICE[itemType(k)];
 const randomChip = () => Math.random() < 0.08 ? 'vit:all' : 'vit:' + pick(CHIP_KEYS);
 const virtue = w => { w = String(w || '').replace(/[^A-Za-z]/g, ''); w = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); return VIRTUE_ALIAS[w] || (VIRTUES.includes(w) ? w : 'Miracles'); };
 const itemType = k => k.split(':')[0];
-const itemName = k => k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
-const itemIcon = k => k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
-const itemUsable = k => k === 'clean' || itemType(k) === 'vit';
+const itemName = k => k === 'pers:?' ? 'Mystery Mint' : k.startsWith('pers:') ? (PERS[k.slice(5)] ? PERS[k.slice(5)].name + ' Mint' : 'Mint') : k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
+const itemIcon = k => k === 'pers:?' ? '🎲' : k.startsWith('pers:') ? '🌿' : k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
+const itemUsable = k => k === 'clean' || itemType(k) === 'vit' || itemType(k) === 'pers';
+const MINT_KEYS = () => ['pers:?', ...PERS_KEYS.map(k => 'pers:' + k)];
+const USABLE_KEYS = () => ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all', ...MINT_KEYS()];
 const itemKept = k => itemType(k) === 'crest';
 const hasItem = k => (G.items[k] || 0) > 0;
 function giveItem(k, n){ G.items[k] = (G.items[k] || 0) + (n || 1); }
@@ -2289,16 +2294,16 @@ function ownedItemsLine(){
 function bagScreen(msg){
   const p = P(); if (!p) return;
   busy = true;
-  const usable = ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].filter(hasItem);
+  const usable = USABLE_KEYS().filter(hasItem);
   const evoItems = Object.keys(G.items).filter(k => hasItem(k) && !itemUsable(k) && !k.startsWith('h:'));
   const cur = heldOf(p), heldOwned = HELD_KEYS.filter(hasItem);
-  const effect = k => k === 'clean' ? 'Clears ' + failures(p) + ' failure' + (failures(p) === 1 ? '' : 's') + ' this stage'
+  const effect = k => k === 'pers:?' ? 'Random new personality (now ' + persOf(p).name + ')' : k.startsWith('pers:') ? 'Become ' + PERS[k.slice(5)].name + ': ' + PERS[k.slice(5)].desc + (p.pers === k.slice(5) ? ' (already)' : '') : k === 'clean' ? 'Clears ' + failures(p) + ' failure' + (failures(p) === 1 ? '' : 's') + ' this stage'
     : k === 'vit:all' ? 'All stats up' : '+' + chipGain(k.split(':')[1], p.stage) + ' ' + STAT_LABEL[k.split(':')[1]];
   const html = '<h4>🎒 Bag · ' + esc(p.name) + '</h4>' +
     '<div class="row statrow pstats">' + statChips(partnerStats(p)) + '</div>' +
     '<div class="wallet"><span>Failures this stage <b>' + failures(p) + '</b></span></div>' +
     (usable.length ? '<div class="shop">' + usable.map(k => '<div class="shopitem"><span class="upic" aria-hidden="true">' + itemIcon(k) + '</span><div class="info"><b>' + esc(itemName(k)) + ' ×' + G.items[k] + '</b><small>' + esc(effect(k)) + '</small></div>' +
-      '<button class="act" data-use="' + k + '"' + (k === 'clean' && !failures(p) ? ' disabled' : '') + '>Use</button></div>').join('') + '</div>'
+      '<button class="act" data-use="' + k + '"' + ((k === 'clean' && !failures(p)) || k === 'pers:' + p.pers ? ' disabled' : '') + '>Use</button></div>').join('') + '</div>'
       : '<p class="ownline">No usable items. Buy Clean Slates and stat chips in the Shop, or find them on expeditions.</p>') +
     (evoItems.length ? '<p class="ownline">Evolution items: ' + evoItems.map(k => esc(itemIcon(k) + ' ' + itemName(k) + (itemKept(k) ? '' : ' ×' + G.items[k]))).join(' · ') + '. These are used automatically when your Digimon digivolves.</p>' : '') +
     '<h5 class="lockh">Held item</h5><div class="shop"><div class="shopitem"><span class="upic" aria-hidden="true">' + (cur ? HELD[cur].icon : '✋') + '</span><div class="info"><b>' + (cur ? esc(HELD[cur].name) : 'Nothing held') + '</b><small>' + (cur ? esc(HELD[cur].desc) : 'Give ' + esc(p.name) + ' an item to hold for a lasting bonus.') + '</small></div>' + (cur ? '<button class="act" data-unhold="1">Remove</button>' : '') + '</div>' +
@@ -2313,7 +2318,12 @@ function bagScreen(msg){
   $('#overlay').querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
     const k = b.dataset.use; if (!hasItem(k)) return;
     let note;
-    if (k === 'clean'){ if (!failures(p)) return; const n = failures(p); p.stageMistakes = 0; p.stageLosses = 0; note = 'Cleared ' + n + ' failure' + (n === 1 ? '' : 's') + '. ' + p.name + ' gets a fresh start this stage.'; }
+    if (k.startsWith('pers:')){
+      persOf(p); const old = p.pers, nk = k === 'pers:?' ? pick(PERS_KEYS.filter(x => x !== old)) : k.slice(5);
+      if (!PERS[nk] || nk === old) return;
+      p.pers = nk; note = p.name + ' went from ' + PERS[old].name + ' to ' + PERS[nk].name + '! (' + PERS[nk].desc + ')';
+    }
+    else if (k === 'clean'){ if (!failures(p)) return; const n = failures(p); p.stageMistakes = 0; p.stageLosses = 0; note = 'Cleared ' + n + ' failure' + (n === 1 ? '' : 's') + '. ' + p.name + ' gets a fresh start this stage.'; }
     else {
       const g = growthOf(p), keys = k === 'vit:all' ? CHIP_KEYS : [k.split(':')[1]], parts = [];
       for (const s of keys){ const v = k === 'vit:all' ? Math.ceil(chipGain(s, p.stage) / 2) : chipGain(s, p.stage); g[s] = (g[s] || 0) + v; parts.push('+' + v + ' ' + STAT_LABEL[s]); }
