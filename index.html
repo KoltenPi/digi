@@ -2425,12 +2425,12 @@ async function processImg(img){
   const orig = img.dataset.orig || img.getAttribute('src');
   if (!orig || orig.startsWith('data:')) return;
   const sil = img.classList.contains('sil');
-  if (!retroOn && !sil){ if (img.dataset.orig){ img.src = orig; img.style.imageRendering = ''; delete img.dataset.orig; delete img.dataset.mode; } return; }
+  if (!retroOn && !sil && !isDark()){ if (img.dataset.orig){ img.src = orig; img.style.imageRendering = ''; delete img.dataset.orig; delete img.dataset.mode; } return; }
   const mode = retroOn ? 'retro' : 'cut';
   if (img.dataset.mode === mode) return;
   img.dataset.orig = orig; img.dataset.mode = mode;
   const big = img.matches('#sprite, .art, .reveal img');
-  const url = await processArt(orig, retroOn ? (big ? 56 : 44) : (big ? 160 : 96), retroOn);
+  const url = await processArt(orig, retroOn ? (big ? 56 : 44) : (big ? 320 : 128), retroOn);
   if (url && img.dataset.orig === orig && img.dataset.mode === mode){ img.src = url; img.style.imageRendering = retroOn ? 'pixelated' : ''; }
 }
 const imgIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ imgIO.unobserve(e.target); processImg(e.target); } }), {rootMargin: '300px'});
@@ -2474,16 +2474,16 @@ setInterval(() => { if (!busy && !document.hidden && state.tab === 'quests') ren
 renderRail();
 setRetro(false);
 // light / dark mode: follows the phone until you pick one, then remembers it
-const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+function isDark(){ return document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); }
 function paintThemeBtn(){ $('#themeBtn').textContent = isDark() ? '☀️ Light' : '🌙 Dark'; $('#themeBtn').setAttribute('aria-label', isDark() ? 'Switch to light mode' : 'Switch to dark mode'); }
 $('#themeBtn').onclick = () => {
   const next = isDark() ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
   try{ localStorage.setItem('dx_theme', next); }catch{}
-  paintThemeBtn();
+  paintThemeBtn(); setRetro(false);   // re-process art: cut out white backgrounds in dark mode
   if (typeof dg !== 'undefined' && dg && !dg.over) dgDraw();
 };
-try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintThemeBtn); }catch{}
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { paintThemeBtn(); setRetro(false); }); }catch{}
 paintThemeBtn();
 questInit(); updateQuestBadge();
 setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
