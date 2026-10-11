@@ -109,9 +109,9 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .skill p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
 
 /* tabs */
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(5,1fr);background:var(--panel);
   border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs button{border:0;background:none;padding:12px 0 10px;font:700 .8rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tabs button{border:0;background:none;padding:12px 0 10px;font:700 .68rem var(--mono);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-transform:uppercase;color:var(--muted)}
 .tabs button[aria-selected="true"]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
 
 /* partner */
@@ -298,6 +298,17 @@ img.sil{filter:var(--silf)}
 .itile .nm b{font-size:.84rem;overflow-wrap:anywhere}
 .itile .nm small{font:.64rem var(--mono);color:var(--muted)}
 .itile .act{padding:6px 10px;min-width:0}
+.quests{display:grid;gap:8px}
+.quest{display:grid;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.quest .qtop{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.quest .qtop span{font:700 .78rem var(--mono);color:var(--muted);white-space:nowrap}
+.quest .qbot{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.quest small{font:.72rem/1.35 var(--mono);color:var(--muted)}
+.quest .act{padding:8px 14px;min-width:0}
+.quest.done{border-color:var(--good)}
+.quest.done .evotrack i{background:var(--good)}
+.quest.empty,.quest.locked{opacity:.7;border-style:dashed}
+.qrefresh .act{width:100%}
 .reveal{display:grid;justify-items:center;gap:6px;text-align:center}
 .reveal img{width:160px;height:160px;object-fit:contain}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.card:active,.act:active{transform:none}}
@@ -331,12 +342,14 @@ img.sil{filter:var(--silf)}
   <section id="detailView" class="detail" hidden></section>
   <section id="shopView" class="partner" hidden></section>
   <section id="boxView" class="partner" hidden></section>
+  <section id="questsView" class="partner" hidden></section>
 </main>
 
 <nav class="tabs" role="tablist" aria-label="Sections">
   <button id="tabPartner" role="tab" aria-selected="true">Partner</button>
   <button id="tabIndex" role="tab" aria-selected="false">Index</button>
   <button id="tabBox" role="tab" aria-selected="false">Box</button>
+  <button id="tabQuests" role="tab" aria-selected="false">Quests</button>
   <button id="tabShop" role="tab" aria-selected="false">Shop</button>
 </nav>
 <div id="overlay" class="ov" hidden></div>
@@ -488,6 +501,7 @@ function showError(html, retry){
 }
 function updateCount(){
   updateBoxBadge();
+  if (state.tab === 'quests' && G.quests){ $('#count').innerHTML = G.quests.list.filter(questDone).length + ' to claim<br>' + foundCount() + ' found'; return; }
   if (state.tab === 'box'){ $('#count').innerHTML = G.box.length + ' / ' + G.boxCap + ' stored<br>' + expRunning() + ' exploring'; return; }
   const n = Object.values(G.col).filter(v => v === 'raised').length;
   if (state.tab === 'shop') $('#count').innerHTML = G.data.toLocaleString() + ' DigiData<br>' + G.eggs.length + ' egg' + (G.eggs.length === 1 ? '' : 's');
@@ -502,7 +516,9 @@ function setTab(t){
   $('#tabIndex').setAttribute('aria-selected', t === 'index');
   $('#tabShop').setAttribute('aria-selected', t === 'shop');
   $('#tabBox').setAttribute('aria-selected', t === 'box');
-  const isP = t === 'partner', isI = t === 'index', isS = t === 'shop', isB = t === 'box';
+  $('#tabQuests').setAttribute('aria-selected', t === 'quests');
+  const isP = t === 'partner', isI = t === 'index', isS = t === 'shop', isB = t === 'box', isQ = t === 'quests';
+  $('#questsView').hidden = !isQ;
   $('#partnerView').hidden = !isP;
   $('#shopView').hidden = !isS;
   $('#boxView').hidden = !isB;
@@ -512,12 +528,14 @@ function setTab(t){
   if (isP){ tick(); renderPartner(); }
   else if (isS) renderShop();
   else if (isB) renderBox();
+  else if (isQ) renderQuests();
   else renderGrid();
   updateCount();
   window.scrollTo(0, 0);
 }
 $('#tabShop').onclick = () => setTab('shop');
 $('#tabBox').onclick = () => setTab('box');
+$('#tabQuests').onclick = () => setTab('quests');
 $('#tabPartner').onclick = () => setTab('partner');
 $('#tabIndex').onclick = () => { if (!$('#detailView').hidden) goList(); setTab('index'); };
 
@@ -583,7 +601,7 @@ function idFromUrl(u){ const m = String(u||'').match(/\/(\d+)\/?$/); return m ? 
 
 async function openDetail(id, fromEvo){
   id = +id;
-  if (state.tab !== 'index'){ state.tab = 'index'; store.set('dx_tab', 'index'); $('#tabPartner').setAttribute('aria-selected', false); $('#tabIndex').setAttribute('aria-selected', true); $('#tabShop').setAttribute('aria-selected', false); $('#tabBox').setAttribute('aria-selected', false); $('#partnerView').hidden = true; $('#shopView').hidden = true; $('#boxView').hidden = true; }
+  if (state.tab !== 'index'){ state.tab = 'index'; store.set('dx_tab', 'index'); $('#tabPartner').setAttribute('aria-selected', false); $('#tabIndex').setAttribute('aria-selected', true); $('#tabShop').setAttribute('aria-selected', false); $('#tabBox').setAttribute('aria-selected', false); $('#tabQuests').setAttribute('aria-selected', false); $('#partnerView').hidden = true; $('#shopView').hidden = true; $('#boxView').hidden = true; $('#questsView').hidden = true; }
   const v = $('#detailView');
   $('#listView').hidden = true; $('#indexChrome').hidden = true;
   v.hidden = false;
@@ -839,13 +857,13 @@ $('#partnerView').addEventListener('click', e => {
   if (k === 'feed'){
     if (p.hunger > 92){ p.mood = clamp(p.mood - 6); return say(`${p.name} is stuffed and pushes the food away.`); }
     const low = p.hunger < 50;
-    p.hunger = clamp(p.hunger + 30); if (low) p.evo += 1;
+    p.hunger = clamp(p.hunger + 30); if (low) p.evo += 1; questProgress('care');
     return say(pick([`${p.name} gobbled it up!`, `Crunch crunch. ${p.name} looks satisfied.`, `${p.name} ate every last bite.`]), 'happy');
   }
   if (k === 'play'){
     if (p.energy < 10) return say(`${p.name} is too tired to play.`);
     const low = p.mood < 60;
-    p.mood = clamp(p.mood + 25); p.energy = clamp(p.energy - 10); p.hunger = clamp(p.hunger - 4); if (low) p.evo += 1;
+    p.mood = clamp(p.mood + 25); p.energy = clamp(p.energy - 10); p.hunger = clamp(p.hunger - 4); if (low) p.evo += 1; questProgress('care');
     return say(pick([`You and ${p.name} played tag. It's having a great time!`, `${p.name} chased the ball around and around.`, `${p.name} is laughing!`]), 'happy');
   }
   if (k === 'rest'){
@@ -903,6 +921,7 @@ function hatchNew(type = 'mystery', toBox){
   const id = pick(from);
   let m;
   if (toBox){ m = makePartner(id); G.box.push(m); } else { newPartner(id); m = P(); }
+  questProgress('hatch');
   if (type === 'rare'){ const g = growthOf(m); g.hp += 6; g.sp += 2; g.atk += 2; g.int += 2; g.spd += 2; m.mood = 90; }
   saveGame();
   return m;
@@ -1085,6 +1104,7 @@ async function collectExpeditions(list){
     if (found.length) extra += ' Spotted ' + found.join(', ') + '.';
     m.exp = null;
     const lv = await gainXP(m, xp);
+    questProgress('exp');
     lines.push('<div><b>' + esc(m.name) + '</b> · ' + esc(ex.name) + (ok ? '' : ' (rough trip)') + '<br><small>+' + data + ' DigiData · +' + xp + ' XP.' + esc(levelText(lv) + extra) + '</small></div>');
   }
   saveGame();
@@ -1257,6 +1277,7 @@ function trainGame(kind){
     else if (kind === 'sp'){ const s = hits * per * 2 + bonus; g.sp = (g.sp || 0) + s; gained = '+' + s + ' SP'; }
     else { const v = hits * per + bonus; g[kind] = (g[kind] || 0) + v; gained = '+' + v + ' ' + STAT_LABEL[kind]; }
     p.evo += hits; p.energy = clamp(p.energy - 20); p.hunger = clamp(p.hunger - 10);
+    questProgress('train'); if (hits === 3) questProgress('perfect');
     if (!hits) p.mood = clamp(p.mood - 6);
     saveGame();
     $('#hit').textContent = 'Done';
@@ -1555,6 +1576,7 @@ async function battle(diff){
     const g = growthOf(p), k = pick(['atk', 'int', 'def', 'spd', 'hp', 'sp']), v = k === 'hp' ? 3 + p.stage : k === 'sp' ? 2 : 1 + Math.floor(p.stage / 2);
     g[k] = (g[k] || 0) + v;
     const ev = Math.max(1, Math.round(3 * diff.reward)), dd = Math.round((4 + 3 * p.stage) * diff.reward);
+    questProgress('win'); if (diff.key === 'hard' || diff.key === 'nightmare') questProgress('winHard');
     p.wins++; p.stageWins = (p.stageWins || 0) + 1; p.evo += ev; p.mood = clamp(p.mood + 8); G.data += dd;
     summary = p.name + ' won! +' + ev + ' digivolution points, +' + v + ' ' + STAT_LABEL[k] + ', +' + dd + ' DigiData.';
     if (diff.battleEgg && Math.random() < diff.battleEgg){ G.eggs.push(diff.rare ? 'rare' : 'mystery'); summary += ' It dropped ' + (diff.rare ? 'a Rare Mystery Egg!' : 'a Mystery Egg!'); }
@@ -1828,7 +1850,7 @@ function dgEnd(result){
   if (result === 'clear'){
     data += Math.round((30 * (r.stage + 1) + 10 * r.floors) * r.diff.reward); evo += Math.round(5 * r.diff.reward);
     if (Math.random() < r.diff.egg){ if (r.diff.rare && Math.random() < 0.5) r.rareEgg = true; else eggs++; }
-    p.mood = clamp(p.mood + 15); title = 'Dungeon cleared!'; p.stageWins = (p.stageWins || 0) + 1;
+    p.mood = clamp(p.mood + 15); title = 'Dungeon cleared!'; p.stageWins = (p.stageWins || 0) + 1; questProgress('dungeon');
     const crestOdds = { hard: 0.2, nightmare: 0.4 }[r.diff.key] || 0;
     if (Math.random() < crestOdds){ const ck = randomCrest() || randomDigimental(); (r.relics = r.relics || []).push(ck); }
     note = 'You made it through all ' + r.floors + ' floors on ' + r.diff.name + '.' + (r.rareEgg ? ' You found a Rare Mystery Egg!' : '');
@@ -1838,6 +1860,7 @@ function dgEnd(result){
   } else { title = 'Left the dungeon'; note = 'You escaped from floor ' + r.floor + ' with everything you found.'; }
   G.data += data; p.evo += evo; for (let i = 0; i < eggs; i++) G.eggs.push('mystery');
   if (r.rareEgg && result === 'clear'){ G.eggs.push('rare'); eggs++; }
+  if (r.kos) questProgress('ko', r.kos);
   const relics = r.relics || []; relics.forEach(k => giveItem(k));
   if (relics.length) note += ' Items: ' + relics.map(itemName).join(', ') + '.';
   const xp = Math.round((r.kos * (3 + 2 * r.stage) + (result === 'clear' ? 20 + 10 * r.stage : 0)) * (result === 'faint' ? 0.5 : 1) * r.diff.reward);
@@ -2108,6 +2131,89 @@ function bagScreen(msg){
   });
 }
 
+// ----- quests: 3 slots, +1 each at 50 / 100 / 200 Digimon found; free refresh every hour, paid refreshes cost more each time -----
+const QUEST_UNLOCKS = [50, 100, 200];
+const QUEST_TYPES = [
+  { t: 'win', min: 3, max: 6, per: 22, text: n => 'Win ' + n + ' battles' },
+  { t: 'winHard', min: 1, max: 3, per: 65, text: n => 'Win ' + n + ' battle' + (n === 1 ? '' : 's') + ' on Hard or Nightmare' },
+  { t: 'dungeon', min: 1, max: 2, per: 95, text: n => 'Clear ' + n + ' dungeon' + (n === 1 ? '' : 's') },
+  { t: 'ko', min: 8, max: 20, per: 6, text: n => 'Defeat ' + n + ' foes in dungeons' },
+  { t: 'train', min: 3, max: 6, per: 16, text: n => 'Train ' + n + ' times' },
+  { t: 'perfect', min: 1, max: 3, per: 45, text: n => 'Get ' + n + ' perfect training' + (n === 1 ? '' : 's') + ' (3 of 3 hits)' },
+  { t: 'exp', min: 1, max: 3, per: 50, text: n => 'Finish ' + n + ' expedition' + (n === 1 ? '' : 's') },
+  { t: 'evolve', min: 1, max: 1, per: 130, text: () => 'Digivolve a Digimon' },
+  { t: 'care', min: 4, max: 8, per: 9, text: n => 'Feed or play with your partners ' + n + ' times' },
+  { t: 'hatch', min: 1, max: 1, per: 70, text: () => 'Hatch an egg' },
+  { t: 'discover', min: 2, max: 5, per: 35, text: n => 'Discover ' + n + ' new Digimon' },
+];
+const foundCount = () => Object.keys(G.col).length;
+const questSlots = () => 3 + QUEST_UNLOCKS.filter(n => foundCount() >= n).length;
+const hourKey = () => Math.floor(Date.now() / 3600000);
+const questRefreshCost = () => 50 + 50 * (G.quests.paid || 0);
+function makeQuest(avoid){
+  const pool = QUEST_TYPES.filter(q => !avoid.includes(q.t));
+  const T = pick(pool.length ? pool : QUEST_TYPES), n = T.min + Math.floor(Math.random() * (T.max - T.min + 1));
+  const r = Math.random(), item = r < 0.12 ? 'egg' : r < 0.3 ? 'clean' : r < 0.55 ? randomChip() : r < 0.65 ? randomDigimental() : null;
+  return { t: T.t, n, prog: 0, base: T.t === 'discover' ? foundCount() : 0, data: Math.round(T.per * n * (0.9 + Math.random() * 0.3) / 5) * 5, item };
+}
+function questInit(){
+  if (!G.quests || !Array.isArray(G.quests.list)) G.quests = { list: [], hour: hourKey(), freeUsed: false, paid: 0 };
+  const Q = G.quests;
+  if (Q.hour !== hourKey()){ Q.hour = hourKey(); Q.freeUsed = false; Q.paid = 0; }   // new hour: free refresh back, price resets
+  while (Q.list.length < questSlots()) Q.list.push(makeQuest(Q.list.filter(Boolean).map(q => q.t)));
+}
+const questProg = q => q.t === 'discover' ? Math.max(0, foundCount() - q.base) : q.prog;
+const questDone = q => q && !q.claimed && questProg(q) >= q.n;
+function questProgress(t, amount){
+  if (!G.quests) return;
+  let hit = false;
+  for (const q of G.quests.list) if (q && q.t === t && !q.claimed && q.prog < q.n){ q.prog = Math.min(q.n, q.prog + (amount || 1)); hit = true; }
+  if (hit){ saveGame(); updateQuestBadge(); }
+}
+function updateQuestBadge(){
+  const t = $('#tabQuests'); if (!t || !G.quests) return;
+  const n = G.quests.list.filter(questDone).length;
+  t.textContent = n ? 'Quests · ' + n : 'Quests';
+}
+function rewardText(q){ return '+' + q.data + ' DigiData' + (q.item ? ' · ' + (q.item === 'egg' ? '🥚 Mystery Egg' : itemIcon(q.item) + ' ' + itemName(q.item)) : ''); }
+// replaces every quest except finished ones you haven't claimed yet
+function rerollQuests(){
+  const Q = G.quests, keep = Q.list.map(q => questDone(q) ? q : null);
+  Q.list = keep.map(q => q || null);
+  for (let i = 0; i < Q.list.length; i++) if (!Q.list[i]) Q.list[i] = makeQuest(Q.list.filter(Boolean).map(x => x.t));
+}
+function renderQuests(msg){
+  questInit(); updateQuestBadge();
+  if (state.tab !== 'quests') return;
+  const Q = G.quests, slots = questSlots(), cost = questRefreshCost(), found = foundCount();
+  const nextHour = (hourKey() + 1) * 3600000 - Date.now();
+  const card = (q, i) => {
+    if (!q) return '<div class="quest empty"><b>Quest complete</b><small>A new quest arrives when you refresh.</small></div>';
+    const T = QUEST_TYPES.find(x => x.t === q.t), p = Math.min(q.n, questProg(q)), done = questDone(q);
+    return '<div class="quest' + (q.claimed ? ' claimed' : done ? ' done' : '') + '"><div class="qtop"><b>' + esc(T.text(q.n)) + '</b><span>' + p + ' / ' + q.n + '</span></div>' +
+      '<div class="evotrack"><i style="width:' + (p / q.n * 100) + '%"></i></div>' +
+      '<div class="qbot"><small>' + esc(rewardText(q)) + '</small>' + (done ? '<button class="act" data-claim="' + i + '">Claim</button>' : '') + '</div></div>';
+  };
+  const locked = QUEST_UNLOCKS.filter(n => found < n).map(n => '<div class="quest locked"><b>🔒 Locked slot</b><small>Unlocks at ' + n + ' Digimon found (' + found + ' / ' + n + ')</small><div class="evotrack"><i style="width:' + Math.min(100, found / n * 100) + '%"></i></div></div>');
+  $('#questsView').innerHTML = '<div class="ptop"><h2>Quests</h2></div>' +
+    '<div class="wallet"><span>Slots <b>' + slots + ' / 6</b></span><span>Found <b>' + found + '</b></span><span>DigiData <b>' + G.data.toLocaleString() + '</b></span></div>' +
+    '<div class="quests">' + Q.list.map(card).join('') + locked.join('') + '</div>' +
+    '<div class="qrefresh">' + (Q.freeUsed
+      ? '<button class="act" id="qPaid"' + (G.data < cost ? ' disabled' : '') + '>🔄 Refresh now · ' + cost + ' DigiData<small>free again in ' + fmtLeft(nextHour) + ' · price goes up with each refresh</small></button>'
+      : '<button class="act" id="qFree">🔄 Free refresh<small>1 per hour · next in ' + fmtLeft(nextHour) + '</small></button>') + '</div>' +
+    '<p class="ownline">Refreshing replaces every quest except finished ones waiting to be claimed. The refresh price goes back to ' + 50 + ' at the top of every hour. Unlock more quest slots by finding Digimon (battles, hatching, digivolving and expeditions all count).</p>' +
+    '<p id="qMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>';
+  $('#questsView').querySelectorAll('[data-claim]').forEach(b => b.onclick = () => {
+    const q = Q.list[+b.dataset.claim]; if (!questDone(q)) return;
+    G.data += q.data;
+    if (q.item === 'egg') G.eggs.push('mystery'); else if (q.item) giveItem(q.item);
+    Q.list[+b.dataset.claim] = null; saveGame(); updateCount();
+    renderQuests('Claimed: ' + rewardText(q) + '!');
+  });
+  const f = $('#qFree'); if (f) f.onclick = () => { if (Q.freeUsed) return; Q.freeUsed = true; rerollQuests(); saveGame(); renderQuests('New quests are in!'); };
+  const pd = $('#qPaid'); if (pd) pd.onclick = () => { const c = questRefreshCost(); if (G.data < c) return; G.data -= c; Q.paid = (Q.paid || 0) + 1; rerollQuests(); saveGame(); updateCount(); renderQuests('Refreshed for ' + c + ' DigiData.'); };
+}
+
 // planner: every next form and what it needs, so you can aim for one
 async function pathsScreen(){
   const p = P(); if (!p || busy) return;
@@ -2180,7 +2286,7 @@ async function evolveTo(id, reqs){
   const firstTime = !raised(id);
   p.id = id; p.name = b.name; p.image = b.image;
   p.stage = inStage(id, p.stage + 1) ? p.stage + 1 : Math.min(5, higherStage(id, p.stage) ?? p.stage + 1);
-  p.evo = 0; p.stageMistakes = 0; p.stageWins = 0; p.stageLosses = 0; p.line.push(id);
+  p.evo = 0; p.stageMistakes = 0; p.stageWins = 0; p.stageLosses = 0; p.line.push(id); questProgress('evolve');
   p.stageLine = [...(p.stageLine || p.line.slice(0, -1).map((_, i) => i)), p.stage];
   p.mood = clamp(p.mood + 20); p.energy = clamp(p.energy + 20); p.str += 3;
   G.col[id] = 'raised';
@@ -2350,9 +2456,11 @@ window.addEventListener('popstate', route);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy){ tick(); renderPartner(); } });
 setInterval(() => { if (!busy && !document.hidden && state.tab === 'partner' && P()){ tick(); renderPartner(); } }, 60000);
 setInterval(() => { updateBoxBadge(); if (!busy && !document.hidden && state.tab === 'box') renderBox(); }, 15000);
+setInterval(() => { if (!busy && !document.hidden && state.tab === 'quests') renderQuests(); else { questInit(); updateQuestBadge(); } }, 30000);
 
 renderRail();
 setRetro(retroOn);
+questInit(); updateQuestBadge();
 setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
 </script>
