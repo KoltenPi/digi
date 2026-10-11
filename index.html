@@ -272,6 +272,16 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .shopitem .info small{color:var(--muted);font-size:.78rem;line-height:1.3}
 .shopitem .act{min-width:76px}
 .egg.mini{width:40px;height:52px;animation:none;cursor:default;display:block}
+.eggpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.eggopt{display:grid;justify-items:center;gap:4px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 6px;text-align:center}
+.eggopt b{font-size:.8rem}.eggopt small{font:600 .7rem var(--mono);color:var(--muted)}
+.egg.lucky{background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.75),transparent 28%),radial-gradient(circle at 50% 58%,#2fae5c 0 12%,transparent 13%),radial-gradient(circle at 40% 50%,#2fae5c 0 9%,transparent 10%),radial-gradient(circle at 60% 50%,#2fae5c 0 9%,transparent 10%),radial-gradient(circle at 30% 76%,#f2c94c 0 6%,transparent 7%),#e7f6e1;box-shadow:inset -10px -14px 0 rgba(0,0,0,.1)}
+.egg.rookie{background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.75),transparent 28%),radial-gradient(circle at 64% 58%,#ff8a3d 0 13%,transparent 14%),radial-gradient(circle at 34% 70%,#3b82f6 0 9%,transparent 10%),radial-gradient(circle at 58% 26%,#ff8a3d 0 7%,transparent 8%),#ffe9c9;box-shadow:inset -10px -14px 0 rgba(0,0,0,.1)}
+.egg.dragon{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.55),transparent 26%),repeating-radial-gradient(circle at 50% 120%,rgba(0,0,0,.18) 0 6px,transparent 6px 12px),linear-gradient(160deg,#ef6b3b,#a3271b);box-shadow:inset -10px -14px 0 rgba(0,0,0,.2),0 0 0 2px #ffb347}
+.egg.dark{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.35),transparent 26%),radial-gradient(circle at 62% 60%,#a066ff 0 11%,transparent 12%),radial-gradient(circle at 36% 72%,#d24dff 0 7%,transparent 8%),radial-gradient(circle at 56% 30%,#a066ff 0 6%,transparent 7%),#241634;box-shadow:inset -10px -14px 0 rgba(0,0,0,.3),0 0 0 2px #7b3fe4}
+.egg.xegg{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.75),transparent 26%),linear-gradient(45deg,transparent 44%,#2b6fe0 44% 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,#2b6fe0 44% 56%,transparent 56%),linear-gradient(180deg,#eef1f6,#b8c2d4);box-shadow:inset -10px -14px 0 rgba(0,0,0,.12),0 0 0 2px #2b6fe0}
+.egg.champion{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.6),transparent 26%),linear-gradient(transparent 44%,#ffd04d 44% 56%,transparent 56%),linear-gradient(160deg,#3b5bdb,#1c2f8a);box-shadow:inset -10px -14px 0 rgba(0,0,0,.2),0 0 0 2px #ffd04d}
+.egg.golden{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.95),transparent 24%),radial-gradient(circle at 66% 62%,rgba(255,255,255,.5) 0 6%,transparent 7%),linear-gradient(140deg,#fff4b8,#ffcf3f 45%,#c98a00);box-shadow:inset -10px -14px 0 rgba(120,70,0,.25),0 0 0 2px #ffd04d,0 0 18px rgba(255,200,40,.55)}
 .egg.rare{background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.75),transparent 30%),radial-gradient(circle at 62% 60%,var(--star) 0 12%,transparent 13%),radial-gradient(circle at 34% 68%,var(--accent) 0 9%,transparent 10%),radial-gradient(circle at 55% 28%,var(--star) 0 7%,transparent 8%),var(--fg);box-shadow:inset -10px -14px 0 rgba(0,0,0,.2),0 0 0 2px var(--star)}
 .party{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
 .slot{position:relative;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:4px 2px 5px;display:grid;justify-items:center;gap:1px;min-width:0}
@@ -970,17 +980,23 @@ function renderEgg(){
   };
 }
 function hatchNew(type = 'mystery', toBox){
-  const pool = state.stageIds[0].filter(id => state.byId.has(id));
+  const def = SHOP.find(x => x.key === type) || SHOP[0], st = def.stage || 0;
+  let pool = (state.stageIds[st] || []).filter(id => state.byId.has(id) && !state.armor.has(id));
+  if (EGG_RE[type]){ const f = pool.filter(id => { const n = state.byId.get(id).name; return EGG_RE[type].test(n) && !(type === 'dark' && /White/.test(n)); }); if (f.length) pool = f; }
+  if (!pool.length) pool = state.stageIds[0].filter(id => state.byId.has(id));
   const inParty = new Set(G.party.map(m => m.id));
-  // rare eggs: a Fresh Digimon you have never discovered; otherwise favor ones you haven't raised
+  // rare and golden eggs: a Digimon you have never discovered; otherwise favor ones you haven't raised
   const undiscovered = pool.filter(id => !known(id) && !inParty.has(id));
   const fresh = pool.filter(id => !raised(id) && !inParty.has(id));
-  const from = type === 'rare' && undiscovered.length ? undiscovered : fresh.length ? fresh : pool;
+  const from = (type === 'rare' || type === 'golden') && undiscovered.length ? undiscovered : fresh.length ? fresh : pool;
   const id = pick(from);
   let m;
   if (toBox){ m = makePartner(id); G.box.push(m); } else { newPartner(id); m = P(); }
   questProgress('hatch'); bump('hatches');
+  if (st){ m.stage = st; m.stageLine = [st]; m.level = Math.max(m.level || 1, STAGE_MIN_LV[st]); m.xp = 0; syncMoves(m); }
   if (type === 'rare'){ const g = growthOf(m); g.hp += 6; g.sp += 2; g.atk += 2; g.int += 2; g.spd += 2; m.mood = 90; }
+  if (type === 'golden'){ const g = growthOf(m); g.hp += 20; g.sp += 5; ['atk', 'int', 'def', 'spd'].forEach(k => g[k] = (g[k] || 0) + 4); m.mood = 100; m.bond = 40; m.held = randomHeld(); }
+  if (type === 'lucky'){ m.bond = 25; m.held = randomHeld(); m.mood = 90; }
   saveGame();
   return m;
 }
@@ -995,7 +1011,17 @@ function releaseValue(p){
 const SHOP = [
   { key: 'mystery', name: 'Mystery Egg', price: 80, desc: 'Hatches a random Fresh Digimon, usually one you haven\'t raised yet.' },
   { key: 'rare', name: 'Rare Mystery Egg', price: 250, desc: 'Hatches a Digimon you\'ve never discovered, born with bonus stats and in a great mood.' },
+  { key: 'lucky', name: 'Lucky Egg', price: 300, desc: 'Hatches a Fresh Digimon that already trusts you (bond 25) and comes holding a random item.' },
+  { key: 'rookie', name: 'Rookie Egg', price: 450, stage: 2, desc: 'Skips the baby stages and hatches straight into a Rookie, usually one you haven\'t raised.' },
+  { key: 'dragon', name: 'Dragon Egg', price: 550, stage: 2, desc: 'Hatches a dragon-line Rookie like Agumon, Guilmon, V-mon, Dracomon or Gammamon.' },
+  { key: 'dark', name: 'Dark Egg', price: 550, stage: 2, desc: 'Hatches a dark Rookie like Impmon, Keramon, Pico Devimon or Black Tailmon.' },
+  { key: 'xegg', name: 'X Egg', price: 700, stage: 2, desc: 'Hatches an X-Antibody Rookie.' },
+  { key: 'champion', name: 'Champion Egg', price: 1200, stage: 3, desc: 'Hatches straight into a Champion, usually one you haven\'t raised.' },
+  { key: 'golden', name: 'Golden Egg', price: 2500, stage: 3, desc: 'Hatches a Champion you\'ve never discovered, with big bonus stats, bond 40 and a held item.' },
 ];
+// themed eggs draw from matching Digimon of their stage
+const EGG_RE = { dragon: /dramon|Dragon|Dracomon|DORUmon|Guilmon|V-mon|Agumon|Gammamon|Ryudamon|Coronamon|Gaomon/i, dark: /Devi|Dark|Black|Impmon|Gazimon|Keramon|Lopmon|Phascomon|Psychemon|Ghost/, xegg: /X-Antibody/ };
+const eggName = k => (SHOP.find(x => x.key === k) || SHOP[0]).name;
 function walletRow(){
   const eggs = G.eggs.length;
   return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
@@ -1159,7 +1185,11 @@ async function collectExpeditions(list){
     const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5)), xp = Math.round(est.xp * (ok ? 1 : 0.5));
     G.data += data;
     let extra = '';
-    if (ok && ex.egg && Math.random() < ex.egg){ const rare = Math.random() < ex.rare / ex.egg; G.eggs.push(rare ? 'rare' : 'mystery'); extra += ' Found a ' + (rare ? 'Rare Mystery Egg' : 'Mystery Egg') + '!'; }
+    if (ok && ex.egg && Math.random() < ex.egg){
+      const rare = Math.random() < ex.rare / ex.egg, r2 = Math.random();
+      const k = rare ? 'rare' : ex.key === 'dark' && r2 < 0.5 ? pick(['rookie', 'dragon', 'dark', 'xegg', 'lucky']) : ex.key === 'ruins' && r2 < 0.3 ? pick(['lucky', 'rookie']) : 'mystery';
+      G.eggs.push(k); extra += ' Found a ' + eggName(k) + '!';
+    }
     if (ok && ex.relic && Math.random() < ex.relic){ const k = randomDigimental(); giveItem(k); extra += ' Found a ' + itemName(k) + '!'; }
     if (ok && ex.crest && Math.random() < ex.crest){ const k = randomCrest(); if (k){ giveItem(k); extra += ' Found the ' + itemName(k) + '!'; } }
     if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); extra += ' Found an X-Antibody!'; }
@@ -1226,10 +1256,19 @@ function partyBar(){
   }
   return `<div class="party" aria-label="Your party">${slots.join('')}</div>`;
 }
-function hatchOverlay(){
+function hatchOverlay(type){
   if (G.party.length >= PARTY_MAX || !G.eggs.length) return;
+  const kinds = SHOP.map(x => x.key).filter(k => G.eggs.includes(k));
+  if (!type && kinds.length > 1){
+    busy = true;
+    openOv('<h4>Choose an egg to hatch</h4><div class="eggpick">' + kinds.map(k => '<button class="eggopt" data-egg="' + k + '"><span class="egg mini ' + k + '" aria-hidden="true"></span><b>' + esc(eggName(k)) + '</b><small>×' + G.eggs.filter(e => e === k).length + '</small></button>').join('') + '</div><button class="ghost" id="eggCancel">Not now</button>');
+    $('#eggCancel').onclick = closeOv;
+    $('#overlay').querySelectorAll('[data-egg]').forEach(b => b.onclick = () => { closeOv(); hatchOverlay(b.dataset.egg); });
+    return;
+  }
+  type = type && G.eggs.includes(type) ? type : G.eggs[0];
   busy = true;
-  const type = G.eggs[0], item = SHOP.find(x => x.key === type) || SHOP[0];
+  const item = SHOP.find(x => x.key === type) || SHOP[0];
   openOv(`<h4>${item.name}</h4>
     <p style="margin:0;color:var(--muted)">Tap it three times to hatch. The new Digimon joins your party in slot ${G.party.length + 1}.</p>
     <button class="egg ${type}" id="egg2" aria-label="Tap to hatch"></button>
@@ -1243,10 +1282,10 @@ function hatchOverlay(){
     $('#eggMsg2').textContent = taps < 3 ? ['', 'IT MOVED!', 'IT\'S CRACKING…'][taps] : 'HATCHING!';
     if (taps < 3) return;
     await sleep(600);
-    G.eggs.shift();
-    hatchNew(type);
+    G.eggs.splice(G.eggs.indexOf(type), 1);
+    const m = hatchNew(type);
     closeOv();
-    say(`${P().name} hatched and joined your party!${type === 'rare' ? ' It looks especially strong.' : ''}`, 'happy');
+    say(`${m.name} hatched and joined your party!` + (type === 'golden' ? ' It\'s glowing gold, and it\'s holding ' + (/^[AEIOU]/.test(HELD[m.held].name) ? 'an ' : 'a ') + HELD[m.held].name + '!' : type === 'lucky' ? ' It already trusts you, and it\'s holding ' + (/^[AEIOU]/.test(HELD[m.held].name) ? 'an ' : 'a ') + HELD[m.held].name + '.' : item.stage ? ' It hatched as a ' + LEVEL_EN[STAGES[item.stage]] + '!' : type === 'rare' ? ' It looks especially strong.' : ''), 'happy');
   };
 }
 
@@ -1902,7 +1941,7 @@ function dgDown(u, by){
   dgLog(u.name + ' was defeated! +' + gain + ' DigiData.');
   if (u.boss){
     bump('bosses'); const bonus = Math.round(60 * (dg.stage + 1) * dg.diff.reward); dg.data += bonus;
-    const drop = pick([randomCrest() || randomHeld(), randomHeld(), 'egg:rare']); (dg.relics = dg.relics || []).push(drop);
+    const drop = pick([randomCrest() || randomHeld(), randomHeld(), pick(['egg:rare', 'egg:champion', 'egg:golden', 'egg:xegg'])]); (dg.relics = dg.relics || []).push(drop);
     dgLog('👑 Boss defeated! +' + bonus + ' DigiData and a ' + itemName(drop) + '!'); dg.boss = null;
   }
 }
@@ -2179,8 +2218,8 @@ const itemPrice = k => k === 'pers:?' ? 150 : k.startsWith('pers:') ? 350 : k.st
 const randomChip = () => Math.random() < 0.08 ? 'vit:all' : 'vit:' + pick(CHIP_KEYS);
 const virtue = w => { w = String(w || '').replace(/[^A-Za-z]/g, ''); w = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); return VIRTUE_ALIAS[w] || (VIRTUES.includes(w) ? w : 'Miracles'); };
 const itemType = k => k.split(':')[0];
-const itemName = k => k === 'pers:?' ? 'Mystery Mint' : k.startsWith('pers:') ? (PERS[k.slice(5)] ? PERS[k.slice(5)].name + ' Mint' : 'Mint') : k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
-const itemIcon = k => k === 'pers:?' ? '🎲' : k.startsWith('pers:') ? '🌿' : k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
+const itemName = k => k.startsWith('egg:') ? eggName(k.slice(4)) : k === 'pers:?' ? 'Mystery Mint' : k.startsWith('pers:') ? (PERS[k.slice(5)] ? PERS[k.slice(5)].name + ' Mint' : 'Mint') : k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
+const itemIcon = k => k.startsWith('egg:') ? '🥚' : k === 'pers:?' ? '🎲' : k.startsWith('pers:') ? '🌿' : k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
 const itemUsable = k => k === 'clean' || itemType(k) === 'vit' || itemType(k) === 'pers';
 const MINT_KEYS = () => ['pers:?', ...PERS_KEYS.map(k => 'pers:' + k)];
 const USABLE_KEYS = () => ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all', ...MINT_KEYS()];
@@ -2876,7 +2915,7 @@ function achValue(stat){
 const achDone = a => achValue(a.stat) >= a.n;
 const achClaimable = () => ACH.filter(a => achDone(a) && !(G.achClaimed || {})[a.id]);
 function rewardLine(data, item){ return (data ? '+' + data + ' DigiData' : '') + (item ? (data ? ' · ' : '') + itemIcon(item) + ' ' + itemName(item) : ''); }
-function grantItem(k){ if (!k) return; if (k === 'egg:rare') G.eggs.push('rare'); else if (k === 'egg') G.eggs.push('mystery'); else giveItem(k); }
+function grantItem(k){ if (!k) return; if (k.startsWith('egg:')) G.eggs.push(k.slice(4)); else if (k === 'egg') G.eggs.push('mystery'); else giveItem(k); }
 const titleOf = () => G.title && ACH.concat(colTitles()).some(a => a.name === G.title && (a.col ? true : (G.achClaimed || {})[a.id])) ? G.title : '';
 function paintTitle(){ const t = $('#tagline'); if (t) t.textContent = titleOf() ? '★ ' + titleOf() : 'raise · digivolve · collect'; }
 
