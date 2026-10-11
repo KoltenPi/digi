@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script>try{var t=localStorage.getItem('dx_theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}</script>
 <style>
 /* Layout: bottom tab bar switches between the Partner habitat (one-screen raising game) and the Index (search grid + detail with evo branches) */
 :root{
@@ -23,11 +24,16 @@
   --r:10px;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#0d1120; --panel:#161c30; --sunk:#1e263f; --fg:#e6eaf5; --muted:#8f9ab8; --line:#2a3452;
   --accent:#ff8a3d; --accent-ink:#1a0d02; --link:#8fa8ff; --star:#ffd04d;
   --good:#3ccf7a; --warn:#ffb534; --bad:#ff6b6b; --grid:rgba(143,168,255,.08); --silf:brightness(0) invert(1) opacity(.3); color-scheme:dark;
 }}
+:root[data-theme="dark"]{
+  --bg:#0d1120; --panel:#161c30; --sunk:#1e263f; --fg:#e6eaf5; --muted:#8f9ab8; --line:#2a3452;
+  --accent:#ff8a3d; --accent-ink:#1a0d02; --link:#8fa8ff; --star:#ffd04d;
+  --good:#3ccf7a; --warn:#ffb534; --bad:#ff6b6b; --grid:rgba(143,168,255,.08); --silf:brightness(0) invert(1) opacity(.3); color-scheme:dark;
+}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
 body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);-webkit-text-size-adjust:100%;
@@ -323,7 +329,8 @@ img.sil{filter:var(--silf)}
   <div class="wrap">
     <div class="top">
       <h1 class="brand">Digimon Index<small id="tagline">raise · digivolve · collect</small></h1>
-      <span class="count" id="count" style="margin-left:auto"></span>
+      <button id="themeBtn" class="favbtn" title="Switch between light and dark mode" style="margin-left:auto;padding:6px 10px">🌙 Dark</button>
+      <span class="count" id="count" style="margin-left:0"></span>
     </div>
     <div id="indexChrome" hidden>
       <div class="search" id="searchRow">
@@ -2466,6 +2473,18 @@ setInterval(() => { if (!busy && !document.hidden && state.tab === 'quests') ren
 
 renderRail();
 setRetro(false);
+// light / dark mode: follows the phone until you pick one, then remembers it
+const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+function paintThemeBtn(){ $('#themeBtn').textContent = isDark() ? '☀️ Light' : '🌙 Dark'; $('#themeBtn').setAttribute('aria-label', isDark() ? 'Switch to light mode' : 'Switch to dark mode'); }
+$('#themeBtn').onclick = () => {
+  const next = isDark() ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try{ localStorage.setItem('dx_theme', next); }catch{}
+  paintThemeBtn();
+  if (typeof dg !== 'undefined' && dg && !dg.over) dgDraw();
+};
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintThemeBtn); }catch{}
+paintThemeBtn();
 questInit(); updateQuestBadge();
 setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
