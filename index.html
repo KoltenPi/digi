@@ -3657,13 +3657,12 @@ function autoChoice(me, foe, modes, modeCost){
     }
     return m.hp / m.st.hp >= f.hp / f.st.hp ? 0.6 : 0.2;
   };
-  const N = Math.max(12, Math.min(40, Math.floor(240 / opts.length)));
+  // up to 120 imaginary fights per option, in rounds, stopping early if a slow phone runs out of time
+  const sums = opts.map(() => 0), t0 = performance.now(); let n = 0;
+  while (n < 120 && (n < 16 || performance.now() - t0 < 180)){ opts.forEach((o, i) => { for (let k = 0; k < 8; k++) sums[i] += play(o); }); n += 8; }
+  const heur = autoHeur(me, foe, modes, modeCost);
   let best = opts[0], bestScore = -1;
-  for (const o of opts){
-    let sc = 0; for (let k = 0; k < N; k++) sc += play(o);
-    sc = sc / N + (o === autoHeur(me, foe, modes, modeCost) ? 0.03 : 0);   // small nudge toward the sensible pick on ties
-    if (sc > bestScore){ bestScore = sc; best = o; }
-  }
+  opts.forEach((o, i) => { const sc = sums[i] / n + (o === heur ? 0.02 : 0); if (sc > bestScore){ bestScore = sc; best = o; } });   // small nudge toward the sensible pick on ties
   return best;
 }
 function expMs(ex){ return Math.round(ex.mins * 60000 * (1 - 0.1 * perk('path'))); }
