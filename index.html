@@ -387,6 +387,36 @@ img.sil{filter:var(--silf)}
 .reveal{display:grid;justify-items:center;gap:6px;text-align:center}
 .reveal img{width:160px;height:160px;object-fit:contain}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.card:active,.act:active{transform:none}}
+.tamerchip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 10px;font:600 .72rem var(--mono);color:var(--accent)}
+.tamerchip.alert{border-color:var(--accent);background:var(--accent);color:var(--bg)}
+.habitat .sky{position:absolute;right:10px;bottom:8px;z-index:2}
+.skytag{font:600 .66rem var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px 8px;color:var(--muted)}
+.habitat.ph-night{background:radial-gradient(1.5px 1.5px at 18% 34%,#fffa,transparent),radial-gradient(1.5px 1.5px at 72% 20%,#fffb,transparent),radial-gradient(1px 1px at 44% 48%,#fff9,transparent),radial-gradient(1px 1px at 86% 44%,#fff8,transparent),radial-gradient(1px 1px at 30% 14%,#fff9,transparent),linear-gradient(#0c1430,#1d2752)}
+.habitat.ph-dawn{background:linear-gradient(var(--grid) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(#ffcfa3,#fff1df)}
+.habitat.ph-dusk{background:linear-gradient(var(--grid) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,var(--grid) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(#f39a6c,#7a5596)}
+.habitat.ph-night::after,.habitat.ph-dusk::after{background:rgba(0,0,0,.28)}
+.habitat.dim::before{content:"";position:absolute;inset:0;background:rgba(0,0,12,.55);z-index:3;pointer-events:none}
+.habitat.dim .bubble,.habitat.dim .zzz{z-index:4}
+.sprite.sleep{animation:breathe 3.2s ease-in-out infinite;filter:brightness(.8)}
+@keyframes breathe{50%{transform:scale(1.03,.97)}}
+.zzz{position:absolute;left:calc(50% + 50px);bottom:160px;z-index:2;font:700 1.3rem var(--display);color:#cfd8ff;animation:zz 2.4s ease-in-out infinite}
+.zzz small{font-size:.7em;margin-left:2px}
+@keyframes zz{0%{opacity:0;transform:translate(0,8px)}40%{opacity:1}100%{opacity:0;transform:translate(14px,-14px)}}
+.poops{position:absolute;left:12px;bottom:10px;z-index:2;font-size:1.4rem;letter-spacing:2px}
+.sickic{position:absolute;left:calc(50% + 56px);bottom:150px;z-index:2;font-size:1.6rem}
+.wx{position:absolute;inset:0;pointer-events:none;z-index:1}
+.wx.rain{background:repeating-linear-gradient(105deg,transparent 0 14px,rgba(110,160,255,.35) 14px 15px);background-size:40px 40px;animation:rainf .5s linear infinite}
+@keyframes rainf{to{background-position:-10px 40px}}
+.wx.snow{background-image:radial-gradient(2px 2px at 10px 10px,#fff,transparent),radial-gradient(2px 2px at 30px 25px,#fff,transparent),radial-gradient(1.5px 1.5px at 20px 35px,#fff,transparent);background-size:40px 40px;animation:snowf 3s linear infinite;opacity:.9}
+@keyframes snowf{to{background-position:8px 40px}}
+.wx.fog{background:linear-gradient(transparent,rgba(200,200,214,.45) 60%,rgba(200,200,214,.65))}
+.wx.aurora{background:linear-gradient(170deg,rgba(80,255,180,.28),rgba(140,90,255,.22) 40%,transparent 65%)}
+@media (prefers-reduced-motion:reduce){.wx,.zzz,.sprite.sleep{animation:none}}
+.skyinfo{display:grid;gap:4px;font-size:.88rem}
+.skyinfo span{color:var(--muted)}
+.autorow{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.autorow span{font:600 .7rem var(--mono);color:var(--muted)}
+.perk.locked{opacity:.55}
 </style>
 </head>
 <body>
@@ -825,11 +855,12 @@ function tick(){
   for (const p of G.party){
     const mins = Math.min((now - p.last) / 60000, 1440);
     if (mins < 0.2) continue;
-    const pr = persOf(p);
-    p.hunger = clamp(p.hunger - mins / 4 * (pr.hunger || 1));
-    p.mood = clamp(p.mood - mins / 5 * (pr.mood || 1));
-    p.energy = clamp(p.energy + mins / 6 * (pr.energy || 1));
+    const pr = persOf(p), sl = asleep(p), nur = 1 - 0.1 * perk('nurture');
+    p.hunger = clamp(p.hunger - mins / 4 * (pr.hunger || 1) * nur * (sl ? 0.35 : 1));
+    p.mood = clamp(p.mood - mins / 5 * (pr.mood || 1) * nur * (sl ? 0.3 : 1));
+    p.energy = clamp(p.energy + mins / 6 * (pr.energy || 1) * (sl ? (lightsOff() ? 2.5 : 1) : 1));
     p.last = now;
+    careTick(p, mins);
     checkNeglect(p); changed = true;
   }
   if (changed) saveGame();
@@ -852,6 +883,7 @@ function ageText(p){
 }
 function moodLine(p){
   if (p.msg){ const m = p.msg; p.msg = ''; return m; }
+  const cl = careLine(p); if (cl) return cl;
   if (p.hunger < 25) return `${p.name} is hungry.`;
   if (p.energy < 20) return `${p.name} is worn out and needs rest.`;
   if (p.mood < 25) return `${p.name} looks bored. Play with it!`;
@@ -870,16 +902,18 @@ function renderPartner(){
   const partyHtml = partyBar() + walletRow();
   const need = EVO_NEED[p.stage];
   const atTop = p.stage >= 5 || p.final;
+  const sl = asleep(p), block = sl ? 'asleep' : careInit(p).sick ? 'sick' : '';
   const lineImgs = p.line.map(id => state.byId.get(id)).filter(Boolean)
     .map(b => `<img alt="${esc(b.name)}" title="${esc(b.name)}" src="${esc(b.image)}">`).join('<span>→</span>');
   v.innerHTML = `
     ${eventBanner()}
+    ${G.tamerNote ? `<button class="dailybar" data-act="tamer">⭐ ${esc(G.tamerNote)} Tap to open the skill tree.</button>` : ''}
     ${dailyReady() ? `<button class="dailybar" data-act="daily">🎁 Daily reward ready · day ${((dailyNextStreak() - 1) % 7) + 1} of your streak. Tap to claim!</button>` : ''}
     ${partyHtml}
     <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">Lv ${p.level}</span><span class="stage">${LEVEL_EN[STAGES[p.stage]]}</span>
       <span class="stage">${ageText(p)}</span><span class="stage pers" title="${esc(persOf(p).desc)}">${persOf(p).name}</span>${heldOf(p) ? `<span class="stage" title="${esc(HELD[heldOf(p)].desc)}">${HELD[heldOf(p)].icon} ${esc(HELD[heldOf(p)].name)}</span>` : ''}</div>
-    <div class="habitat"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
-      <img class="sprite" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}"></div>
+    <div class="habitat${habitatClass(p)}"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
+      <img class="sprite${sl ? ' sleep' : ''}" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}">${habitatExtras(p)}</div>
     <div class="meters">${meter('Hunger', p.hunger)}${meter('Energy', p.energy)}${meter('Mood', p.mood)}</div>
     <div class="evobox">
       <div class="row statrow">${statChips(partnerStats(p))}</div>
@@ -894,14 +928,15 @@ function renderPartner(){
     </div>
     ${canEvolve(p) ? `<button class="big" id="evolveBtn">Digivolve!</button>` : ''}
     <div class="actions">
-      <button class="act" data-act="feed">🍖 Feed<small>+hunger</small></button>
-      <button class="act" data-act="play">⚽ Play<small>+mood</small></button>
-      <button class="act" data-act="rest">💤 Rest<small>+energy</small></button>
-      <button class="act" data-act="train" ${p.energy < 20 ? 'disabled' : ''}>💪 Train<small>${p.energy < 20 ? 'too tired' : 'raise stats'}</small></button>
-      <button class="act" data-act="battle" ${p.energy < 25 ? 'disabled' : ''}>⚔️ Battle<small>${p.energy < 25 ? 'too tired' : '+evo points'}</small></button>
+      <button class="act" data-act="feed" ${sl ? 'disabled' : ''}>🍖 Feed<small>${sl ? 'asleep' : '+hunger'}</small></button>
+      <button class="act" data-act="play" ${sl ? 'disabled' : ''}>⚽ Play<small>${sl ? 'asleep' : '+mood'}</small></button>
+      ${sl ? '<button class="act" data-act="wake">⏰ Wake up<small>−8 mood</small></button>' : '<button class="act" data-act="rest">💤 Rest<small>+energy</small></button>'}
+      <button class="act" data-act="train" ${p.energy < 20 || block ? 'disabled' : ''}>💪 Train<small>${block || (p.energy < 20 ? 'too tired' : 'raise stats')}</small></button>
+      <button class="act" data-act="battle" ${p.energy < 25 || block ? 'disabled' : ''}>⚔️ Battle<small>${block || (p.energy < 25 ? 'too tired' : '+evo points')}</small></button>
       <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
     </div>
-    <button class="act wide" data-act="dungeon" ${p.energy < 30 ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${p.energy < 30 ? 'too tired (needs 30 energy)' : 'choose a difficulty · 3–8 floors'}</small></button>
+    ${careButtons(p)}
+    <button class="act wide" data-act="dungeon" ${p.energy < 30 || block ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${block ? esc(p.name) + ' is ' + block : p.energy < 30 ? 'too tired (needs 30 energy)' : 'choose a difficulty · 3–8 floors'}</small></button>
     <div class="actions two">${atTop ? '' : `<button class="act" data-act="paths">🧭 Evolution paths<small>what each form needs</small></button>`}<button class="act" data-act="tree">🌳 Evolution tree<small>branches you've found</small></button><button class="act" data-act="jogress">🧬 Jogress<small>DNA fusion</small></button><button class="act" data-act="bag">🎒 Bag<small>${USABLE_KEYS().reduce((n, k) => n + (G.items[k] || 0), 0)} usable items</small></button></div>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
@@ -940,18 +975,20 @@ $('#partnerView').addEventListener('click', e => {
   if (e.target.closest('[data-hatch]')) return hatchOverlay();
   if (e.target.closest('[data-shop]')) return setTab('shop');
   const b = e.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'tamer') return trainerScreen('tamer');
   tick();
   const p = P(); const k = b.dataset.act;
+  if (careAction(k, p)) return;
   if (k === 'feed'){
     if (p.hunger > 92){ p.mood = clamp(p.mood - 6); return say(`${p.name} is stuffed and pushes the food away.`); }
     const low = p.hunger < 50;
-    p.hunger = clamp(p.hunger + 30); if (low) p.evo += 1; questProgress('care'); addBond(p, 1);
+    p.hunger = clamp(p.hunger + 30); if (low) p.evo += 1; questProgress('care'); addBond(p, 1); bump('cares');
     return say(pick([`${p.name} gobbled it up!`, `Crunch crunch. ${p.name} looks satisfied.`, `${p.name} ate every last bite.`]), 'happy');
   }
   if (k === 'play'){
     if (p.energy < 10) return say(`${p.name} is too tired to play.`);
     const low = p.mood < 60;
-    p.mood = clamp(p.mood + 25); p.energy = clamp(p.energy - 10); p.hunger = clamp(p.hunger - 4); if (low) p.evo += 1; questProgress('care'); addBond(p, 1);
+    p.mood = clamp(p.mood + 25); p.energy = clamp(p.energy - 10); p.hunger = clamp(p.hunger - 4); if (low) p.evo += 1; questProgress('care'); addBond(p, 1); bump('cares');
     return say(pick([`You and ${p.name} played tag. It's having a great time!`, `${p.name} chased the ball around and around.`, `${p.name} is laughing!`]), 'happy');
   }
   if (k === 'rest'){
@@ -1047,7 +1084,8 @@ const EGG_RE = { dragon: /dramon|Dragon|Dracomon|DORUmon|Guilmon|V-mon|Agumon|Ga
 const eggName = k => (SHOP.find(x => x.key === k) || SHOP[0]).name;
 function walletRow(){
   const eggs = G.eggs.length;
-  return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
+  const T = tamerInit();
+  return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span><button class="tamerchip${T.pts ? ' alert' : ''}" data-act="tamer">⭐ Tamer Lv ${T.lv}${T.pts ? ' · ' + T.pts + ' pt' + (T.pts === 1 ? '' : 's') : ''}</button>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
 }
 function itemTile(k){
   const own = G.items[k] || 0, price = itemPrice(k), kept = itemKept(k);
@@ -1185,7 +1223,7 @@ function boxMenu(i){
 
 function expeditionPicker(m){
   const card = ex => { const est = expEstimate(m, ex), odds = Math.round(expOdds(m, ex) * 100);
-    return '<button class="diff" data-ex="' + ex.key + '"><span class="dn">' + ex.name + '<small>' + fmtLeft(ex.mins * 60000) + '</small></span><span class="dd">' + ex.desc + '</span>' +
+    return '<button class="diff" data-ex="' + ex.key + '"><span class="dn">' + ex.name + '<small>' + fmtLeft(expMs(ex)) + '</small></span><span class="dd">' + ex.desc + '</span>' +
       '<span class="dr">~' + est.data + ' DigiData · ~' + est.xp + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + (ex.relic ? ' · ' + Math.round(ex.relic * 100) + '% Digimental' : '') + (ex.crest ? ' · Crests' : '') + (ex.chip ? ' · ' + Math.round(ex.chip * 100) + '% stat chip' : '') + (ex.clean ? ' · ' + Math.round(ex.clean * 100) + '% Clean Slate' : '') + ' · ' + odds + '% smooth trip</span></button>'; };
   $('#overlay .sheet').innerHTML = '<h4>Send ' + esc(m.name) + ' to…</h4><div class="diffs">' + EXPEDITIONS.map(card).join('') + '</div>' +
     '<p style="margin:0;color:var(--muted);font-size:.82rem">A rough trip brings back half the rewards. Higher levels make trips smoother. Each trip may also spot undiscovered Digimon for your Index.</p>' +
@@ -1193,7 +1231,7 @@ function expeditionPicker(m){
   $('#exCancel').onclick = () => { closeOv(); renderBox(); };
   $('#overlay').querySelectorAll('[data-ex]').forEach(b => b.onclick = () => {
     const ex = EXPEDITIONS.find(x => x.key === b.dataset.ex), now = Date.now();
-    m.exp = { key: ex.key, start: now, end: now + ex.mins * 60000 };
+    m.exp = { key: ex.key, start: now, end: now + expMs(ex) };
     saveGame(); closeOv(); renderBox();
   });
 }
@@ -1205,10 +1243,10 @@ async function collectExpeditions(list){
     if (!expDone(m)) continue;
     const ex = EXPEDITIONS.find(x => x.key === m.exp.key) || EXPEDITIONS[0];
     const ok = Math.random() < expOdds(m, ex), est = expEstimate(m, ex);
-    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5) * (evOn('data') ? 2 : 1)), xp = Math.round(est.xp * (ok ? 1 : 0.5));
+    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5) * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav'))), xp = Math.round(est.xp * (ok ? 1 : 0.5));
     G.data += data;
     let extra = '';
-    if (ok && ex.egg && Math.random() < Math.min(0.9, ex.egg * (evOn('eggs') ? 3 : 1))){
+    if (ok && ex.egg && Math.random() < Math.min(0.9, ex.egg * (evOn('eggs') ? 3 : 1) * (1 + 0.15 * perk('eggs')))){
       const rare = Math.random() < ex.rare / ex.egg, r2 = Math.random();
       const k = rare ? 'rare' : ex.key === 'dark' && r2 < 0.5 ? pick(['rookie', 'dragon', 'dark', 'xegg', 'lucky', ...Object.keys(ELEMS).map(k => 'e' + k)]) : ex.key === 'ruins' && r2 < 0.3 ? pick(['lucky', 'rookie']) : 'mystery';
       G.eggs.push(k); extra += ' Found a ' + eggName(k) + '!';
@@ -1372,22 +1410,29 @@ const TRAININGS = [
   { key: 'hp', icon: '❤️', name: 'Stamina', desc: 'Raises HP' },
   { key: 'sp', icon: '🔋', name: 'Focus', desc: 'Raises SP' },
 ];
+const trainCost = hard => Math.round((hard ? 35 : 20) * (1 - 0.15 * perk('stamina')));
 function train(){
   const p = P(); busy = true;
-  openOv(`<h4>Training · ${esc(p.name)}</h4>
-    <p style="margin:0;color:var(--muted)">What should ${esc(p.name)} work on?</p>
-    <div class="actions">${TRAININGS.map(t => `<button class="act" data-train="${t.key}">${t.icon} ${t.name}<small>${t.desc}</small></button>`).join('')}</div>
-    <button class="ghost" id="trCancel">Cancel</button>`);
-  $('#trCancel').onclick = closeOv;
-  $('#overlay').querySelectorAll('[data-train]').forEach(b => b.onclick = () => trainGame(b.dataset.train));
+  let hard = !!store.get('dx_trainhard', false) && p.energy >= trainCost(true);
+  const draw = () => {
+    $('#overlay .sheet').innerHTML = `<h4>Training · ${esc(p.name)}</h4>
+    <div class="segs"><button class="seg${hard ? '' : ' on'}" data-tm="0">Normal</button><button class="seg${hard ? ' on' : ''}" data-tm="1"${p.energy < trainCost(true) ? ' disabled' : ''}>🔥 Hard · ×2</button></div>
+    <p style="margin:0;color:var(--muted)">${hard ? `Hard training: a smaller target and a faster marker, but <b>double</b> stats, evo points and XP. Uses ${trainCost(true)} energy.` : `What should ${esc(p.name)} work on? Uses ${trainCost(false)} energy.`}${p.energy < trainCost(true) ? ` Hard training needs ${trainCost(true)} energy.` : ''}</p>
+    <div class="actions">${TRAININGS.map(t => `<button class="act" data-train="${t.key}">${t.icon} ${t.name}<small>${t.desc}${hard ? ' ×2' : ''}</small></button>`).join('')}</div>
+    <button class="ghost" id="trCancel">Cancel</button>`;
+    $('#trCancel').onclick = closeOv;
+    $('#overlay').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => { if (b.disabled) return; hard = b.dataset.tm === '1'; store.set('dx_trainhard', hard); draw(); });
+    $('#overlay').querySelectorAll('[data-train]').forEach(b => b.onclick = () => trainGame(b.dataset.train, hard));
+  };
+  openOv(''); draw();
 }
-function trainGame(kind){
+function trainGame(kind, hard){
   const p = P(); const t = TRAININGS.find(x => x.key === kind);
-  const zoneW = [28, 26, 23, 20, 17, 15][p.stage];
+  const zoneW = [28, 26, 23, 20, 17, 15][p.stage] * (hard ? 0.62 : 1);
   let round = 0, hits = 0, pos = 0, dir = 1, raf = 0, zoneL = 0, waiting = false;
   const results = [];
-  const speed = () => 0.9 + round * 0.35 + p.stage * 0.12;
-  $('#overlay .sheet').innerHTML = `<h4>${t.icon} ${t.name} training</h4>
+  const speed = () => (0.9 + round * 0.35 + p.stage * 0.12) * (hard ? 1.4 : 1);
+  $('#overlay .sheet').innerHTML = `<h4>${t.icon} ${t.name} training${hard ? ' <span class="stage">🔥 Hard</span>' : ''}</h4>
     <p style="margin:0;color:var(--muted)">Tap <b>Hit!</b> when the marker is inside the green zone.</p>
     <div class="tmeter"><span class="zone" id="zone"></span><span class="mark" id="mark"></span></div>
     <div class="dots" id="dots">○ ○ ○</div>
@@ -1403,16 +1448,17 @@ function trainGame(kind){
     if (round < 3){ waiting = true; cancelAnimationFrame(raf); await sleep(350); placeZone(); waiting = false; raf = requestAnimationFrame(loop); return; }
     cancelAnimationFrame(raf);
     const g = growthOf(p), per = 1 + Math.floor(p.stage / 2), bonus = hits && p.mood > 60 ? 1 : 0;
+    const mult = hard ? 2 : 1, boost = x => hits ? Math.max(x * mult, Math.round(x * mult * (1 + 0.15 * perk('drill')))) : 0;
     let gained;
-    if (kind === 'hp'){ const h = hits * per * 4 + bonus * 2; g.hp = (g.hp || 0) + h; gained = '+' + h + ' HP'; }
-    else if (kind === 'sp'){ const s = hits * per * 2 + bonus; g.sp = (g.sp || 0) + s; gained = '+' + s + ' SP'; }
-    else { const v = hits * per + bonus + (hits && evOn('xp') ? 1 : 0); g[kind] = (g[kind] || 0) + v; gained = '+' + v + ' ' + STAT_LABEL[kind]; }
-    p.evo += hits; p.energy = clamp(p.energy - 20); p.hunger = clamp(p.hunger - 10);
+    if (kind === 'hp'){ const h = boost(hits * per * 4 + bonus * 2); g.hp = (g.hp || 0) + h; gained = '+' + h + ' HP'; }
+    else if (kind === 'sp'){ const s = boost(hits * per * 2 + bonus); g.sp = (g.sp || 0) + s; gained = '+' + s + ' SP'; }
+    else { const v = boost(hits * per + bonus + (hits && evOn('xp') ? 1 : 0)); g[kind] = (g[kind] || 0) + v; gained = '+' + v + ' ' + STAT_LABEL[kind]; }
+    p.evo += hits * mult + (hits ? perk('evo') : 0); p.energy = clamp(p.energy - trainCost(hard)); p.hunger = clamp(p.hunger - (hard ? 15 : 10)); bump('trains', mult);
     questProgress('train'); if (hits === 3){ questProgress('perfect'); bump('perfects'); } if (hits) addBond(p, 1);
     if (!hits) p.mood = clamp(p.mood - 6);
     saveGame();
     $('#hit').textContent = 'Done';
-    const lvr = await gainXP(p, hits * 3 + 1);
+    const lvr = await gainXP(p, (hits * 3 + 1) * (hard ? 2 : 1));
     $('#hit').onclick = () => { closeOv(); say((hits === 3 ? `Perfect training! ${p.name} gained ${gained}.` : hits ? `Good effort! ${p.name} gained ${gained}.` : `${p.name} missed every hit and looks discouraged.`) + levelText(lvr), hits ? 'happy' : null); };
   };
 }
@@ -1517,7 +1563,7 @@ async function syncMoves(p){
 }
 async function gainXP(p, amount){
   initMoves(p);
-  p.xp += Math.max(0, Math.round(amount * (heldOf(p) === 'h:amulet' ? 1.3 : 1) * (evOn('xp') ? 2 : 1))); const ups = [];
+  p.xp += Math.max(0, Math.round(amount * (heldOf(p) === 'h:amulet' ? 1.3 : 1) * (evOn('xp') ? 2 : 1) * (1 + 0.1 * perk('study')))); const ups = [];
   while (p.xp >= XP_NEED(p.level) && p.level < 99){
     p.xp -= XP_NEED(p.level); p.level++;
     const g = growthOf(p), gk = pick(['atk', 'int', 'def', 'spd']); g[gk] = (g[gk] || 0) + 1; g.hp += 2;
@@ -1572,7 +1618,7 @@ function doMove(att, def, mv){
   if (mv.kind === 'buff'){ att.sp -= mv.cost || 0; att.buff = Math.min(1.9, (att.buff || 1) * mv.power); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' }; }
   if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: `${att.name} guards and recovers ${g} SP.` }; }
   att.sp -= mv.cost || 0;
-  const evade = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012));
+  const evade = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (curWeather().evade || 0);
   if (Math.random() < evade) return { text: `${att.name} used ${mv.name}… but ${def.name} dodged!`, miss: true };
   const crit = Math.random() < Math.max(0.04, Math.min(0.33, 0.06 + (att.critBonus || 0) + (att.st.spd - def.st.spd) * 0.01));
   const em = elemMult(att.elem, def.elem), am = attrMult(att.attr, def.attr) * em;
@@ -1580,7 +1626,7 @@ function doMove(att, def, mv){
   // DEF softens both physical (ATK) and SP-powered attacks; equal attack and defense keeps damage about where it was
   const aStat = mv.kind === 'phys' || mv.kind === 'atk' ? att.st.atk : att.st.int, dStat = def.st.def || 0;
   const defFactor = 1.35 * (2 * aStat) / (2 * aStat + dStat);
-  const dmg = Math.max(1, Math.round(base * defFactor * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1)));
+  const dmg = Math.max(1, Math.round(base * defFactor * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1) * skyMult(att) * (att.tdm || 1) * (def.ttk || 1)));
   def.hp = Math.max(0, def.hp - dmg);
   let text = `${att.name} used ${mv.name}! ${dmg} damage.`;
   if (mv.kind === 'drain'){ const h = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + h); text += ' Drained ' + h + ' HP.'; }
@@ -1591,7 +1637,7 @@ function doMove(att, def, mv){
   if (def.hp <= 0 && def.endureChance && !def.endured && Math.random() < def.endureChance){ def.hp = 1; def.endured = true; text += ' ' + def.name + ' hung on with 1 HP!'; }
   if (def.status && def.status.k === 'slp' && def.hp > 0){ def.status = null; text += ' ' + def.name + ' woke up!'; }
   const sk = moveStatus(mv);
-  if (sk && def.hp > 0 && !def.status && !def.noStatus && Math.random() < 0.3){ def.status = { k: sk, t: sk === 'slp' ? 1 + (Math.random() * 3 | 0) : sk === 'par' ? 3 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
+  if (sk && def.hp > 0 && !def.status && !def.noStatus && Math.random() < (sk === 'par' && curWeather().par ? 0.45 : 0.3)){ def.status = { k: sk, t: sk === 'slp' ? 1 + (Math.random() * 3 | 0) : sk === 'par' ? 3 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
   return { text, dmg };
 }
 function foeChoice(f, me){
@@ -1652,6 +1698,7 @@ async function battle(diff, opts){
   G.col[foeBase.id] = G.col[foeBase.id] || 'seen';
   saveGame();
 
+  let autoOn = !!store.get('dx_auto', false), pendRes = null;
   const side = (f, id) => `<div class="fighter" id="${id}"><img alt="" src="${esc(f.image)}"><b>${esc(f.name)}</b>
       <span class="attr">${esc(f.attr)} · ${elemTag(f.elem)}</span>
       <div class="bars"><div class="hp"><i></i></div><small class="hpt"></small><div class="hp spb"><i></i></div><small class="spt"></small></div></div>`;
@@ -1659,6 +1706,7 @@ async function battle(diff, opts){
     <div class="arena">${side(me, 'fMe')}<div class="vs">VS</div>${side(foe, 'fFoe')}</div>
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
     <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
+    <div class="autorow"><button class="seg${autoOn ? ' on' : ''}" id="autoBtn">🤖 Auto ${autoOn ? 'on' : 'off'}</button><span>${skyTag()}</span></div>
     <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}</small></button>`).join('')}
       ${modes.length ? `<button class="act modebtn" data-mv="mode">✨ Mode Change<small>${modeCost} SP · once per battle</small></button>` : ''}
       ${opts.noRun ? '' : '<button class="act" data-mv="run">Run<small>Escape (SPD)</small></button>'}</div>`;
@@ -1677,8 +1725,16 @@ async function battle(diff, opts){
   const setButtons = on => $('#overlay').querySelectorAll('[data-mv]').forEach(b => {
     const m = me.moves[+b.dataset.mv]; b.disabled = !on || (m && m.cost > me.sp) || (b.dataset.mv === 'mode' && (me.moded || me.sp < modeCost));
   });
-  const playerMove = () => new Promise(res => { setButtons(true); $('#overlay').querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { setButtons(false); res(b.dataset.mv); }); });
+  const playerMove = () => new Promise(res => {
+    if (autoOn){ setTimeout(() => res(autoChoice(me, foe, modes, modeCost)), 250); return; }
+    pendRes = res; setButtons(true);
+    $('#overlay').querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { pendRes = null; setButtons(false); res(b.dataset.mv); });
+  });
   draw(); setButtons(false);
+  const ab = $('#autoBtn'); if (ab) ab.onclick = () => {
+    autoOn = !autoOn; store.set('dx_auto', autoOn); ab.textContent = '🤖 Auto ' + (autoOn ? 'on' : 'off'); ab.classList.toggle('on', autoOn);
+    if (autoOn && pendRes){ const r = pendRes; pendRes = null; setButtons(false); r(autoChoice(me, foe, modes, modeCost)); }
+  };
   await sleep(900);
 
   let outcome = null;
@@ -1717,7 +1773,7 @@ async function battle(diff, opts){
         log(r.text);
       }
       draw();
-      await sleep(1000);
+      await sleep(autoOn ? 650 : 1000);
       if (foe.hp <= 0) outcome = 'win'; else if (me.hp <= 0) outcome = 'lose';
     }
     // a little SP comes back every round
@@ -1734,24 +1790,24 @@ async function battle(diff, opts){
     return;
   }
 
-  p.energy = clamp(p.energy - 25); p.hunger = clamp(p.hunger - 10);
+  p.energy = clamp(p.energy - 25 * (1 - 0.15 * perk('stamina'))); p.hunger = clamp(p.hunger - 10);
   let summary;
   if (outcome === 'win'){
     const g = growthOf(p), k = pick(['atk', 'int', 'def', 'spd', 'hp', 'sp']), v = k === 'hp' ? 3 + p.stage : k === 'sp' ? 2 : 1 + Math.floor(p.stage / 2);
     g[k] = (g[k] || 0) + v;
-    const ev = Math.max(1, Math.round(3 * diff.reward)), dd = Math.round((4 + 3 * p.stage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1));
+    const ev = Math.max(1, Math.round(3 * diff.reward)), dd = Math.round((4 + 3 * p.stage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1) * (1 + 0.1 * perk('scav')));
     bump('wins'); addBond(p, 2);
     questProgress('win'); if (diff.key === 'hard' || diff.key === 'nightmare') questProgress('winHard');
-    p.wins++; p.stageWins = (p.stageWins || 0) + 1; p.evo += ev; p.mood = clamp(p.mood + 8); G.data += dd;
+    p.wins++; p.stageWins = (p.stageWins || 0) + 1; p.evo += ev + perk('evo'); p.mood = clamp(p.mood + 8); G.data += dd;
     summary = p.name + ' won! +' + ev + ' digivolution points, +' + v + ' ' + STAT_LABEL[k] + ', +' + dd + ' DigiData.';
-    if (diff.battleEgg && Math.random() < diff.battleEgg){ G.eggs.push(diff.rare ? 'rare' : 'mystery'); summary += ' It dropped ' + (diff.rare ? 'a Rare Mystery Egg!' : 'a Mystery Egg!'); }
+    if (diff.battleEgg && Math.random() < diff.battleEgg * (1 + 0.15 * perk('eggs'))){ G.eggs.push(diff.rare ? 'rare' : 'mystery'); summary += ' It dropped ' + (diff.rare ? 'a Rare Mystery Egg!' : 'a Mystery Egg!'); }
     if (diff.battleEgg && Math.random() < diff.battleEgg * 0.8){ const it = randomDigimental(); giveItem(it); summary += ' Found a ' + itemName(it) + '!'; }
     const rd = regionDrop(); if (rd){ grantItem(rd); summary += ' Found ' + itemIcon(rd) + ' ' + itemName(rd) + '!'; }
     if (evOn('eggs') && Math.random() < 0.12){ G.eggs.push('mystery'); summary += ' Egg Hunt: found a Mystery Egg!'; }
   } else if (outcome === 'lose'){ p.losses++; p.stageLosses = (p.stageLosses || 0) + 1; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.`; }
   else summary = `${p.name} escaped from ${foe.name}.`;
   saveGame();
-  const xp = Math.round((outcome === 'win' ? 10 + p.stage * 6 : outcome === 'lose' ? 3 + p.stage * 2 : 0) * diff.reward * (rareUp && outcome === 'win' ? 3 : 1));
+  const xp = Math.round((outcome === 'win' ? 10 + p.stage * 6 : outcome === 'lose' ? 3 + p.stage * 2 : 0) * diff.reward * (rareUp && outcome === 'win' ? 3 : 1) * (curWeather().xp || 1));
   if (xp){ const lv = await gainXP(p, xp); summary += ' +' + xp + ' XP.' + levelText(lv); }
   $('#bact').innerHTML = `<button class="big" id="bDone">Continue</button>`;
   log(summary);
@@ -1915,7 +1971,7 @@ function dgNextFloor(){
   for (let i = 0; i < ni; i++){
     const s = dgFreeSpot(); if (!s) continue;
     const r = Math.random();
-    const type = dg.floor >= 3 && r < 0.04 * dg.diff.reward * (evOn('eggs') ? 3 : 1) ? 'egg' : dg.floor >= 2 && r > 1 - 0.05 * dg.diff.reward ? 'relic' : r < 0.45 ? 'chip' : r < 0.75 ? 'meat' : 'disk';
+    const type = dg.floor >= 3 && r < 0.04 * dg.diff.reward * (evOn('eggs') ? 3 : 1) * (1 + 0.15 * perk('eggs')) ? 'egg' : dg.floor >= 2 && r > 1 - 0.05 * dg.diff.reward ? 'relic' : r < 0.45 ? 'chip' : r < 0.75 ? 'meat' : 'disk';
     dg.items.push({ x: s.x, y: s.y, type });
   }
   dgReveal();
@@ -2088,7 +2144,7 @@ function dgEnd(result){
   let data = r.data, evo = Math.floor(r.kos / 2), eggs = r.eggs, title, note;
   if (result === 'clear'){
     data += Math.round((30 * (r.stage + 1) + 10 * r.floors) * r.diff.reward); evo += Math.round(5 * r.diff.reward);
-    if (Math.random() < r.diff.egg * (evOn('eggs') ? 1.5 : 1)){ if (r.diff.rare && Math.random() < 0.5) r.rareEgg = true; else eggs++; }
+    if (Math.random() < r.diff.egg * (evOn('eggs') ? 1.5 : 1) * (1 + 0.15 * perk('eggs'))){ if (r.diff.rare && Math.random() < 0.5) r.rareEgg = true; else eggs++; }
     p.mood = clamp(p.mood + 15); title = 'Dungeon cleared!'; p.stageWins = (p.stageWins || 0) + 1; questProgress('dungeon');
     bump('dungeons'); if (r.diff.key === 'nightmare') bump('nightmare'); r.team.forEach(u => addBond(u.ref, 2));
     const crestOdds = { hard: 0.2, nightmare: 0.4 }[r.diff.key] || 0;
@@ -2099,7 +2155,7 @@ function dgEnd(result){
     note = 'Your whole team fainted on floor ' + r.floor + '. Half the DigiData and any eggs or items were lost.';
   } else { title = 'Left the dungeon'; note = 'You escaped from floor ' + r.floor + ' with everything you found.'; }
   if (r.team.some(u => heldOf(u.ref) === 'h:charm')) data = Math.round(data * 1.3);
-  data = Math.round(data * curRegion().reward * (evOn('data') ? 2 : 1));
+  data = Math.round(data * curRegion().reward * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav')));
   G.data += data; p.evo += evo; for (let i = 0; i < eggs; i++) G.eggs.push('mystery');
   if (r.rareEgg && result === 'clear'){ G.eggs.push('rare'); eggs++; }
   if (r.kos) questProgress('ko', r.kos);
@@ -2746,7 +2802,7 @@ setInterval(() => { if (!busy && !document.hidden && state.tab === 'quests') ren
 
 renderRail();
 // ================= TRAINER SYSTEMS: personalities, bond, held items, status effects, modes, jogress, tree, achievements, daily, collection, crafting, backup =================
-function bump(k, n){ G.stats = G.stats || {}; G.stats[k] = (G.stats[k] || 0) + (n || 1); }
+function bump(k, n){ G.stats = G.stats || {}; G.stats[k] = (G.stats[k] || 0) + (n || 1); tamerXP(tamerXPFor(k) * (n || 1)); }
 
 // ----- personalities -----
 const PERS = {
@@ -2770,7 +2826,7 @@ function persOf(p){
 // ----- bond -----
 const BOND_TIERS = [{ at: 0, name: 'Stranger' }, { at: 20, name: 'Friend' }, { at: 40, name: 'Partner' }, { at: 70, name: 'Best Friend' }, { at: 100, name: 'Soulmate' }];
 const bondTier = p => BOND_TIERS.reduce((t, x, i) => (p.bond || 0) >= x.at ? i : t, 0);
-function addBond(p, n){ if (!p) return; p.bond = Math.max(0, Math.min(100, (p.bond || 0) + n)); }
+function addBond(p, n){ if (!p) return; if (n > 0 && perk('bondm')){ const x = n * (1 + 0.25 * perk('bondm')); n = Math.floor(x) + (Math.random() < x % 1 ? 1 : 0); } p.bond = Math.max(0, Math.min(100, (p.bond || 0) + n)); }
 const bondStatMul = p => bondTier(p) >= 4 ? 1.06 : bondTier(p) >= 2 ? 1.03 : 1;
 const bondEndure = p => bondTier(p) >= 4 ? 0.4 : bondTier(p) >= 3 ? 0.25 : 0;
 
@@ -2795,7 +2851,8 @@ function applyPerks(u, p){
   const h = heldOf(p);
   u.endureChance = h === 'h:band' ? 1 : bondEndure(p);
   u.noStatus = h === 'h:scarf';
-  u.critBonus = persOf(p).crit || 0;
+  u.critBonus = (persOf(p).crit || 0) + 0.03 * perk('focus');
+  u.tamer = true; u.tdm = 1 + 0.04 * perk('power'); u.ttk = 1 - 0.04 * perk('guard');
   return u;
 }
 
@@ -2948,12 +3005,16 @@ const ACH = [
   { id: 'colo10', name: 'Colosseum Legend', desc: 'Clear the Colosseum\'s Legend rank', stat: 'colo', n: 10, data: 1500, item: 'h:band' },
   { id: 'travel6', name: 'World Traveler', desc: 'Visit every region of the Digital World', stat: 'regions', n: 6, data: 800, item: 'egg:golden' },
   { id: 'farm25', name: 'DigiFarmer', desc: 'Harvest 25 crops', stat: 'harvests', n: 25, data: 300 },
+  { id: 'tamer10', name: 'Seasoned Tamer', desc: 'Reach Tamer level 10', stat: 'tamer', n: 10, data: 500 },
+  { id: 'tamer25', name: 'Legendary Tamer', desc: 'Reach Tamer level 25', stat: 'tamer', n: 25, data: 2000, item: 'egg:golden' },
+  { id: 'clean50', name: 'Clean Freak', desc: 'Clean up 50 messes', stat: 'cleans', n: 50, data: 300 },
   { id: 'bond100', name: 'Soulmates', desc: 'Max out a Digimon\'s bond', stat: 'bond', n: 100, data: 500, item: 'h:heart' },
 ];
 function achValue(stat){
   if (stat === 'found') return foundCount();
   if (stat === 'megas'){ const s = state.levelSets[STAGES[5]]; return s ? Object.keys(G.col).filter(id => G.col[id] === 'raised' && s.has(+id)).length : 0; }
   if (stat === 'streak') return (G.daily && G.daily.best) || 0;
+  if (stat === 'tamer') return (G.tamer && G.tamer.lv) || 1;
   if (stat === 'colo') return (G.colo && G.colo.best) || 0;
   if (stat === 'regions') return new Set([...Object.keys(G.visited || {}), 'file']).size;
   if (stat === 'bond') return Math.max(0, ...[...G.party, ...G.box].map(m => m.bond || 0));
@@ -3040,16 +3101,17 @@ function readBackup(code){
 // ----- trainer hub: daily, achievements, collection, titles, backup -----
 function updateTrainerBadge(){
   const b = $('#trainerBtn'); if (!b) return;
-  const n = (dailyReady() ? 1 : 0) + achClaimable().length + (state.ready ? colClaimable() : 0);
+  const n = (dailyReady() ? 1 : 0) + ((G.tamer && G.tamer.pts) || 0) + achClaimable().length + (state.ready ? colClaimable() : 0);
   b.textContent = n ? '🏆 ' + n : '🏆';
   b.classList.toggle('alert', !!n);
 }
 function trainerScreen(tab, msg){
-  tab = tab || (dailyReady() ? 'daily' : 'ach');
+  tab = tab || (tamerInit().pts ? 'tamer' : dailyReady() ? 'daily' : 'ach');
   busy = true;
-  const tabs = [['daily', 'Daily'], ['ach', 'Achievements'], ['col', 'Collection'], ['titles', 'Titles'], ['backup', 'Backup']];
+  const tabs = [['tamer', 'Tamer'], ['daily', 'Daily'], ['ach', 'Achievements'], ['col', 'Collection'], ['titles', 'Titles'], ['backup', 'Backup']];
   let body = '';
-  if (tab === 'daily'){
+  if (tab === 'tamer'){ body = tamerBody(); G.tamerNote = ''; }
+  else if (tab === 'daily'){
     const D = G.daily || {}, ready = dailyReady(), next = ready ? dailyNextStreak() : D.streak || 1;
     body = '<div class="wallet"><span>Streak <b>' + (D.last === dayKey() || D.last === dayKey(Date.now() - 864e5) ? D.streak || 0 : 0) + ' day' + ((D.streak || 0) === 1 ? '' : 's') + '</b></span><span>Best <b>' + (D.best || 0) + '</b></span></div>' +
       '<div class="days">' + DAILY.map((r, i) => { const day = i + 1, cyc = ((next - 1) % 7) + 1, done = ready ? day < cyc : day <= cyc, today = ready && day === cyc;
@@ -3077,12 +3139,13 @@ function trainerScreen(tab, msg){
       '<h5 class="lockh">Restore from a code</h5><textarea id="bkIn" class="bkbox" placeholder="Paste a save code (starts with DXSAVE1:)"></textarea><button class="act" id="bkLoad">Restore this save</button>' +
       '<p class="ownline">Restoring replaces everything on this device with the saved game.</p>';
   }
-  const html = '<h4>🏆 Trainer</h4><div class="segs">' + tabs.map(([k, l]) => '<button class="seg' + (k === tab ? ' on' : '') + '" data-tt="' + k + '">' + l + (k === 'daily' && dailyReady() ? ' •' : k === 'ach' && achClaimable().length ? ' ' + achClaimable().length : k === 'col' && colClaimable() ? ' ' + colClaimable() : '') + '</button>').join('') + '</div>' +
+  const html = '<h4>🏆 Trainer</h4><div class="segs">' + tabs.map(([k, l]) => '<button class="seg' + (k === tab ? ' on' : '') + '" data-tt="' + k + '">' + l + (k === 'tamer' && tamerInit().pts ? ' ' + G.tamer.pts : k === 'daily' && dailyReady() ? ' •' : k === 'ach' && achClaimable().length ? ' ' + achClaimable().length : k === 'col' && colClaimable() ? ' ' + colClaimable() : '') + '</button>').join('') + '</div>' +
     body + '<p id="trMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p><button class="ghost" id="trClose">Close</button>';
   if ($('#overlay').hidden) openOv(html); else $('#overlay .sheet').innerHTML = html;
   const again = m => { updateTrainerBadge(); updateCount(); trainerScreen(tab, m); };
   $('#trClose').onclick = () => { closeOv(); updateTrainerBadge(); if (state.tab === 'partner') renderPartner(); };
   $('#overlay').querySelectorAll('[data-tt]').forEach(b => b.onclick = () => trainerScreen(b.dataset.tt));
+  tamerHandlers(again);
   const dc = $('#dailyClaim'); if (dc) dc.onclick = () => { const r = claimDaily(); if (r) again('Day ' + r.s + ' claimed: ' + rewardLine(r.r.data, r.r.item) + '!'); };
   $('#overlay').querySelectorAll('[data-ach]').forEach(b => b.onclick = () => { const a = ACH.find(x => x.id === b.dataset.ach); if (!a || !achDone(a) || (G.achClaimed || {})[a.id]) return;
     G.achClaimed = G.achClaimed || {}; G.achClaimed[a.id] = true; G.data += a.data; grantItem(a.item); if (!G.title) G.title = a.name; saveGame(); paintTitle(); again('Unlocked “' + a.name + '”: ' + rewardLine(a.data, a.item) + '!'); });
@@ -3176,7 +3239,7 @@ function eventBanner(){
   const ev = evCheck(); if (!ev) return '';
   return '<div class="evbanner"><b>' + ev.icon + ' ' + esc(ev.name) + '</b><span>' + esc(ev.desc) + '</span><small>Ends in ' + fmtLeft(G.ev.end - Date.now()) + '</small></div>';
 }
-const salePrice = (p, egg) => Math.max(1, Math.round(p * (evOn('sale') ? 0.7 : 1) * (egg && evOn('eggs') ? 0.75 : 1)));
+const salePrice = (p, egg) => Math.max(1, Math.round(p * (evOn('sale') ? 0.7 : 1) * (egg && evOn('eggs') ? 0.75 : 1) * (1 - 0.05 * perk('bargain'))));
 
 // ----- Digital World regions -----
 const REGIONS = [
@@ -3222,6 +3285,7 @@ function coloFoes(i, stage){
 }
 function coloMatch(i){
   const p = P(); if (!p || busy) return;
+  if (asleep(p) || careInit(p).sick){ renderWorld('colo', p.name + (asleep(p) ? ' is asleep. Wake it up on the Partner tab first.' : ' is sick. Give it medicine on the Partner tab first.')); return; }
   const rank = COLO[i], foes = coloFoes(i, p.stage), carry = { hp: null, sp: null };
   p.energy = clamp(p.energy - 30); saveGame();
   let round = 0;
@@ -3263,7 +3327,7 @@ const CROPS = [
 ];
 const GYM = [{ rate: 0, cost: 300 }, { rate: 5, cost: 900 }, { rate: 10, cost: 2400 }, { rate: 18 }];   // XP per hour per Box Digimon
 function farmInit(){ if (!G.farm) G.farm = { plots: [null, null], gym: 0, gymLast: Date.now() }; return G.farm; }
-const cropMs = c => c.mins * 60000 * (evOn('harvest') ? 0.5 : 1);
+const cropMs = c => c.mins * 60000 * (evOn('harvest') ? 0.5 : 1) * (weatherAt('file').farm || 1) * (1 - 0.1 * perk('thumb'));
 const plotReady = pl => pl && Date.now() - pl.start >= cropMs(CROPS.find(c => c.key === pl.crop));
 const plotCost = () => 200 * (farmInit().plots.length - 1);
 function gymPending(){ const F = farmInit(), rate = GYM[F.gym].rate; if (!rate) return 0; return Math.floor(Math.min(24, (Date.now() - F.gymLast) / 3600000) * rate); }
@@ -3296,7 +3360,7 @@ function renderWorld(sub, msg){
     body = '<p class="ownline">Travel to a region to change which wild Digimon you meet in battles and dungeons. Tougher regions pay more. Regions open up as you find more Digimon (' + found + ' found).</p><div class="regions">' +
       REGIONS.map(r => { const open = regionOpen(r), here = r === cur;
         return '<div class="region' + (here ? ' here' : '') + (open ? '' : ' locked') + '"><div class="qtop"><b>' + r.icon + ' ' + esc(r.name) + '</b><span>' + (here ? 'You are here' : open ? 'Open' : '🔒 ' + found + ' / ' + r.need + ' found') + '</span></div>' +
-          '<small>' + esc(r.desc) + '</small><small>Foes ×' + r.foe + ' · DigiData ×' + r.reward + (r.gift && !(G.visited || {})[r.key] ? ' · first-visit gift: ' + esc(itemIcon(r.gift) + ' ' + itemName(r.gift)) : '') + '</small>' +
+          '<small>' + esc(r.desc) + '</small><small>' + weatherAt(r.key).icon + ' ' + weatherAt(r.key).name + ' now · Foes ×' + r.foe + ' · DigiData ×' + r.reward + (r.gift && !(G.visited || {})[r.key] ? ' · first-visit gift: ' + esc(itemIcon(r.gift) + ' ' + itemName(r.gift)) : '') + '</small>' +
           (!open ? '<div class="evotrack"><i style="width:' + Math.min(100, found / r.need * 100) + '%"></i></div>' : here ? '' : '<button class="act" data-travel="' + r.key + '">Travel here</button>') + '</div>'; }).join('') + '</div>';
   } else if (sub === 'colo'){
     const best = G.colo.best || 0;
@@ -3309,7 +3373,7 @@ function renderWorld(sub, msg){
           (open && p ? '<button class="act" data-colo="' + i + '"' + (p.energy < 30 ? ' disabled' : '') + '>' + (p.energy < 30 ? 'Too tired (30 energy)' : done ? 'Fight again' : 'Fight') + '</button>' : '') + '</div>'; }).join('') + '</div>';
   } else {
     const F = farmInit(), pend = gymPending(), boxers = G.box.filter(m => !m.exp).length;
-    body = '<p class="ownline">Plant crops and they grow in real time, even while the app is closed.' + (evOn('harvest') ? ' 🌾 Bumper Crop: everything grows twice as fast right now!' : '') + '</p>' +
+    body = '<p class="ownline">Plant crops and they grow in real time, even while the app is closed.' + (evOn('harvest') ? ' 🌾 Bumper Crop: everything grows twice as fast right now!' : '') + (weatherAt('file').farm ? ' 🌧️ It\'s raining on the farm, so crops grow 20% faster.' : '') + '</p>' +
       '<div class="plots">' + F.plots.map((pl, i) => { if (!pl) return '<div class="plot empty"><b>Empty plot</b><div class="seeds">' + CROPS.map(c => '<button class="seed" data-plant="' + i + ':' + c.key + '"' + (G.data < c.cost ? ' disabled' : '') + '>' + c.icon + '<span>' + esc(c.name) + '</span><small>' + c.cost + ' DD · ' + fmtLeft(cropMs(c)) + '</small></button>').join('') + '</div></div>';
         const c = CROPS.find(x => x.key === pl.crop), left = cropMs(c) - (Date.now() - pl.start), pct = Math.min(100, (1 - left / cropMs(c)) * 100);
         return '<div class="plot' + (left <= 0 ? ' ripe' : '') + '"><b>' + c.icon + ' ' + esc(c.name) + '</b><small>Gives ' + esc(c.out) + '</small><div class="evotrack"><i style="width:' + pct + '%"></i></div>' +
@@ -3319,7 +3383,7 @@ function renderWorld(sub, msg){
       '<div class="bkrow">' + (F.gym ? '<button class="act" id="gymCollect"' + (pend && boxers ? '' : ' disabled') + '>Collect XP</button>' : '<span></span>') +
       (F.gym < GYM.length - 1 ? '<button class="act" id="gymUp"' + (G.data < GYM[F.gym].cost ? ' disabled' : '') + '>' + (F.gym ? 'Upgrade' : 'Build') + ' · ' + GYM[F.gym].cost + ' DD</button>' : '<span class="rq ok">Max level</span>') + '</div>';
   }
-  v.innerHTML = '<div class="ptop"><h2>Digital World</h2><span class="stage">' + curRegion().icon + ' ' + esc(curRegion().name) + '</span></div>' + eventBanner() +
+  v.innerHTML = '<div class="ptop"><h2>Digital World</h2><span class="stage">' + curRegion().icon + ' ' + esc(curRegion().name) + '</span><span class="stage">' + skyTag() + '</span></div>' + eventBanner() +
     '<div class="wallet"><span>DigiData <b>' + G.data.toLocaleString() + '</b></span></div>' +
     '<div class="segs">' + [['map', '🗺️ Map'], ['colo', '🏟️ Colosseum'], ['farm', '🌾 DigiFarm']].map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-ws="' + k + '">' + l + '</button>').join('') + '</div>' +
     body + '<p id="wMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>';
@@ -3346,6 +3410,181 @@ function updateWorldBadge(){
   const F = G.farm, ripe = F ? F.plots.filter(plotReady).length : 0;
   t.textContent = ripe ? 'World · ' + ripe : 'World';
 }
+
+
+// ================= TAMER LEVEL, DIGIMON CARE, WEATHER, DAY / NIGHT =================
+
+// ----- day and night follow the phone's clock -----
+var PHASES = { dawn: { icon: '🌅', name: 'Dawn' }, day: { icon: '☀️', name: 'Day' }, dusk: { icon: '🌇', name: 'Dusk' }, night: { icon: '🌙', name: 'Night' } };
+function dayPhase(d){ const h = (d || new Date()).getHours(); return h >= 6 && h < 8 ? 'dawn' : h >= 8 && h < 18 ? 'day' : h >= 18 && h < 20 ? 'dusk' : 'night'; }
+// Digimon sleep from 10pm to 7am unless you wake them
+function sleepHour(){ const h = new Date().getHours(); return h >= 22 || h < 7; }
+function asleep(p){ return !!p && sleepHour() && !(p.wokeUntil > Date.now()); }
+function lightsOff(){ return sleepHour() && !!G.lightsOff && Date.now() - G.lightsOff < 12 * 3600000; }
+// Holy Digimon are a little stronger by day, Dark ones at night
+function timeMult(e){ const ph = dayPhase(); if (ph === 'night') return e === 'dark' ? 1.15 : e === 'holy' ? 0.9 : 1; if (ph === 'day') return e === 'holy' ? 1.1 : e === 'dark' ? 0.95 : 1; return 1; }
+
+// ----- weather: each region has its own, changing every 3 hours -----
+var WEATHER = {
+  clear:  { icon: '🌤️', name: 'Clear', desc: 'Calm skies. No effects.' },
+  sunny:  { icon: '☀️', name: 'Sunny', up: ['fire', 'plant'], down: ['water'], desc: 'Fire and Plant attacks +20%, Water −15%.' },
+  rain:   { icon: '🌧️', name: 'Rain', up: ['water'], down: ['fire'], farm: 0.8, desc: 'Water attacks +20%, Fire −15%. Crops grow 20% faster.' },
+  wind:   { icon: '🌬️', name: 'Gale', up: ['wind'], down: ['machine'], evade: 0.04, desc: 'Wind attacks +20%, Machine −15%. Everyone dodges a little more.' },
+  storm:  { icon: '⛈️', name: 'Thunderstorm', up: ['machine', 'wind'], down: ['plant'], par: true, desc: 'Machine and Wind attacks +20%, Plant −15%. Paralysis happens more often.' },
+  fog:    { icon: '🌫️', name: 'Fog', up: ['dark'], down: ['holy'], evade: 0.08, desc: 'Dark attacks +20%, Holy −15%. Attacks miss more often.' },
+  snow:   { icon: '❄️', name: 'Snow', up: ['water', 'beast'], down: ['plant', 'fire'], desc: 'Water and Beast attacks +20%, Plant and Fire −15%.' },
+  aurora: { icon: '🌌', name: 'Aurora', up: ['holy'], xp: 1.25, desc: 'Holy attacks +20%, and battles give 25% more XP.' },
+};
+var REGION_WEATHER = { file: ['clear', 'clear', 'sunny', 'rain', 'wind', 'fog'], server: ['clear', 'storm', 'rain', 'fog', 'sunny'], folder: ['sunny', 'sunny', 'clear', 'storm', 'wind'],
+  ocean: ['rain', 'rain', 'storm', 'clear', 'wind', 'fog'], dark: ['fog', 'fog', 'storm', 'clear', 'snow'], spiral: ['snow', 'wind', 'storm', 'aurora', 'clear', 'fog'] };
+var WEATHER_MS = 3 * 3600000;
+function weatherAt(rk, t){
+  const list = REGION_WEATHER[rk] || REGION_WEATHER.file, slot = Math.floor((t || Date.now()) / WEATHER_MS), ri = Math.max(0, REGIONS.findIndex(r => r.key === rk));
+  const k = list[Math.floor(Math.abs(seeded(slot % 100000 + 1, 7000 + ri * 37)) * list.length) % list.length] || 'clear';
+  return Object.assign({ key: k }, WEATHER[k]);
+}
+function curWeather(){ return weatherAt(curRegion().key); }
+const weatherLeft = () => WEATHER_MS - Date.now() % WEATHER_MS;
+function weatherMult(e){ const w = curWeather(); return (w.up || []).includes(e) ? 1.2 : (w.down || []).includes(e) ? 0.85 : 1; }
+// weather × time of day for one attacker; the Weather Reader perk ignores the penalties
+function skyMult(u){ const m = weatherMult(u.elem) * timeMult(u.elem); return u.tamer && perk('weather') ? Math.max(1, m) : m; }
+function skyTag(){ const w = curWeather(), ph = PHASES[dayPhase()]; return w.icon + ' ' + w.name + ' · ' + ph.icon + ' ' + ph.name; }
+function skyInfo(){
+  const w = curWeather(), ph = dayPhase();
+  const tm = ph === 'night' ? 'Night: Dark attacks +15%, Holy −10%.' : ph === 'day' ? 'Day: Holy attacks +10%, Dark −5%.' : PHASES[ph].name + ': no time-of-day effects.';
+  return '<div class="skyinfo"><b>' + w.icon + ' ' + esc(w.name) + ' in ' + esc(curRegion().name) + '</b><span>' + esc(w.desc) + ' Changes in ' + fmtLeft(weatherLeft()) + '.</span><span>' + PHASES[ph].icon + ' ' + esc(tm) + ' Digimon sleep from 10pm to 7am.</span></div>';
+}
+
+// ----- Tamer level and skill tree -----
+function tamerInit(){ if (!G.tamer) G.tamer = { lv: 1, xp: 0, pts: 0, perks: {} }; return G.tamer; }
+function tamerNeed(lv){ return 60 + lv * 40; }
+function tamerXPFor(k){ return ({ wins: 6, hatches: 10, perfects: 4, bosses: 15, dungeons: 25, exps: 8, quests: 12, evolves: 20, harvests: 3, coloWins: 20, crafts: 5, jogress: 25, nightmare: 20, cleans: 1, cures: 2, cares: 1, trains: 2 })[k] || 0; }
+function tamerXP(n){
+  if (!n) return;
+  const T = tamerInit(); T.xp += Math.round(n); let up = 0;
+  while (T.xp >= tamerNeed(T.lv) && T.lv < 60){ T.xp -= tamerNeed(T.lv); T.lv++; T.pts++; up++; }
+  if (up){ G.tamerNote = 'Tamer level ' + T.lv + '! You have ' + T.pts + ' skill point' + (T.pts === 1 ? '' : 's') + ' to spend.'; if (typeof updateTrainerBadge === 'function') try{ updateTrainerBadge(); }catch{} }
+}
+var PERK_TREE = [
+  { key: 'care', name: 'Caretaker', icon: '🍼', perks: [
+    { id: 'nurture', name: 'Nurture', max: 3, desc: 'Hunger and mood drop 10% slower per rank.' },
+    { id: 'tidy', name: 'Tidy', max: 3, desc: 'Digimon make a mess 15% less often and get sick 20% less per rank.' },
+    { id: 'bondm', name: 'Bond Master', max: 2, desc: 'Bond grows 25% faster per rank.' },
+    { id: 'thumb', name: 'Green Thumb', max: 2, desc: 'DigiFarm crops grow 10% faster per rank.' } ] },
+  { key: 'coach', name: 'Coach', icon: '💪', perks: [
+    { id: 'drill', name: 'Drill', max: 3, desc: '+15% stats from training per rank.' },
+    { id: 'study', name: 'Study', max: 3, desc: 'Your Digimon earn 10% more XP per rank.' },
+    { id: 'stamina', name: 'Stamina', max: 2, desc: 'Training and battles use 15% less energy per rank.' },
+    { id: 'evo', name: 'Evo Expert', max: 2, desc: '+1 digivolution point from every win and training session per rank.' } ] },
+  { key: 'tact', name: 'Tactician', icon: '⚔️', perks: [
+    { id: 'power', name: 'Power', max: 3, desc: 'Your Digimon deal 4% more damage per rank.' },
+    { id: 'guard', name: 'Iron Wall', max: 3, desc: 'Your Digimon take 4% less damage per rank.' },
+    { id: 'focus', name: 'Focus', max: 2, desc: '+3% critical hit chance per rank.' },
+    { id: 'weather', name: 'Weather Reader', max: 1, desc: 'Weather and time of day can only help your Digimon, never weaken them.' } ] },
+  { key: 'explore', name: 'Explorer', icon: '🧭', perks: [
+    { id: 'scav', name: 'Scavenger', max: 3, desc: '+10% DigiData from battles, dungeons and expeditions per rank.' },
+    { id: 'path', name: 'Pathfinder', max: 3, desc: 'Expeditions finish 10% faster per rank.' },
+    { id: 'eggs', name: 'Egg Finder', max: 2, desc: '+15% egg drop chance per rank.' },
+    { id: 'bargain', name: 'Haggler', max: 3, desc: 'Everything in the Shop costs 5% less per rank.' } ] },
+];
+function perk(id){ return (G.tamer && G.tamer.perks && G.tamer.perks[id]) || 0; }
+const branchSpent = br => br.perks.reduce((n, x) => n + perk(x.id), 0);
+const perkNeed = i => i * 2;   // points spent in a branch to unlock its next perk
+const tamerSpent = () => PERK_TREE.reduce((n, br) => n + branchSpent(br), 0);
+const respecCost = () => 100 + 25 * tamerSpent();
+function tamerBody(){
+  const T = tamerInit();
+  return '<div class="wallet"><span>Tamer <b>Lv ' + T.lv + '</b></span><span>XP <b>' + T.xp + ' / ' + tamerNeed(T.lv) + '</b></span><span>Skill points <b>' + T.pts + '</b></span></div>' +
+    '<div class="xptrack"><i style="width:' + Math.min(100, T.xp / tamerNeed(T.lv) * 100) + '%"></i></div>' +
+    '<p class="ownline">Everything you do earns Tamer XP: battles, hatching, dungeons, expeditions, quests, digivolving, training, caring for your Digimon and more. Each Tamer level gives one skill point. Deeper perks in a branch unlock as you spend points in it.</p>' +
+    PERK_TREE.map(br => { const sp = branchSpent(br);
+      return '<h5 class="lockh">' + br.icon + ' ' + esc(br.name) + ' <span class="stage">' + sp + ' spent</span></h5><div class="achs">' + br.perks.map((x, i) => {
+        const r = perk(x.id), open = sp >= perkNeed(i), full = r >= x.max;
+        return '<div class="ach perk' + (full ? ' got' : '') + (open ? '' : ' locked') + '"><div class="qtop"><b>' + esc(x.name) + '</b><span>' + '●'.repeat(r) + '○'.repeat(x.max - r) + '</span></div><small>' + esc(x.desc) + '</small>' +
+          (!open ? '<small>🔒 Spend ' + perkNeed(i) + ' points in ' + esc(br.name) + ' to unlock</small>' : full ? '<small class="okt">✓ Maxed</small>' : '<button class="act" data-perk="' + x.id + '"' + (T.pts ? '' : ' disabled') + '>' + (T.pts ? 'Learn rank ' + (r + 1) : 'Needs a skill point') + '</button>') + '</div>'; }).join('') + '</div>'; }).join('') +
+    (tamerSpent() ? '<button class="ghost" id="tmReset"' + (G.data < respecCost() ? ' disabled' : '') + '>Reset all perks · ' + respecCost() + ' DigiData</button>' : '');
+}
+function tamerHandlers(again){
+  $('#overlay').querySelectorAll('[data-perk]').forEach(b => b.onclick = () => {
+    const T = tamerInit(); let found = null, idx = 0, branch = null;
+    for (const br of PERK_TREE) br.perks.forEach((x, i) => { if (x.id === b.dataset.perk){ found = x; idx = i; branch = br; } });
+    if (!found || !T.pts || perk(found.id) >= found.max || branchSpent(branch) < perkNeed(idx)) return;
+    T.perks[found.id] = perk(found.id) + 1; T.pts--; saveGame(); again('Learned ' + found.name + ' rank ' + T.perks[found.id] + '!');
+  });
+  const rs = $('#tmReset'); if (rs) rs.onclick = () => {
+    if (!rs.dataset.armed){ rs.dataset.armed = '1'; rs.textContent = 'Tap again to refund all ' + tamerSpent() + ' points'; return; }
+    const T = tamerInit(), c = respecCost(); if (G.data < c) return;
+    G.data -= c; T.pts += tamerSpent(); T.perks = {}; saveGame(); again('All perks reset. Your points are back.');
+  };
+}
+
+// ----- Digimon care: messes, sickness and sleep -----
+function careInit(p){ if (p.poop == null){ p.poop = 0; p.poopAcc = 0; p.sick = 0; } p.flags = p.flags || {}; return p; }
+function careMistake(p, text){ p.mistakes++; p.stageMistakes++; addBond(p, -5); p.msg = text; }
+function careTick(p, mins){
+  careInit(p);
+  const sl = asleep(p);
+  p.poopAcc += mins * (sl ? 0.4 : 1) / (1 + 0.15 * perk('tidy'));
+  while (p.poopAcc >= 110){ p.poopAcc -= 110; if (p.poop < 4) p.poop++; }
+  if (p.poop >= 4 && !p.flags.poop){ p.flags.poop = true; careMistake(p, p.name + ' was stuck in a mess for too long. That\'s a care mistake.'); }
+  const risk = ((p.poop >= 3 ? 0.0025 : p.poop >= 2 ? 0.0008 : 0) + (p.hunger <= 5 ? 0.002 : 0)) * (1 - 0.2 * perk('tidy'));
+  if (!p.sick && risk > 0 && Math.random() < 1 - Math.pow(1 - risk, mins)){ p.sick = Date.now(); p.msg = p.name + ' caught a bug and feels sick. Give it medicine!'; }
+  if (p.sick && Date.now() - p.sick > 6 * 3600000 && !p.flags.sick){ p.flags.sick = true; careMistake(p, p.name + ' was left sick for hours. That\'s a care mistake.'); }
+  if (p.poop) p.mood = clamp(p.mood - mins / 40 * p.poop);
+  if (p.sick) p.mood = clamp(p.mood - mins / 20);
+  if (sl && !lightsOff()) p.mood = clamp(p.mood - mins / 30);
+}
+var MED_COST = 40;
+function careLine(p){
+  careInit(p);
+  if (asleep(p)) return lightsOff() ? 'Zzz… ' + p.name + ' is fast asleep.' : p.name + ' is trying to sleep, but the lights are on.';
+  if (p.sick) return p.name + ' is sick. Give it medicine before training or battling.';
+  if (p.poop >= 3) return p.name + ' is sitting in a big mess. Clean it up!';
+  return '';
+}
+function habitatExtras(p){
+  careInit(p);
+  const w = curWeather(), sl = asleep(p);
+  return '<div class="sky" aria-hidden="true"><span class="skytag">' + skyTag() + '</span></div>' +
+    (w.key === 'rain' || w.key === 'storm' ? '<i class="wx rain" aria-hidden="true"></i>' : w.key === 'snow' ? '<i class="wx snow" aria-hidden="true"></i>' : w.key === 'fog' ? '<i class="wx fog" aria-hidden="true"></i>' : w.key === 'aurora' ? '<i class="wx aurora" aria-hidden="true"></i>' : '') +
+    (p.poop ? '<div class="poops" aria-label="' + p.poop + ' mess' + (p.poop === 1 ? '' : 'es') + '">' + '💩'.repeat(p.poop) + '</div>' : '') +
+    (p.sick ? '<span class="sickic" aria-label="sick">🤒</span>' : '') + (sl ? '<span class="zzz" aria-hidden="true">Z<small>z</small><small>z</small></span>' : '');
+}
+function habitatClass(p){ return ' ph-' + dayPhase() + (asleep(p) ? ' sleeping' : '') + (lightsOff() ? ' dim' : ''); }
+function careButtons(p){
+  careInit(p);
+  const third = sleepHour()
+    ? '<button class="act" data-act="lights">' + (lightsOff() ? '💡 Lights on<small>room is dark</small>' : '🌙 Lights off<small>bedtime</small>') + '</button>'
+    : '<button class="act" data-act="sky">' + curWeather().icon + ' Weather<small>' + esc(curWeather().name) + ' · ' + PHASES[dayPhase()].name.toLowerCase() + '</small></button>';
+  return '<div class="actions">' +
+    '<button class="act" data-act="clean"' + (p.poop ? '' : ' disabled') + '>🧹 Clean<small>' + (p.poop ? p.poop + ' mess' + (p.poop === 1 ? '' : 'es') : 'all tidy') + '</small></button>' +
+    '<button class="act" data-act="med"' + (p.sick && G.data >= MED_COST ? '' : ' disabled') + '>💊 Medicine<small>' + (p.sick ? MED_COST + ' DigiData' : 'healthy') + '</small></button>' + third + '</div>';
+}
+// returns true when the action was a care action and has been handled
+function careAction(k, p){
+  careInit(p);
+  if (k === 'clean'){ if (!p.poop) return true; const n = p.poop; p.poop = 0; p.flags.poop = false; p.mood = clamp(p.mood + 4 * n); bump('cleans'); say('All clean! ' + p.name + ' looks relieved.', 'happy'); return true; }
+  if (k === 'med'){ if (!p.sick || G.data < MED_COST) return true; G.data -= MED_COST; p.sick = 0; p.flags.sick = false; p.mood = clamp(p.mood + 10); bump('cures'); updateCount(); say(p.name + ' took its medicine and feels much better!', 'happy'); return true; }
+  if (k === 'lights'){ G.lightsOff = lightsOff() ? 0 : Date.now(); say(lightsOff() ? 'Lights off. Good night, ' + p.name + '.' : 'Lights on.'); return true; }
+  if (k === 'wake'){ p.wokeUntil = Date.now() + 2 * 3600000; p.mood = clamp(p.mood - 8); say(p.name + ' rubs its eyes and wakes up, a little grumpy. It will stay up for 2 hours.'); return true; }
+  if (k === 'sky'){ busy = true; openOv('<h4>Weather &amp; time</h4>' + skyInfo() + '<div class="hist">' + REGIONS.filter(regionOpen).map(r => { const w = weatherAt(r.key); return '<div><b>' + r.icon + ' ' + esc(r.name) + '</b> · ' + w.icon + ' ' + esc(w.name) + '<br><small>' + esc(w.desc) + '</small></div>'; }).join('') + '</div><button class="big" id="skyDone">Close</button>'); $('#skyDone').onclick = closeOv; return true; }
+  return false;
+}
+
+// ----- auto-battle: picks a sensible move each turn -----
+function autoChoice(me, foe, modes, modeCost){
+  if (modes && modes.length && !me.moded && me.sp >= modeCost) return 'mode';
+  const idx = me.moves.map((m, i) => [m, i]).filter(([m]) => (m.cost || 0) <= me.sp);
+  const heal = idx.find(([m]) => m.kind === 'heal');
+  if (heal && me.hp < me.st.hp * 0.35) return String(heal[1]);
+  const buff = idx.find(([m]) => m.kind === 'buff');
+  if (buff && (me.buff || 1) < 1.2 && me.hp > me.st.hp * 0.6 && foe.hp > foe.st.hp * 0.5) return String(buff[1]);
+  const dmg = idx.filter(([m]) => m.kind === 'phys' || m.kind === 'mag' || m.kind === 'drain' || m.kind === 'atk');
+  if (!dmg.length){ const g = idx.find(([m]) => m.kind === 'guard'); return String(g ? g[1] : 0); }
+  const score = m => (m.kind === 'phys' || m.kind === 'atk' ? me.st.atk : me.st.int) * (m.power || 1) * (m.kind === 'drain' && me.hp < me.st.hp * 0.6 ? 1.25 : 1) - (m.cost || 0) * 0.15 * (me.sp < me.st.sp * 0.3 ? 2 : 1);
+  return String(dmg.sort((a, b) => score(b[0]) - score(a[0]))[0][1]);
+}
+function expMs(ex){ return Math.round(ex.mins * 60000 * (1 - 0.1 * perk('path'))); }
 
 setRetro(false);
 // light / dark mode: follows the phone until you pick one, then remembers it
