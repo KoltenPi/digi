@@ -214,6 +214,13 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .dbar{display:inline-block;width:40px;height:5px;border-radius:3px;background:var(--sunk);margin-left:4px;vertical-align:middle;overflow:hidden}
 .dbar i{display:block;height:100%;background:var(--good)}
 .dbar.s i{background:var(--link)}
+.dteam{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.dteam:empty{display:none}
+.dmate{flex:none;display:grid;gap:1px;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:4px 8px;font:600 .64rem var(--mono);color:var(--muted)}
+.dmate b{font:700 .74rem var(--body);color:var(--fg);max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dmate .dbar{margin-left:0;width:100%}
+.dmate.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.dmate.out{opacity:.45;text-decoration:line-through}
 #dgc{display:block;margin:0 auto;border-radius:10px;touch-action:manipulation;max-width:100%}
 .dlog{font-size:.78rem;color:var(--muted);min-height:3.6em;line-height:1.2}
 .dctl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center}
@@ -1643,16 +1650,57 @@ function genFloor(){
 
 const dgFloor = (x, y) => x >= 0 && y >= 0 && x < DG.W && y < DG.H && dg.map[y * DG.W + x] === 1;
 const dgRoomAt = (x, y) => dg.rooms.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+// the whole party explores together; you control one (dg.me) and the rest follow and fight
+const dgAlive = () => dg.team.filter(u => u.hp > 0);
+const dgMates = () => dg.team.filter(u => u.hp > 0 && u !== dg.me);
+const dgIsMate = u => dg.team.includes(u);
 function dgUnitAt(x, y){
-  if (dg.me.x === x && dg.me.y === y) return dg.me;
-  if (dg.ally && dg.ally.hp > 0 && dg.ally.x === x && dg.ally.y === y) return dg.ally;
+  for (const u of dg.team) if (u.hp > 0 && u.x === x && u.y === y) return u;
   return dg.enemies.find(e => e.x === x && e.y === y) || null;
+}
+// nearest open floor tiles around the leader (for placing teammates)
+function dgNearFree(n){
+  const W = DG.W, q = [[dg.me.x, dg.me.y]], seen = new Set([dg.me.y * W + dg.me.x]), out = [];
+  for (let qi = 0; qi < q.length && out.length < n && qi < 600; qi++){
+    const [cx, cy] = q[qi];
+    for (const d of Object.values(DIRS)){
+      const nx = cx + d[0], ny = cy + d[1], k = ny * W + nx;
+      if (seen.has(k) || !dgFloor(nx, ny)) continue;
+      seen.add(k); q.push([nx, ny]);
+      if (!dgUnitAt(nx, ny)) out.push([nx, ny]);
+    }
+  }
+  return out;
+}
+function dgPlaceMates(){
+  const mates = dgMates(); mates.forEach(u => { u.x = -9; u.y = -9; });
+  const spots = dgNearFree(mates.length);
+  mates.forEach((u, i) => { const p = spots[i] || [dg.me.x, dg.me.y]; u.x = p[0]; u.y = p[1]; });
+}
+function dgBestMove(u){ const i = u.moves.findIndex(mv => mv.cost > 0 && mv.kind !== 'guard'); return i >= 0 ? i : 0; }
+// take control of another teammate (free action)
+function dgLead(u, forced){
+  if (!u || u.hp <= 0 || u === dg.me) return;
+  dg.me = u; dg.sel = dgBestMove(u); if (!u.face) u.face = DIRS.down;
+  dgLog(forced ? u.name + ' takes the lead!' : 'You switched to ' + u.name + '.');
+  dgReveal(); dgDraw();
+}
+function dgCampfire(){
+  dg.fire.used = true;
+  for (const u of dgAlive()){ u.hp = Math.min(u.max, u.hp + Math.round(u.max * 0.3)); u.sp = Math.min(u.st.sp, u.sp + Math.round(u.st.sp * 0.3)); }
+  let msg = '🔥 The team rested at the campfire and recovered some HP and SP.';
+  const down = dg.team.find(u => u.hp <= 0);
+  if (down){
+    const spot = dgNearFree(1)[0];
+    if (spot){ down.hp = Math.round(down.max * 0.4); down.sp = Math.round(down.st.sp * 0.5); down.x = spot[0]; down.y = spot[1]; msg += ' ' + down.name + ' was revived!'; }
+  }
+  dgLog(msg);
 }
 function dgFreeSpot(avoidRoom){
   for (let t = 0; t < 400; t++){
     const r = pick(dg.rooms); if (r === avoidRoom && dg.rooms.length > 1) continue;
     const x = r.x + (Math.random() * r.w | 0), y = r.y + (Math.random() * r.h | 0);
-    if (!dgUnitAt(x, y) && !dg.items.some(i => i.x === x && i.y === y) && !(dg.stairs && dg.stairs.x === x && dg.stairs.y === y)) return { x, y };
+    if (!dgUnitAt(x, y) && !dg.items.some(i => i.x === x && i.y === y) && !(dg.stairs && dg.stairs.x === x && dg.stairs.y === y) && !(dg.fire && dg.fire.x === x && dg.fire.y === y)) return { x, y };
   }
   return null;
 }
@@ -1685,17 +1733,13 @@ async function dungeon(diff){
   diff = diff || DIFFS[1];
   const p = P(); busy = true;
   openOv('<h4>Entering the dungeon…</h4><div class="status">Generating floor 1…</div>');
-  const ally = G.party.length > 1 ? G.party[(G.active + 1) % G.party.length] : null;
-  let myD = null, allyD = null;
-  try{ [myD, allyD] = await Promise.all([getDetail(p.id), ally ? getDetail(ally.id) : null]); }catch{}
-  await syncMoves(p); if (ally) await syncMoves(ally);
-  const st = partnerStats(p);
+  const party = [p, ...G.party.filter(m => m !== p)];   // your active partner leads, everyone else comes along
+  const details = await Promise.all(party.map(m => getDetail(m.id).catch(() => null)));
+  for (const m of party) await syncMoves(m);
   dg = { stage: p.stage, diff, floors: diff.floors, floor: 0, data: 0, kos: 0, turn: 0, steps: 0, bag: { meat: 1, disk: 1 }, eggs: 0, over: false,
-    me: dgUnit(p.id, p.name, st, mainAttr(myD), partnerMoves(p), 1), ally: null, log: [], sel: 0 };
-  const firstSkill = dg.me.moves.findIndex(mv => mv.cost > 0 && mv.kind !== 'guard');
-  dg.sel = firstSkill >= 0 ? firstSkill : 0;
-  dg.me.face = DIRS.down;
-  if (ally){ const ast = partnerStats(ally); dg.ally = dgUnit(ally.id, ally.name, ast, mainAttr(allyD), partnerMoves(ally), 1); }
+    team: party.map((m, i) => { const u = dgUnit(m.id, m.name, partnerStats(m), mainAttr(details[i]), partnerMoves(m), 1); u.ref = m; u.face = DIRS.down; return u; }),
+    me: null, log: [], sel: 0, fire: null };
+  dg.me = dg.team[0]; dg.sel = dgBestMove(dg.me);
   p.energy = clamp(p.energy - 30); saveGame();
   dgNextFloor();
   dgUI();
@@ -1707,8 +1751,9 @@ function dgNextFloor(){
   dg.seen = new Uint8Array(DG.W * DG.H); dg.enemies = []; dg.items = []; dg.stairs = null;
   const startRoom = dg.rooms[0];
   dg.me.x = startRoom.x + (startRoom.w >> 1); dg.me.y = startRoom.y + (startRoom.h >> 1);
-  if (dg.ally && dg.ally.hp > 0){ const s = [[1,0],[-1,0],[0,1],[0,-1]].map(d => [dg.me.x + d[0], dg.me.y + d[1]]).find(c => dgFloor(c[0], c[1])) || [dg.me.x, dg.me.y]; dg.ally.x = s[0]; dg.ally.y = s[1]; }
+  dg.fire = null; dgPlaceMates();
   dg.stairs = dgFreeSpot(startRoom);
+  const fs = dgFreeSpot(); dg.fire = fs ? { x: fs.x, y: fs.y, used: false } : null;   // one campfire per floor
   // a few species per floor, from the leader's level
   const pool = (state.stageIds[dg.stage] || []).filter(id => state.byId.has(id));
   dg.species = [pick(pool), pick(pool), pick(pool)];
@@ -1758,8 +1803,12 @@ function dgHit(att, def, mv){
   if (r.dmg){ def.flash = 3; if (def.hp <= 0) dgDown(def, att); }
 }
 function dgDown(u, by){
-  if (u === dg.me){ dgLog(dg.me.name + ' fainted…'); dgEnd('faint'); return; }
-  if (u === dg.ally){ dgLog(u.name + ' fainted and was carried out.'); return; }
+  if (dgIsMate(u)){
+    u.hp = 0;
+    dgLog(u.name + ' fainted and is out for the rest of this run' + (dg.fire && !dg.fire.used ? ' (a campfire can revive it).' : '.'));
+    if (u === dg.me){ const next = dgMates()[0]; if (!next){ dgEnd('faint'); return; } dgLead(next, true); }
+    return;
+  }
   dg.enemies = dg.enemies.filter(e => e !== u);
   dg.kos++; const gain = Math.round((3 + dg.stage * 2) * dg.diff.reward); dg.data += gain;
   if (!G.col[u.id]) G.col[u.id] = 'seen';
@@ -1774,13 +1823,14 @@ function dgAct(action, dir){
   if (action === 'move'){
     m.face = dir;
     const nx = m.x + dir[0], ny = m.y + dir[1], occ = dgUnitAt(nx, ny);
-    if (occ && occ !== dg.ally) dgHit(m, occ, m.moves[0]);
+    if (occ && !dgIsMate(occ)) dgHit(m, occ, m.moves[0]);
     else if (!dgFloor(nx, ny)) { dgDraw(); return; }
     else {
-      if (occ && occ === dg.ally){ dg.ally.x = m.x; dg.ally.y = m.y; }
+      if (occ){ occ.x = m.x; occ.y = m.y; }   // swap places with a teammate
       m.x = nx; m.y = ny; dg.steps++;
       const it = dg.items.find(i => i.x === nx && i.y === ny);
       if (it){ dg.items = dg.items.filter(i => i !== it); dgPickup(it); }
+      if (dg.fire && !dg.fire.used && dg.fire.x === nx && dg.fire.y === ny) dgCampfire();
     }
   } else if (action === 'skill'){
     const mv = m.moves[dg.sel] || m.moves[0];
@@ -1791,7 +1841,7 @@ function dgAct(action, dir){
       for (let k = 1; k <= range; k++){
         const x = m.x + m.face[0] * k, y = m.y + m.face[1] * k;
         if (!dgFloor(x, y)) break;
-        const u = dgUnitAt(x, y); if (u && u !== dg.ally){ target = u; break; }
+        const u = dgUnitAt(x, y); if (u && !dgIsMate(u)){ target = u; break; }
       }
       if (target) dgHit(m, target, mv); else { m.sp -= mv.cost || 0; dgLog(m.name + ' used ' + mv.name + ', but hit nothing.'); }
     }
@@ -1823,9 +1873,10 @@ function dgPickup(it){
 
 function dgWorld(){
   dg.turn++;
-  const m = dg.me, a = dg.ally;
-  // ally: fight next to it, otherwise stay close to the leader
-  if (a && a.hp > 0){
+  const m = dg.me;
+  // teammates: fight whatever is next to them, otherwise follow the leader
+  for (const a of dgMates()){
+    if (dg.over) return;
     const foe = dg.enemies.find(e => Math.abs(e.x - a.x) + Math.abs(e.y - a.y) === 1);
     a.guard = false;
     if (foe) dgHit(a, foe, foeChoice(a, foe));
@@ -1836,7 +1887,7 @@ function dgWorld(){
     if (dg.over) return;
     if (!dg.enemies.includes(e)) continue;
     e.guard = false;
-    const targets = [m, a].filter(u => u && u.hp > 0);
+    const targets = dgAlive(); if (!targets.length) return;
     const t = targets.sort((u, v) => (Math.abs(u.x - e.x) + Math.abs(u.y - e.y)) - (Math.abs(v.x - e.x) + Math.abs(v.y - e.y)))[0];
     const dist = Math.abs(t.x - e.x) + Math.abs(t.y - e.y);
     if (dist <= 7 || dgRoomAt(e.x, e.y) && dgRoomAt(e.x, e.y) === dgRoomAt(m.x, m.y)) e.awake = true;
@@ -1845,10 +1896,10 @@ function dgWorld(){
     else if (Math.random() < 0.5){ const d = pick(Object.values(DIRS)); if (dgFloor(e.x + d[0], e.y + d[1]) && !dgUnitAt(e.x + d[0], e.y + d[1])){ e.x += d[0]; e.y += d[1]; } }
   }
   // regen, belly, reinforcements
-  if (dg.turn % 4 === 0){ for (const u of [m, a]) if (u && u.hp > 0 && u.hp < u.max) u.hp++; }
-  if (dg.turn % 6 === 0){ for (const u of [m, a]) if (u && u.hp > 0 && u.sp < u.st.sp) u.sp++; }
+  if (dg.turn % 4 === 0){ for (const u of dgAlive()) if (u.hp < u.max) u.hp++; }
+  if (dg.turn % 6 === 0){ for (const u of dgAlive()) if (u.sp < u.st.sp) u.sp++; }
   const p = P(); p.hunger = clamp(p.hunger - 0.1);
-  if (p.hunger <= 0){ m.hp = Math.max(0, m.hp - 1); if (dg.turn % 5 === 0) dgLog(m.name + ' is starving!'); if (m.hp <= 0) dgDown(m); }
+  if (p.hunger <= 0 && dg.me.hp > 0){ const lead = dg.me; lead.hp = Math.max(0, lead.hp - 1); if (dg.turn % 5 === 0) dgLog('The team is starving!'); if (lead.hp <= 0) dgDown(lead); }
   if (dg.turn % 30 === 0) dgSpawn(dgRoomAt(m.x, m.y));
 }
 
@@ -1865,8 +1916,8 @@ function dgEnd(result){
     if (Math.random() < crestOdds){ const ck = randomCrest() || randomDigimental(); (r.relics = r.relics || []).push(ck); }
     note = 'You made it through all ' + r.floors + ' floors on ' + r.diff.name + '.' + (r.rareEgg ? ' You found a Rare Mystery Egg!' : '');
   } else if (result === 'faint'){
-    data = Math.floor(data / 2); eggs = 0; p.mood = clamp(p.mood - 15); title = 'Knocked out'; p.stageLosses = (p.stageLosses || 0) + 1; r.relics = [];
-    note = p.name + ' fainted on floor ' + r.floor + '. Half the DigiData and any eggs or items were lost.';
+    data = Math.floor(data / 2); eggs = 0; p.mood = clamp(p.mood - 15); title = 'Knocked out'; r.relics = [];
+    note = 'Your whole team fainted on floor ' + r.floor + '. Half the DigiData and any eggs or items were lost.';
   } else { title = 'Left the dungeon'; note = 'You escaped from floor ' + r.floor + ' with everything you found.'; }
   G.data += data; p.evo += evo; for (let i = 0; i < eggs; i++) G.eggs.push('mystery');
   if (r.rareEgg && result === 'clear'){ G.eggs.push('rare'); eggs++; }
@@ -1874,7 +1925,16 @@ function dgEnd(result){
   const relics = r.relics || []; relics.forEach(k => giveItem(k));
   if (relics.length) note += ' Items: ' + relics.map(itemName).join(', ') + '.';
   const xp = Math.round((r.kos * (3 + 2 * r.stage) + (result === 'clear' ? 20 + 10 * r.stage : 0)) * (result === 'faint' ? 0.5 : 1) * r.diff.reward);
-  if (xp) gainXP(p, xp).then(lv => { const el = $('#dgLv'); if (el) el.textContent = '+' + xp + ' XP.' + levelText(lv); });
+  // every teammate who fainted along the way takes a loss; teammates still standing get full XP, fainted ones half
+  for (const u of r.team) if (u.hp <= 0) u.ref.stageLosses = (u.ref.stageLosses || 0) + 1;
+  const downs = r.team.filter(u => u.hp <= 0 && result !== 'faint').map(u => u.name);
+  if (downs.length) note += ' Fainted along the way: ' + downs.join(', ') + '.';
+  for (const u of r.team){
+    const gx = u.hp > 0 || result === 'faint' ? xp : Math.round(xp / 2);
+    if (!gx) continue;
+    const pr = gainXP(u.ref, gx);
+    if (u.ref === p) pr.then(lv => { const el = $('#dgLv'); if (el) el.textContent = '+' + gx + ' XP' + (r.team.length > 1 ? ' each (half for fainted teammates).' : '.') + levelText(lv); });
+  }
   saveGame();
   const sheet = $('#overlay .sheet');
   if (sheet) sheet.innerHTML = '<h4>' + title + '</h4><p style="margin:0;color:var(--muted)">' + esc(note) + '</p>' +
@@ -1887,7 +1947,7 @@ function dgEnd(result){
 function dgUI(){
   const sheet = $('#overlay .sheet'); if (!sheet) return;
   sheet.classList.add('dsheet');
-  sheet.innerHTML = '<div class="dhead" id="dhead"></div><canvas id="dgc" aria-label="Dungeon map"></canvas><div class="dlog" id="dlog" aria-live="polite"></div>' +
+  sheet.innerHTML = '<div class="dhead" id="dhead"></div><div class="dteam" id="dteam"></div><canvas id="dgc" aria-label="Dungeon map"></canvas><div class="dlog" id="dlog" aria-live="polite"></div>' +
     '<div class="dctl"><div class="dpad">' +
       '<span></span><button data-d="up" aria-label="Move up">▲</button><span></span>' +
       '<button data-d="left" aria-label="Move left">◀</button><button data-d="wait" aria-label="Wait a turn">•</button><button data-d="right" aria-label="Move right">▶</button>' +
@@ -1898,6 +1958,7 @@ function dgUI(){
   $('#dgMeat').onclick = () => dgAct('meat');
   $('#dgDisk').onclick = () => dgAct('disk');
   $('#dgNext').onclick = () => { dg.sel = (dg.sel + 1) % dg.me.moves.length; dgDraw(); };
+  $('#dteam').onclick = e => { const b = e.target.closest('[data-mate]'); if (b && dg && !dg.over) dgLead(dg.team[+b.dataset.mate]); };
   $('#dgQuit').onclick = () => { const q = $('#dgQuit'); if (q.dataset.armed) dgEnd('quit'); else { q.dataset.armed = '1'; q.textContent = 'Tap to leave'; } };
   dgLog(dg.log.pop() || '');
   dgDraw();
@@ -1912,14 +1973,16 @@ document.addEventListener('keydown', e => {
 
 function dgDraw(){
   const cv = $('#dgc'); if (!cv || !dg) return;
-  const m = dg.me, a = dg.ally;
+  const m = dg.me;
   const head = $('#dhead');
   const bar = (v, max, cls) => '<span class="dbar ' + cls + '"><i style="width:' + Math.max(0, v / max * 100) + '%"></i></span>';
   if (head) head.innerHTML = '<b>B' + dg.floor + 'F</b><span class="stage">' + dg.diff.name + '</span>' +
     '<span>' + esc(m.name) + ' HP ' + m.hp + '/' + m.max + bar(m.hp, m.max, 'h') + '</span>' +
     '<span>SP ' + m.sp + '/' + m.st.sp + bar(m.sp, m.st.sp, 's') + '</span>' +
-    (a ? '<span>' + esc(a.name) + ' ' + (a.hp > 0 ? a.hp + '/' + a.max : 'out') + '</span>' : '') +
     '<span>Belly ' + Math.round(P().hunger) + '</span><span>Data +' + dg.data + '</span>';
+  const tm = $('#dteam');
+  if (tm) tm.innerHTML = dg.team.length < 2 ? '' : dg.team.map((u, i) => '<button class="dmate' + (u === m ? ' on' : '') + (u.hp <= 0 ? ' out' : '') + '" data-mate="' + i + '"' + (u.hp <= 0 ? ' disabled' : '') + '>' +
+    '<b>' + esc(u.name) + '</b><small>' + (u.hp > 0 ? u.hp + '/' + u.max : 'fainted') + '</small>' + bar(Math.max(0, u.hp), u.max, 'h') + '</button>').join('');
   const smv = m.moves[dg.sel] || m.moves[0];
   const sk = $('#dgSkill'); if (sk){ sk.innerHTML = esc(smv.name) + '<small>' + esc(moveLabel(smv)) + (smv.kind === 'phys' || smv.kind === 'mag' || smv.kind === 'drain' ? ' · range ' + (smv.cost ? 4 : 1) : '') + '</small>'; sk.disabled = (smv.cost || 0) > m.sp; }
   const mt = $('#dgMeat'); if (mt){ mt.innerHTML = 'Meat ×' + dg.bag.meat + '<small>+40% HP</small>'; mt.disabled = !dg.bag.meat; }
@@ -1965,9 +2028,18 @@ function dgDraw(){
     else { x.fillStyle = enemy ? col('--bad') : col('--accent'); x.beginPath(); x.arc(ux + T / 2, uy + T / 2, T * .35, 0, 7); x.fill(); }
     if (enemy && u.hp < u.max){ x.fillStyle = 'rgba(0,0,0,.5)'; x.fillRect(ux + 3, uy + 1, T - 6, 3); x.fillStyle = meterColor(u.hp / u.max * 100); x.fillRect(ux + 3, uy + 1, (T - 6) * u.hp / u.max, 3); }
   };
+  if (dg.fire && dg.seen[dg.fire.y * DG.W + dg.fire.x] && inView(dg.fire.x, dg.fire.y)){
+    const fx0 = (dg.fire.x - ox) * T, fy0 = (dg.fire.y - oy) * T;
+    x.fillStyle = '#6b4a2b'; x.fillRect(fx0 + T * .2, fy0 + T * .72, T * .6, T * .1);
+    if (!dg.fire.used){
+      x.fillStyle = '#ff7a1a'; x.beginPath(); x.moveTo(fx0 + T * .5, fy0 + T * .15); x.quadraticCurveTo(fx0 + T * .85, fy0 + T * .55, fx0 + T * .5, fy0 + T * .75); x.quadraticCurveTo(fx0 + T * .15, fy0 + T * .55, fx0 + T * .5, fy0 + T * .15); x.fill();
+      x.fillStyle = '#ffd34d'; x.beginPath(); x.moveTo(fx0 + T * .5, fy0 + T * .38); x.quadraticCurveTo(fx0 + T * .68, fy0 + T * .6, fx0 + T * .5, fy0 + T * .72); x.quadraticCurveTo(fx0 + T * .32, fy0 + T * .6, fx0 + T * .5, fy0 + T * .38); x.fill();
+    } else { x.fillStyle = 'rgba(160,160,170,.6)'; x.beginPath(); x.arc(fx0 + T * .5, fy0 + T * .62, T * .14, 0, 7); x.fill(); }
+  }
   for (const e of dg.enemies) if (dgVisible(e.x, e.y)) drawUnit(e, true);
-  if (a && a.hp > 0) drawUnit(a, false);
+  for (const u of dgMates()) drawUnit(u, false);
   drawUnit(m, false);
+  if (inView(m.x, m.y) && dg.team.length > 1){ x.strokeStyle = col('--accent'); x.lineWidth = 2; x.beginPath(); x.ellipse((m.x - ox) * T + T / 2, (m.y - oy) * T + T * .85, T * .42, T * .15, 0, 0, 7); x.stroke(); }
   // facing marker
   const fx = (m.x - ox) * T + T / 2 + m.face[0] * T * .55, fy = (m.y - oy) * T + T / 2 + m.face[1] * T * .55;
   x.fillStyle = col('--accent'); x.beginPath(); x.arc(fx, fy, Math.max(2, T * .08), 0, 7); x.fill();
@@ -1976,6 +2048,7 @@ function dgDraw(){
   x.fillStyle = 'rgba(5,7,13,.55)'; x.fillRect(mx - 2, my - 2, mw + 4, mh + 4);
   for (let j = 0; j < DG.H; j++) for (let i = 0; i < DG.W; i++){ const k = j * DG.W + i; if (dg.seen[k] && dg.map[k]){ x.fillStyle = 'rgba(200,210,235,.55)'; x.fillRect(mx + i * s, my + j * s, s, s); } }
   if (dg.stairs && dg.seen[dg.stairs.y * DG.W + dg.stairs.x]){ x.fillStyle = col('--accent'); x.fillRect(mx + dg.stairs.x * s - 1, my + dg.stairs.y * s - 1, s + 2, s + 2); }
+  if (dg.fire && !dg.fire.used && dg.seen[dg.fire.y * DG.W + dg.fire.x]){ x.fillStyle = '#ff7a1a'; x.fillRect(mx + dg.fire.x * s - 1, my + dg.fire.y * s - 1, s + 2, s + 2); }
   x.fillStyle = '#ffffff'; x.fillRect(mx + m.x * s - 1, my + m.y * s - 1, s + 2, s + 2);
 }
 
