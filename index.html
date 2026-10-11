@@ -160,6 +160,17 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 @keyframes wobble{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-6deg)}90%{transform:rotate(6deg)}95%{transform:rotate(-3deg)}}
 @keyframes shake{25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
 .center{text-align:center}
+.diffs{display:grid;gap:8px}
+.diff{display:grid;gap:3px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px}
+.diff.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.diff .dn{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:700 1.05rem var(--display)}
+.diff .dn small{font:600 .7rem var(--mono);color:var(--muted)}
+.diff.easy .dn{color:var(--good)}
+.diff.normal .dn{color:var(--link)}
+.diff.hard .dn{color:var(--warn)}
+.diff.nightmare .dn{color:var(--bad)}
+.diff .dd{font-size:.8rem;color:var(--muted)}
+.diff .dr{font:600 .7rem/1.4 var(--mono);color:var(--fg)}
 .mvlist{display:grid;gap:6px}
 .mvrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 10px}
 .mvrow.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
@@ -708,7 +719,7 @@ function renderPartner(){
       <button class="act" data-act="battle" ${p.energy < 25 ? 'disabled' : ''}>⚔️ Battle<small>${p.energy < 25 ? 'too tired' : '+evo points'}</small></button>
       <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
     </div>
-    <button class="act wide" data-act="dungeon" ${p.energy < 30 ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${p.energy < 30 ? 'too tired (needs 30 energy)' : '5 floors · items · DigiData'}</small></button>
+    <button class="act wide" data-act="dungeon" ${p.energy < 30 ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${p.energy < 30 ? 'too tired (needs 30 energy)' : 'choose a difficulty · 3–8 floors'}</small></button>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
@@ -764,8 +775,8 @@ $('#partnerView').addEventListener('click', e => {
     return say(`${p.name} curled up for a nap. Zzz…`);
   }
   if (k === 'train') return train();
-  if (k === 'battle') return battle();
-  if (k === 'dungeon') return dungeon();
+  if (k === 'battle') return pickDifficulty('battle');
+  if (k === 'dungeon') return pickDifficulty('dungeon');
   if (k === 'moves') return movesScreen();
   if (k === 'line') return openDetail(p.id, false);
 });
@@ -1101,8 +1112,8 @@ function levelText(r){
   if (!r || !r.ups.length) return '';
   return ' Level up! Now Lv ' + r.ups[r.ups.length - 1] + '.' + (r.learned.length ? ' Learned ' + r.learned.join(', ') + '!' : '');
 }
-function foeMoves(id, d, stage){
-  const lv = (STAGE_MIN_LV[stage] || 1) + Math.floor(Math.random() * 8);
+function foeMoves(id, d, stage, lvBonus){
+  const lv = (STAGE_MIN_LV[stage] || 1) + Math.floor(Math.random() * 8) + (lvBonus || 0);
   const known = learnset(id, d, stage).filter(m => m.learn <= lv).sort((a, b) => b.power - a.power).slice(0, 3);
   return [toBattle(BASIC, stage)].concat(known.map(m => toBattle(m, stage))).concat([GUARD]);
 }
@@ -1169,7 +1180,33 @@ function foeChoice(f, me){
   return dmg.sort((a, b) => score(b) - score(a))[0];
 }
 
-async function battle(){
+// ----- difficulty: tougher foes, bigger rewards -----
+const DIFFS = [
+  { key: 'easy', name: 'Easy', foe: 0.85, reward: 0.7, floors: 3, lv: 0, egg: 0.1, battleEgg: 0, desc: 'Weaker foes' },
+  { key: 'normal', name: 'Normal', foe: 1, reward: 1, floors: 5, lv: 0, egg: 0.25, battleEgg: 0, desc: 'A fair fight' },
+  { key: 'hard', name: 'Hard', foe: 1.22, reward: 1.8, floors: 6, lv: 4, egg: 0.45, battleEgg: 0.05, desc: 'Tougher foes that know more moves' },
+  { key: 'nightmare', name: 'Nightmare', foe: 1.45, reward: 2.8, floors: 8, lv: 8, egg: 0.7, battleEgg: 0.1, rare: true, desc: 'Brutal foes, with a shot at Rare eggs' },
+];
+function pickDifficulty(kind){
+  const p = P(); busy = true;
+  const last = store.get('dx_diff_' + kind, 'normal');
+  const card = d => {
+    const rw = kind === 'battle'
+      ? 'Win: +' + Math.max(1, Math.round(3 * d.reward)) + ' evo · +' + Math.round((4 + 3 * p.stage) * d.reward) + ' DigiData · +' + Math.round((10 + p.stage * 6) * d.reward) + ' XP' + (d.battleEgg ? ' · ' + Math.round(d.battleEgg * 100) + '% egg' : '')
+      : d.floors + ' floors · clear bonus ~' + Math.round((30 * (p.stage + 1) + 10 * d.floors) * d.reward) + ' DigiData · ' + Math.round(d.egg * 100) + '% egg' + (d.rare ? ' (can be Rare)' : '');
+    return '<button class="diff ' + d.key + (d.key === last ? ' on' : '') + '" data-diff="' + d.key + '"><span class="dn">' + d.name + '<small>×' + d.reward + ' rewards</small></span><span class="dd">' + d.desc + ' · foe stats ×' + d.foe + '</span><span class="dr">' + rw + '</span></button>';
+  };
+  openOv('<h4>' + (kind === 'battle' ? 'Battle difficulty' : 'Dungeon difficulty') + '</h4><div class="diffs">' + DIFFS.map(card).join('') + '</div><button class="ghost" id="diffCancel">Cancel</button>');
+  $('#diffCancel').onclick = closeOv;
+  $('#overlay').querySelectorAll('[data-diff]').forEach(b => b.onclick = () => {
+    const d = DIFFS.find(x => x.key === b.dataset.diff);
+    store.set('dx_diff_' + kind, d.key);
+    if (kind === 'battle') battle(d); else dungeon(d);
+  });
+}
+
+async function battle(diff){
+  diff = diff || DIFFS[1];
   const p = P(); busy = true;
   openOv(`<h4>Searching for a wild Digimon…</h4><div class="status">Loading battle data…</div>`);
   const pool = (state.stageIds[p.stage] || []).filter(id => id !== p.id && state.byId.has(id));
@@ -1178,16 +1215,16 @@ async function battle(){
   try{ [myD, foeD] = await Promise.all([getDetail(p.id), getDetail(foeBase.id)]); }catch{}
   await syncMoves(p);
   const mine = partnerStats(p), myBase = baseStats(p.id, p.stage), fb = baseStats(foeBase.id, p.stage);
-  const foeSt = {}; STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round(fb[k] * rand(0.92, 1.1) + 0.55 * (mine[k] - myBase[k]))));
+  const foeSt = {}; STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round((fb[k] * rand(0.92, 1.1) + 0.55 * (mine[k] - myBase[k])) * diff.foe)));
   const me = fighter(p.name, p.image, mine, mainAttr(myD), partnerMoves(p), p.mood);
-  const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), foeMoves(foeBase.id, foeD, p.stage));
+  const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), foeMoves(foeBase.id, foeD, p.stage, diff.lv));
   G.col[foeBase.id] = G.col[foeBase.id] || 'seen';
   saveGame();
 
   const side = (f, id) => `<div class="fighter" id="${id}"><img alt="" src="${esc(f.image)}"><b>${esc(f.name)}</b>
       <span class="attr">${esc(f.attr)}</span>
       <div class="bars"><div class="hp"><i></i></div><small class="hpt"></small><div class="hp spb"><i></i></div><small class="spt"></small></div></div>`;
-  $('#overlay .sheet').innerHTML = `<h4>Wild battle!</h4>
+  $('#overlay .sheet').innerHTML = `<h4>Wild battle! <span class="stage">${diff.name}</span></h4>
     <div class="arena">${side(me, 'fMe')}<div class="vs">VS</div>${side(foe, 'fFoe')}</div>
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
     <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
@@ -1247,12 +1284,14 @@ async function battle(){
   if (outcome === 'win'){
     const g = growthOf(p), k = pick(['atk', 'int', 'spd', 'hp']), v = k === 'hp' ? 3 + p.stage : 1 + Math.floor(p.stage / 2);
     g[k] += v; if (k === 'hp') g.sp += 1;
-    p.wins++; p.evo += 3; p.mood = clamp(p.mood + 8);
-    summary = `${p.name} won! +3 digivolution points, +${v} ${STAT_LABEL[k]}.`;
+    const ev = Math.max(1, Math.round(3 * diff.reward)), dd = Math.round((4 + 3 * p.stage) * diff.reward);
+    p.wins++; p.evo += ev; p.mood = clamp(p.mood + 8); G.data += dd;
+    summary = p.name + ' won! +' + ev + ' digivolution points, +' + v + ' ' + STAT_LABEL[k] + ', +' + dd + ' DigiData.';
+    if (diff.battleEgg && Math.random() < diff.battleEgg){ G.eggs.push(diff.rare ? 'rare' : 'mystery'); summary += ' It dropped ' + (diff.rare ? 'a Rare Mystery Egg!' : 'a Mystery Egg!'); }
   } else if (outcome === 'lose'){ p.losses++; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.`; }
   else summary = `${p.name} escaped from ${foe.name}.`;
   saveGame();
-  const xp = outcome === 'win' ? 10 + p.stage * 6 : outcome === 'lose' ? 3 + p.stage * 2 : 0;
+  const xp = Math.round((outcome === 'win' ? 10 + p.stage * 6 : outcome === 'lose' ? 3 + p.stage * 2 : 0) * diff.reward);
   if (xp){ const lv = await gainXP(p, xp); summary += ' +' + xp + ' XP.' + levelText(lv); }
   $('#bact').innerHTML = `<button class="big" id="bDone">Continue</button>`;
   log(summary);
@@ -1339,7 +1378,8 @@ function dgUnit(id, name, st, attr, moves, hpScale){
   return { id, name, st, attr, moves, hp, max: hp, sp: st.sp, x: 0, y: 0, img: dgImage(id) };
 }
 
-async function dungeon(){
+async function dungeon(diff){
+  diff = diff || DIFFS[1];
   const p = P(); busy = true;
   openOv('<h4>Entering the dungeon…</h4><div class="status">Generating floor 1…</div>');
   const ally = G.party.length > 1 ? G.party[(G.active + 1) % G.party.length] : null;
@@ -1347,7 +1387,7 @@ async function dungeon(){
   try{ [myD, allyD] = await Promise.all([getDetail(p.id), ally ? getDetail(ally.id) : null]); }catch{}
   await syncMoves(p); if (ally) await syncMoves(ally);
   const st = partnerStats(p);
-  dg = { stage: p.stage, floor: 0, data: 0, kos: 0, turn: 0, steps: 0, bag: { meat: 1, disk: 1 }, eggs: 0, over: false,
+  dg = { stage: p.stage, diff, floors: diff.floors, floor: 0, data: 0, kos: 0, turn: 0, steps: 0, bag: { meat: 1, disk: 1 }, eggs: 0, over: false,
     me: dgUnit(p.id, p.name, st, mainAttr(myD), partnerMoves(p), 1), ally: null, log: [], sel: 0 };
   const firstSkill = dg.me.moves.findIndex(mv => mv.cost > 0 && mv.kind !== 'guard');
   dg.sel = firstSkill >= 0 ? firstSkill : 0;
@@ -1375,11 +1415,11 @@ function dgNextFloor(){
   for (let i = 0; i < ni; i++){
     const s = dgFreeSpot(); if (!s) continue;
     const r = Math.random();
-    const type = dg.floor >= 3 && r < 0.05 ? 'egg' : r < 0.45 ? 'chip' : r < 0.75 ? 'meat' : 'disk';
+    const type = dg.floor >= 3 && r < 0.04 * dg.diff.reward ? 'egg' : r < 0.45 ? 'chip' : r < 0.75 ? 'meat' : 'disk';
     dg.items.push({ x: s.x, y: s.y, type });
   }
   dgReveal();
-  dgLog('Floor ' + dg.floor + ' of ' + DG.FLOORS + '. Find the stairs!');
+  dgLog('Floor ' + dg.floor + ' of ' + dg.floors + '. Find the stairs!');
 }
 
 function dgSpawn(avoidRoom){
@@ -1387,12 +1427,12 @@ function dgSpawn(avoidRoom){
   const s = dgFreeSpot(avoidRoom); if (!s) return;
   const id = pick(dg.species), b = state.byId.get(id); if (!b) return;
   const base = baseStats(id, dg.stage), mine = partnerStats(P()), myBase = baseStats(P().id, P().stage);
-  const scale = 1 + 0.07 * (dg.floor - 1), st = {};
+  const scale = (1 + 0.07 * (dg.floor - 1)) * dg.diff.foe, st = {};
   STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round((base[k] + 0.4 * (mine[k] - myBase[k])) * scale)));
-  const e = dgUnit(id, b.name, st, 'Free', foeMoves(id, null, dg.stage), 0.45);
+  const e = dgUnit(id, b.name, st, 'Free', foeMoves(id, null, dg.stage, dg.diff.lv), 0.45);
   e.x = s.x; e.y = s.y; e.awake = false;
   dg.enemies.push(e);
-  getDetail(id).then(d => { e.attr = mainAttr(d); e.moves = foeMoves(id, d, dg.stage); }).catch(() => {});
+  getDetail(id).then(d => { e.attr = mainAttr(d); e.moves = foeMoves(id, d, dg.stage, dg.diff.lv); }).catch(() => {});
 }
 
 function dgVisible(x, y){
@@ -1418,7 +1458,7 @@ function dgDown(u, by){
   if (u === dg.me){ dgLog(dg.me.name + ' fainted…'); dgEnd('faint'); return; }
   if (u === dg.ally){ dgLog(u.name + ' fainted and was carried out.'); return; }
   dg.enemies = dg.enemies.filter(e => e !== u);
-  dg.kos++; const gain = 3 + dg.stage * 2; dg.data += gain;
+  dg.kos++; const gain = Math.round((3 + dg.stage * 2) * dg.diff.reward); dg.data += gain;
   if (!G.col[u.id]) G.col[u.id] = 'seen';
   dgLog(u.name + ' was defeated! +' + gain + ' DigiData.');
 }
@@ -1434,7 +1474,7 @@ function dgAct(action, dir){
     if (occ && occ !== dg.ally) dgHit(m, occ, m.moves[0]);
     else if (!dgFloor(nx, ny)) { dgDraw(); return; }
     else {
-      if (occ === dg.ally){ dg.ally.x = m.x; dg.ally.y = m.y; }
+      if (occ && occ === dg.ally){ dg.ally.x = m.x; dg.ally.y = m.y; }
       m.x = nx; m.y = ny; dg.steps++;
       const it = dg.items.find(i => i.x === nx && i.y === ny);
       if (it){ dg.items = dg.items.filter(i => i !== it); dgPickup(it); }
@@ -1463,7 +1503,7 @@ function dgAct(action, dir){
   }
   if (dg.over) return;
   if (dg.stairs && m.x === dg.stairs.x && m.y === dg.stairs.y){
-    if (dg.floor >= DG.FLOORS){ dgEnd('clear'); return; }
+    if (dg.floor >= dg.floors){ dgEnd('clear'); return; }
     dgLog('Found the stairs!'); dgNextFloor(); dgDraw(); return;
   }
   dgWorld();
@@ -1471,7 +1511,7 @@ function dgAct(action, dir){
 }
 
 function dgPickup(it){
-  if (it.type === 'chip'){ const v = 6 + dg.stage * 4 + (Math.random() * 6 | 0); dg.data += v; dgLog('Picked up a Data Chip: +' + v + ' DigiData.'); }
+  if (it.type === 'chip'){ const v = Math.round((6 + dg.stage * 4 + (Math.random() * 6 | 0)) * dg.diff.reward); dg.data += v; dgLog('Picked up a Data Chip: +' + v + ' DigiData.'); }
   else if (it.type === 'meat'){ dg.bag.meat++; dgLog('Picked up some meat.'); }
   else if (it.type === 'disk'){ dg.bag.disk++; dgLog('Picked up an SP Disk.'); }
   else if (it.type === 'egg'){ dg.eggs++; dgLog('Found a Mystery Egg!'); }
@@ -1514,16 +1554,17 @@ function dgEnd(result){
   const p = P(), r = dg;
   let data = r.data, evo = Math.floor(r.kos / 2), eggs = r.eggs, title, note;
   if (result === 'clear'){
-    data += 30 * (r.stage + 1) + 10 * DG.FLOORS; evo += 5;
-    if (Math.random() < 0.25) eggs++;
+    data += Math.round((30 * (r.stage + 1) + 10 * r.floors) * r.diff.reward); evo += Math.round(5 * r.diff.reward);
+    if (Math.random() < r.diff.egg){ if (r.diff.rare && Math.random() < 0.5) r.rareEgg = true; else eggs++; }
     p.mood = clamp(p.mood + 15); title = 'Dungeon cleared!';
-    note = 'You made it through all ' + DG.FLOORS + ' floors.';
+    note = 'You made it through all ' + r.floors + ' floors on ' + r.diff.name + '.' + (r.rareEgg ? ' You found a Rare Mystery Egg!' : '');
   } else if (result === 'faint'){
     data = Math.floor(data / 2); eggs = 0; p.mood = clamp(p.mood - 15); title = 'Knocked out';
     note = p.name + ' fainted on floor ' + r.floor + '. Half the DigiData and any eggs were lost.';
   } else { title = 'Left the dungeon'; note = 'You escaped from floor ' + r.floor + ' with everything you found.'; }
   G.data += data; p.evo += evo; for (let i = 0; i < eggs; i++) G.eggs.push('mystery');
-  const xp = Math.round((r.kos * (3 + 2 * r.stage) + (result === 'clear' ? 20 + 10 * r.stage : 0)) * (result === 'faint' ? 0.5 : 1));
+  if (r.rareEgg && result === 'clear'){ G.eggs.push('rare'); eggs++; }
+  const xp = Math.round((r.kos * (3 + 2 * r.stage) + (result === 'clear' ? 20 + 10 * r.stage : 0)) * (result === 'faint' ? 0.5 : 1) * r.diff.reward);
   if (xp) gainXP(p, xp).then(lv => { const el = $('#dgLv'); if (el) el.textContent = '+' + xp + ' XP.' + levelText(lv); });
   saveGame();
   const sheet = $('#overlay .sheet');
@@ -1565,7 +1606,7 @@ function dgDraw(){
   const m = dg.me, a = dg.ally;
   const head = $('#dhead');
   const bar = (v, max, cls) => '<span class="dbar ' + cls + '"><i style="width:' + Math.max(0, v / max * 100) + '%"></i></span>';
-  if (head) head.innerHTML = '<b>B' + dg.floor + 'F</b>' +
+  if (head) head.innerHTML = '<b>B' + dg.floor + 'F</b><span class="stage">' + dg.diff.name + '</span>' +
     '<span>' + esc(m.name) + ' HP ' + m.hp + '/' + m.max + bar(m.hp, m.max, 'h') + '</span>' +
     '<span>SP ' + m.sp + '/' + m.st.sp + bar(m.sp, m.st.sp, 's') + '</span>' +
     (a ? '<span>' + esc(a.name) + ' ' + (a.hp > 0 ? a.hp + '/' + a.max : 'out') + '</span>' : '') +
