@@ -1961,8 +1961,8 @@ function nameId(n){
 }
 // a stat goal that matches what the next form is good at
 function statReq(to, s){
-  const b = baseStats(to, s + 1);
-  const k = ['atk', 'int', 'def', 'spd', 'hp', 'sp'].sort((x, y) => b[y] / STAT_BASE[y][s + 1] - b[x] / STAT_BASE[x][s + 1])[0];
+  const b = baseStats(to, s + 1), r = seeded(to, 47);
+  const k = r < 0.3 ? (b.atk / STAT_BASE.atk[s + 1] >= b.int / STAT_BASE.int[s + 1] ? 'atk' : 'int') : r < 0.5 ? 'def' : r < 0.67 ? 'spd' : r < 0.84 ? 'hp' : 'sp';
   const extra = { atk: 3 + 3 * s, int: 3 + 3 * s, def: 3 + 3 * s, spd: 2 + 2 * s, hp: 15 + 10 * s, sp: 4 + 2 * s }[k];
   return { t: 'stat', k, v: STAT_BASE[k][s] + extra };
 }
@@ -1970,7 +1970,7 @@ function statReq(to, s){
 function reqsFor(to, cond, s){
   const name = state.byId.get(to)?.name || '', c = String(cond || ''), q = [];
   if (s < 2) return q;                       // Fresh and In-Training digivolve freely
-  if (state.armor.has(to) && !inStage(to, s + 1)){
+  if (state.armor.has(to) && s === 2){
     const m = c.match(/Digimentals? of (\w+)/i);
     q.push({ t: 'item', key: 'dm:' + (m ? virtue(m[1]) : DIGIMENTAL_OF[name] || VIRTUES[Math.floor(seeded(to, 31) * VIRTUES.length)]) });
     return q;                                // Armor forms just need their Digimental
@@ -2009,7 +2009,7 @@ function pathReqs(fromId, s, cands){
   const m = new Map();
   for (const c of cands) m.set(c.id, reqsFor(c.id, c.cond, s));
   if (cands.length && !cands.some(c => !m.get(c.id).length)){
-    const pool = cands.filter(c => !(state.armor.has(c.id) && !inStage(c.id, s + 1))).sort((a, b) => seeded(a.id, 43) - seeded(b.id, 43));
+    const pool = cands.filter(c => !(state.armor.has(c.id) && s === 2)).sort((a, b) => seeded(a.id, 43) - seeded(b.id, 43));
     if (pool[0]) m.set(pool[0].id, []);
   }
   return m;
