@@ -109,7 +109,7 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .skill p{margin:2px 0 0;color:var(--muted);font-size:.85rem}
 
 /* tabs */
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel);
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:8;display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel);
   border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tabs button{border:0;background:none;padding:12px 0 10px;font:700 .8rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .tabs button[aria-selected="true"]{color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
@@ -160,6 +160,19 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 @keyframes wobble{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-6deg)}90%{transform:rotate(6deg)}95%{transform:rotate(-3deg)}}
 @keyframes shake{25%{transform:rotate(-12deg)}75%{transform:rotate(12deg)}}
 .center{text-align:center}
+.boxgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.bcell{position:relative;display:grid;justify-items:center;align-content:start;gap:2px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 4px;min-width:0;text-align:center}
+.bcell img{width:56px;height:56px;object-fit:contain}
+.bcell b{font-size:.78rem;overflow-wrap:anywhere;line-height:1.2}
+.bcell small{font:.6rem var(--mono);color:var(--muted)}
+.bcell i{font:700 .62rem var(--mono);font-style:normal;color:var(--link)}
+.bcell i.ok{color:var(--good)}
+.bcell.away img{opacity:.4}
+.bcell.empty{border-style:dashed;color:var(--muted);font:.68rem var(--mono);min-height:108px;align-content:center}
+.bhead{display:flex;gap:12px;align-items:center}
+.bhead img{width:72px;height:72px;object-fit:contain}
+.bactions{display:grid;gap:8px}
+.upic{font-size:1.5rem;width:40px;text-align:center}
 .diffs{display:grid;gap:8px}
 .diff{display:grid;gap:3px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px}
 .diff.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
@@ -290,11 +303,13 @@ img.sil{filter:var(--silf)}
   </section>
   <section id="detailView" class="detail" hidden></section>
   <section id="shopView" class="partner" hidden></section>
+  <section id="boxView" class="partner" hidden></section>
 </main>
 
 <nav class="tabs" role="tablist" aria-label="Sections">
   <button id="tabPartner" role="tab" aria-selected="true">Partner</button>
   <button id="tabIndex" role="tab" aria-selected="false">Index</button>
+  <button id="tabBox" role="tab" aria-selected="false">Box</button>
   <button id="tabShop" role="tab" aria-selected="false">Shop</button>
 </nav>
 <div id="overlay" class="ov" hidden></div>
@@ -329,6 +344,9 @@ if (!Array.isArray(G.party)){ G.party = G.partner ? [G.partner] : []; G.active =
 const PARTY_MAX = 6;
 if (typeof G.data !== 'number') G.data = 0;
 if (!Array.isArray(G.eggs)) G.eggs = [];
+if (!Array.isArray(G.box)) G.box = [];
+if (!G.boxCap) G.boxCap = 10;
+if (!G.expSlots) G.expSlots = 3;
 const saveGame = () => store.set('dx_game_v1', G);
 const raised = id => G.col[id] === 'raised';
 const known = id => !!G.col[id];
@@ -431,6 +449,8 @@ function showError(html, retry){
   s.querySelector('.retry').onclick = retry;
 }
 function updateCount(){
+  updateBoxBadge();
+  if (state.tab === 'box'){ $('#count').innerHTML = G.box.length + ' / ' + G.boxCap + ' stored<br>' + expRunning() + ' exploring'; return; }
   const n = Object.values(G.col).filter(v => v === 'raised').length;
   if (state.tab === 'shop') $('#count').innerHTML = G.data.toLocaleString() + ' DigiData<br>' + G.eggs.length + ' egg' + (G.eggs.length === 1 ? '' : 's');
   else if (state.tab === 'partner') $('#count').innerHTML = `${Object.keys(G.col).length} / ${state.all.length ? state.all.length.toLocaleString() : '—'} found<br>${n} raised`;
@@ -443,19 +463,23 @@ function setTab(t){
   $('#tabPartner').setAttribute('aria-selected', t === 'partner');
   $('#tabIndex').setAttribute('aria-selected', t === 'index');
   $('#tabShop').setAttribute('aria-selected', t === 'shop');
-  const isP = t === 'partner', isI = t === 'index', isS = t === 'shop';
+  $('#tabBox').setAttribute('aria-selected', t === 'box');
+  const isP = t === 'partner', isI = t === 'index', isS = t === 'shop', isB = t === 'box';
   $('#partnerView').hidden = !isP;
   $('#shopView').hidden = !isS;
+  $('#boxView').hidden = !isB;
   if (!isI){ $('#detailView').hidden = true; if (location.hash) history.replaceState(null, '', location.pathname + location.search); }
   $('#indexChrome').hidden = !isI || !$('#detailView').hidden;
   $('#listView').hidden = !isI || !$('#detailView').hidden;
   if (isP){ tick(); renderPartner(); }
   else if (isS) renderShop();
+  else if (isB) renderBox();
   else renderGrid();
   updateCount();
   window.scrollTo(0, 0);
 }
 $('#tabShop').onclick = () => setTab('shop');
+$('#tabBox').onclick = () => setTab('box');
 $('#tabPartner').onclick = () => setTab('partner');
 $('#tabIndex').onclick = () => { if (!$('#detailView').hidden) goList(); setTab('index'); };
 
@@ -521,7 +545,7 @@ function idFromUrl(u){ const m = String(u||'').match(/\/(\d+)\/?$/); return m ? 
 
 async function openDetail(id, fromEvo){
   id = +id;
-  if (state.tab !== 'index'){ state.tab = 'index'; store.set('dx_tab', 'index'); $('#tabPartner').setAttribute('aria-selected', false); $('#tabIndex').setAttribute('aria-selected', true); $('#tabShop').setAttribute('aria-selected', false); $('#partnerView').hidden = true; $('#shopView').hidden = true; }
+  if (state.tab !== 'index'){ state.tab = 'index'; store.set('dx_tab', 'index'); $('#tabPartner').setAttribute('aria-selected', false); $('#tabIndex').setAttribute('aria-selected', true); $('#tabShop').setAttribute('aria-selected', false); $('#tabBox').setAttribute('aria-selected', false); $('#partnerView').hidden = true; $('#shopView').hidden = true; $('#boxView').hidden = true; }
   const v = $('#detailView');
   $('#listView').hidden = true; $('#indexChrome').hidden = true;
   v.hidden = false;
@@ -638,15 +662,18 @@ function stageOf(id){ return state.levelOf.get(id); }
 const inStage = (id, s) => !!state.levelSets[STAGES[s]]?.has(id);
 const higherStage = (id, s) => (state.stagesOf.get(id) || []).find(x => x > s);
 
-function newPartner(id){
-  const b = state.byId.get(id);
-  const now = Date.now();
-  if (G.party.length >= PARTY_MAX) return;
-  G.party.push({ id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
-    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], stageLine: [0], final: false });
-  G.active = G.party.length - 1;
-  initMoves(G.party[G.active]); syncMoves(G.party[G.active]);
+function makePartner(id){
+  const b = state.byId.get(id), now = Date.now();
+  const m = { id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
+    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], stageLine: [0], final: false };
+  initMoves(m); syncMoves(m);
   G.col[id] = 'raised';
+  return m;
+}
+function newPartner(id){
+  if (G.party.length >= PARTY_MAX) return;
+  G.party.push(makePartner(id));
+  G.active = G.party.length - 1;
   saveGame();
 }
 
@@ -731,6 +758,7 @@ function renderPartner(){
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
+    <button class="ghost" id="boxBtn"${G.party.length < 2 || G.box.length >= G.boxCap ? ' disabled' : ''}>📦 Send ${esc(p.name)} to the Box${G.party.length < 2 ? ' (keep one in your party)' : G.box.length >= G.boxCap ? ' (Box full)' : ''}</button>
     <button class="${atTop ? 'big' : 'ghost danger'}" id="retireBtn">${atTop ? 'Retire' : 'Release'} ${esc(p.name)} · +${releaseValue(p)} DigiData</button>
   `;
   updateCount();
@@ -741,6 +769,7 @@ function renderPartner(){
     dd.dataset.armed = '1'; dd.textContent = 'Tap again to de-digivolve (evo points reset)';
     setTimeout(() => { if (dd.isConnected){ delete dd.dataset.armed; renderPartner(); } }, 3500);
   };
+  const bxb = $('#boxBtn'); if (bxb) bxb.onclick = sendToBox;
   const rb = $('#retireBtn'); if (rb) rb.onclick = () => {
     if (rb.dataset.armed){ retire(); return; }
     const label = rb.textContent;
@@ -820,15 +849,19 @@ function renderEgg(){
     say(`${P().name} hatched! Take good care of it.`, 'happy');
   };
 }
-function hatchNew(type = 'mystery'){
+function hatchNew(type = 'mystery', toBox){
   const pool = state.stageIds[0].filter(id => state.byId.has(id));
   const inParty = new Set(G.party.map(m => m.id));
   // rare eggs: a Fresh Digimon you have never discovered; otherwise favor ones you haven't raised
   const undiscovered = pool.filter(id => !known(id) && !inParty.has(id));
   const fresh = pool.filter(id => !raised(id) && !inParty.has(id));
   const from = type === 'rare' && undiscovered.length ? undiscovered : fresh.length ? fresh : pool;
-  newPartner(pick(from));
-  if (type === 'rare'){ const g = growthOf(P()); g.hp += 6; g.sp += 2; g.atk += 2; g.int += 2; g.spd += 2; P().mood = 90; saveGame(); }
+  const id = pick(from);
+  let m;
+  if (toBox){ m = makePartner(id); G.box.push(m); } else { newPartner(id); m = P(); }
+  if (type === 'rare'){ const g = growthOf(m); g.hp += 6; g.sp += 2; g.atk += 2; g.int += 2; g.spd += 2; m.mood = 90; }
+  saveGame();
+  return m;
 }
 
 // ----- DigiData: earned by releasing Digimon, spent in the shop -----
@@ -857,8 +890,12 @@ function renderShop(){
     '<div class="shop">' + SHOP.map(it => '<div class="shopitem"><span class="egg mini ' + it.key + '" aria-hidden="true"></span>' +
       '<div class="info"><b>' + it.name + '</b><small>' + it.desc + '</small><small>Owned: ' + G.eggs.filter(e => e === it.key).length + '</small></div>' +
       '<button class="act" data-buy="' + it.key + '"' + (G.data < it.price ? ' disabled' : '') + '>' + it.price + '<small>DigiData</small></button></div>').join('') + '</div>' +
+    '<h3 style="margin:4px 0 0">Upgrades</h3><div class="shop">' +
+      '<div class="shopitem"><span class="upic" aria-hidden="true">📦</span><div class="info"><b>Box +5 slots</b><small>Store more Digimon. You have ' + G.boxCap + ' slots.</small></div>' + (G.boxCap >= BOX_MAX ? '<button class="act" disabled>Maxed</button>' : '<button class="act" data-up="box"' + (G.data < upgradeCosts().box ? ' disabled' : '') + '>' + upgradeCosts().box + '<small>DigiData</small></button>') + '</div>' +
+      '<div class="shopitem"><span class="upic" aria-hidden="true">🧭</span><div class="info"><b>Expedition team +1</b><small>Run more expeditions at once. You have ' + G.expSlots + '.</small></div>' + (G.expSlots >= 6 ? '<button class="act" disabled>Maxed</button>' : '<button class="act" data-up="exp"' + (G.data < upgradeCosts().exp ? ' disabled' : '') + '>' + upgradeCosts().exp + '<small>DigiData</small></button>') + '</div>' +
+    '</div>' +
     '<p id="shopMsg" style="margin:0;min-height:1.4em;font-size:.88rem"></p>' +
-    (G.eggs.length ? (room ? '<button class="big" id="shopHatch">Hatch an egg · ' + G.eggs.length + ' waiting</button>' : '<p style="margin:0;color:var(--muted)">Your party is full. Release a Digimon on the Partner tab to make room for your eggs.</p>') : '');
+    (G.eggs.length ? (room ? '<button class="big" id="shopHatch">Hatch an egg · ' + G.eggs.length + ' waiting</button>' : G.box.length < G.boxCap ? '<button class="big" id="shopHatchBox">Hatch into the Box · ' + G.eggs.length + ' waiting</button>' : '<p style="margin:0;color:var(--muted)">Your party and Box are full. Release a Digimon or buy more Box slots.</p>') : '');
   v.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
     const it = SHOP.find(x => x.key === b.dataset.buy);
     if (G.data < it.price) return;
@@ -867,7 +904,126 @@ function renderShop(){
     $('#shopMsg').textContent = 'Bought a ' + it.name + '! ' + (G.party.length < PARTY_MAX ? 'Hatch it below or from an empty party slot.' : 'It\'s stored until a party slot opens up.');
   });
   const sh = $('#shopHatch'); if (sh) sh.onclick = () => { setTab('partner'); hatchOverlay(); };
+  const shb = $('#shopHatchBox'); if (shb) shb.onclick = () => { const m = hatchNew(G.eggs.shift(), true); renderShop(); updateCount(); $('#shopMsg').textContent = m.name + ' hatched and went into the Box!'; };
+  v.querySelectorAll('[data-up]').forEach(b => b.onclick = () => {
+    const k = b.dataset.up, cost = upgradeCosts()[k];
+    if (G.data < cost) return;
+    G.data -= cost;
+    if (k === 'box') G.boxCap = Math.min(BOX_MAX, G.boxCap + 5); else G.expSlots = Math.min(6, G.expSlots + 1);
+    saveGame(); renderShop(); updateCount();
+    $('#shopMsg').textContent = k === 'box' ? 'Box expanded to ' + G.boxCap + ' slots!' : 'You can now run ' + G.expSlots + ' expeditions at once!';
+  });
 }
+// ----- storage box and timed expeditions -----
+const BOX_MAX = 60;
+const EXPEDITIONS = [
+  { key: 'fields', name: 'Data Fields', mins: 30, data: 1, xp: 1, egg: 0, rare: 0, risk: 0, finds: 1, desc: 'A short trip across calm data plains. Always safe.' },
+  { key: 'ruins', name: 'Ancient Ruins', mins: 120, data: 3.2, xp: 3, egg: 0.06, rare: 0, risk: 0.12, finds: 2, desc: 'Crumbling code ruins with buried treasure.' },
+  { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, desc: 'Dangerous depths with the richest rewards.' },
+];
+function expDone(m){ return !!(m.exp && Date.now() >= m.exp.end); }
+function expRunning(){ return G.box.filter(m => m.exp).length; }
+function fmtLeft(ms){ const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), mn = Math.floor(s % 3600 / 60); return h ? h + 'h ' + mn + 'm' : mn ? mn + 'm' : s + 's'; }
+function expOdds(m, ex){ return Math.max(0.5, 1 - ex.risk * Math.max(0.25, 1 - (m.level || 1) / 45)); }
+function expEstimate(m, ex){ return { data: Math.round((8 + m.stage * 6) * ex.data), xp: Math.round((6 + m.stage * 4) * ex.xp) }; }
+function updateBoxBadge(){ const n = G.box.filter(expDone).length; const t = $('#tabBox'); if (t) t.textContent = n ? 'Box · ' + n : 'Box'; }
+function upgradeCosts(){ return { box: 150 + 100 * Math.round((G.boxCap - 10) / 5), exp: 300 * (G.expSlots - 2) }; }
+
+function renderBox(){
+  updateBoxBadge();
+  if (state.tab !== 'box') return;
+  const v = $('#boxView'), ready = G.box.filter(expDone);
+  const cells = [];
+  for (let i = 0; i < G.boxCap; i++){
+    const m = G.box[i];
+    if (!m){ cells.push('<div class="bcell empty"><span>Empty</span></div>'); continue; }
+    const status = m.exp ? (expDone(m) ? '<i class="ok">Back!</i>' : '<i>' + fmtLeft(m.exp.end - Date.now()) + '</i>') : '';
+    cells.push('<button class="bcell' + (m.exp && !expDone(m) ? ' away' : '') + '" data-box="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + LEVEL_EN[STAGES[m.stage]] + '</small>' + status + '</button>');
+  }
+  v.innerHTML = '<div class="ptop"><h2>Storage Box</h2></div>' +
+    '<div class="wallet"><span>Stored <b>' + G.box.length + ' / ' + G.boxCap + '</b></span><span>Expeditions <b>' + expRunning() + ' / ' + G.expSlots + '</b></span><button class="favbtn" id="boxShop">More slots</button></div>' +
+    '<p style="margin:0;color:var(--muted)">Digimon in the Box rest without getting hungry. Tap one to move it to your party, release it, or send it on a timed expedition. Use “Send to the Box” on the Partner tab to store one.</p>' +
+    (ready.length ? '<button class="big" id="collectAll">Collect ' + ready.length + ' finished expedition' + (ready.length === 1 ? '' : 's') + '</button>' : '') +
+    '<div class="boxgrid">' + cells.join('') + '</div>';
+  v.querySelectorAll('[data-box]').forEach(b => b.onclick = () => boxMenu(+b.dataset.box));
+  $('#boxShop').onclick = () => setTab('shop');
+  const ca = $('#collectAll'); if (ca) ca.onclick = () => collectExpeditions(ready);
+}
+
+function boxMenu(i){
+  const m = G.box[i]; if (!m || busy) return;
+  busy = true; initMoves(m);
+  const st = partnerStats(m), away = !!m.exp, done = expDone(m), partyRoom = G.party.length < PARTY_MAX;
+  const exName = away ? (EXPEDITIONS.find(e => e.key === m.exp.key) || EXPEDITIONS[0]).name : '';
+  openOv('<div class="bhead"><img alt="" src="' + esc(m.image) + '"><div><h4>' + esc(m.name) + '</h4><div class="statrow"><span class="stage">Lv ' + m.level + '</span><span class="stage">' + LEVEL_EN[STAGES[m.stage]] + '</span></div></div></div>' +
+    '<div class="row statrow">' + statChips(st) + '</div>' +
+    (away ? '<p style="margin:0">' + (done ? esc(m.name) + ' is back from ' + esc(exName) + '!' : 'Exploring ' + esc(exName) + '. Back in ' + fmtLeft(m.exp.end - Date.now()) + '.') + '</p>' : '') +
+    '<div class="bactions">' +
+      (done ? '<button class="big" id="bxCollect">Collect rewards</button>' : '') +
+      (!away ? '<button class="act" id="bxParty"' + (partyRoom ? '' : ' disabled') + '>Move to party<small>' + (partyRoom ? G.party.length + ' / ' + PARTY_MAX + ' in party' : 'party is full') + '</small></button>' +
+        '<button class="act" id="bxExp"' + (expRunning() < G.expSlots ? '' : ' disabled') + '>Send on an expedition<small>' + expRunning() + ' / ' + G.expSlots + ' teams out</small></button>' +
+        '<button class="ghost danger" id="bxRelease">Release · +' + releaseValue(m) + ' DigiData</button>' : '') +
+      '<button class="ghost" id="bxClose">Close</button></div>');
+  $('#bxClose').onclick = () => { closeOv(); renderBox(); };
+  const c = $('#bxCollect'); if (c) c.onclick = () => collectExpeditions([m]);
+  const pb = $('#bxParty'); if (pb) pb.onclick = () => { G.box.splice(i, 1); m.last = Date.now(); G.party.push(m); saveGame(); closeOv(); renderBox(); };
+  const eb = $('#bxExp'); if (eb) eb.onclick = () => expeditionPicker(m);
+  const rb = $('#bxRelease'); if (rb) rb.onclick = () => {
+    if (!rb.dataset.armed){ rb.dataset.armed = '1'; rb.textContent = 'Tap again to release ' + m.name; return; }
+    const value = releaseValue(m);
+    G.history.push({ line: m.line.map(id => state.byId.get(id)?.name || '?'), wins: m.wins, date: Date.now(), data: value });
+    G.box.splice(i, 1); G.data += value; saveGame(); closeOv(); renderBox(); updateCount();
+  };
+}
+
+function expeditionPicker(m){
+  const card = ex => { const est = expEstimate(m, ex), odds = Math.round(expOdds(m, ex) * 100);
+    return '<button class="diff" data-ex="' + ex.key + '"><span class="dn">' + ex.name + '<small>' + fmtLeft(ex.mins * 60000) + '</small></span><span class="dd">' + ex.desc + '</span>' +
+      '<span class="dr">~' + est.data + ' DigiData · ~' + est.xp + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + ' · ' + odds + '% smooth trip</span></button>'; };
+  $('#overlay .sheet').innerHTML = '<h4>Send ' + esc(m.name) + ' to…</h4><div class="diffs">' + EXPEDITIONS.map(card).join('') + '</div>' +
+    '<p style="margin:0;color:var(--muted);font-size:.82rem">A rough trip brings back half the rewards. Higher levels make trips smoother. Each trip may also spot undiscovered Digimon for your Index.</p>' +
+    '<button class="ghost" id="exCancel">Cancel</button>';
+  $('#exCancel').onclick = () => { closeOv(); renderBox(); };
+  $('#overlay').querySelectorAll('[data-ex]').forEach(b => b.onclick = () => {
+    const ex = EXPEDITIONS.find(x => x.key === b.dataset.ex), now = Date.now();
+    m.exp = { key: ex.key, start: now, end: now + ex.mins * 60000 };
+    saveGame(); closeOv(); renderBox();
+  });
+}
+
+async function collectExpeditions(list){
+  busy = true;
+  const lines = [];
+  for (const m of list){
+    if (!expDone(m)) continue;
+    const ex = EXPEDITIONS.find(x => x.key === m.exp.key) || EXPEDITIONS[0];
+    const ok = Math.random() < expOdds(m, ex), est = expEstimate(m, ex);
+    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5)), xp = Math.round(est.xp * (ok ? 1 : 0.5));
+    G.data += data;
+    let extra = '';
+    if (ok && ex.egg && Math.random() < ex.egg){ const rare = Math.random() < ex.rare / ex.egg; G.eggs.push(rare ? 'rare' : 'mystery'); extra += ' Found a ' + (rare ? 'Rare Mystery Egg' : 'Mystery Egg') + '!'; }
+    const pool = (state.stageIds[m.stage] || []).filter(id => state.byId.has(id) && !known(id));
+    const found = [];
+    for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; found.push(state.byId.get(id).name); } }
+    if (found.length) extra += ' Spotted ' + found.join(', ') + '.';
+    m.exp = null;
+    const lv = await gainXP(m, xp);
+    lines.push('<div><b>' + esc(m.name) + '</b> · ' + esc(ex.name) + (ok ? '' : ' (rough trip)') + '<br><small>+' + data + ' DigiData · +' + xp + ' XP.' + esc(levelText(lv) + extra) + '</small></div>');
+  }
+  saveGame();
+  openOv('<h4>Expedition results</h4><div class="hist">' + (lines.join('') || '<div>Nothing to collect yet.</div>') + '</div><button class="big" id="exDone">Nice!</button>');
+  $('#exDone').onclick = () => { closeOv(); renderBox(); updateCount(); };
+}
+
+function sendToBox(){
+  const p = P(); if (!p || busy) return;
+  if (G.party.length < 2){ say('Keep at least one Digimon in your party.'); return; }
+  if (G.box.length >= G.boxCap){ say('Your Box is full. Buy more slots in the Shop.'); return; }
+  G.party.splice(G.active, 1); G.box.push(p);
+  G.active = Math.max(0, Math.min(G.active, G.party.length - 1));
+  saveGame(); say(p.name + ' was sent to the Box to rest.');
+}
+
 function openShopOverlay(){
   busy = true;
   const room = G.party.length < PARTY_MAX;
@@ -960,16 +1116,17 @@ function closeOv(){ $('#overlay').hidden = true; $('#overlay').innerHTML = ''; b
 
 // ----- stats: HP, SP, ATK, INT, SPD -----
 // Each Digimon gets base stats from its stage plus a fixed per-species lean (some hit hard, some are casters, some are fast).
-const STAT_BASE = { hp: [36, 60, 96, 150, 225, 315], sp: [10, 14, 20, 28, 38, 50], atk: [4, 7, 12, 19, 28, 40], int: [4, 7, 12, 19, 28, 40], spd: [4, 6, 10, 15, 21, 28] };
-const STAT_KEYS = ['hp', 'sp', 'atk', 'int', 'spd'];
-const STAT_LABEL = { hp: 'HP', sp: 'SP', atk: 'ATK', int: 'INT', spd: 'SPD' };
+const STAT_BASE = { hp: [36, 60, 96, 150, 225, 315], sp: [10, 14, 20, 28, 38, 50], atk: [4, 7, 12, 19, 28, 40], int: [4, 7, 12, 19, 28, 40], def: [4, 7, 12, 19, 28, 40], spd: [4, 6, 10, 15, 21, 28] };
+const STAT_KEYS = ['hp', 'sp', 'atk', 'int', 'def', 'spd'];
+const STAT_LABEL = { hp: 'HP', sp: 'SP', atk: 'ATK', int: 'INT', def: 'DEF', spd: 'SPD' };
 function seeded(id, salt){ let h = (Math.imul(id, 2654435761) ^ Math.imul(salt, 40503)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822507) >>> 0; h ^= h >>> 13; return (h % 1000) / 1000; }
 function baseStats(id, stage){
   const s = Math.max(0, Math.min(5, stage | 0)), lean = seeded(id, 9);
   const f = (k, i) => 0.82 + seeded(id, i) * 0.4;
   const atkLean = 0.8 + lean * 0.4, intLean = 1.2 - lean * 0.4;
   return { hp: Math.round(STAT_BASE.hp[s] * f('hp', 1)), sp: Math.round(STAT_BASE.sp[s] * f('sp', 2) * (0.9 + (1 - lean) * 0.25)),
-    atk: Math.round(STAT_BASE.atk[s] * f('atk', 3) * atkLean), int: Math.round(STAT_BASE.int[s] * f('int', 4) * intLean), spd: Math.round(STAT_BASE.spd[s] * f('spd', 5)) };
+    atk: Math.round(STAT_BASE.atk[s] * f('atk', 3) * atkLean), int: Math.round(STAT_BASE.int[s] * f('int', 4) * intLean), spd: Math.round(STAT_BASE.spd[s] * f('spd', 5)),
+    def: Math.round(STAT_BASE.def[s] * (0.82 + Math.abs(seeded(id, 6)) * 0.4)) };
 }
 function growthOf(p){
   if (!p.growth) p.growth = { hp: 0, sp: 0, atk: Math.max(0, Math.round(((p.str || 2) - 2) / 2)), int: 0, spd: 0 };
@@ -983,7 +1140,9 @@ const TRAININGS = [
   { key: 'atk', icon: '💪', name: 'Power', desc: 'Raises ATK' },
   { key: 'int', icon: '🔮', name: 'Mind', desc: 'Raises INT' },
   { key: 'spd', icon: '💨', name: 'Agility', desc: 'Raises SPD' },
-  { key: 'hp', icon: '🛡️', name: 'Stamina', desc: 'Raises HP and SP' },
+  { key: 'def', icon: '🛡️', name: 'Guard', desc: 'Raises DEF' },
+  { key: 'hp', icon: '❤️', name: 'Stamina', desc: 'Raises HP' },
+  { key: 'sp', icon: '🔋', name: 'Focus', desc: 'Raises SP' },
 ];
 function train(){
   const p = P(); busy = true;
@@ -1017,8 +1176,9 @@ function trainGame(kind){
     cancelAnimationFrame(raf);
     const g = growthOf(p), per = 1 + Math.floor(p.stage / 2), bonus = hits && p.mood > 60 ? 1 : 0;
     let gained;
-    if (kind === 'hp'){ const h = hits * per * 3 + bonus * 2, s = hits * per + bonus; g.hp += h; g.sp += s; gained = `+${h} HP, +${s} SP`; }
-    else { const v = hits * per + bonus; g[kind] += v; gained = `+${v} ${STAT_LABEL[kind]}`; }
+    if (kind === 'hp'){ const h = hits * per * 4 + bonus * 2; g.hp = (g.hp || 0) + h; gained = '+' + h + ' HP'; }
+    else if (kind === 'sp'){ const s = hits * per * 2 + bonus; g.sp = (g.sp || 0) + s; gained = '+' + s + ' SP'; }
+    else { const v = hits * per + bonus; g[kind] = (g[kind] || 0) + v; gained = '+' + v + ' ' + STAT_LABEL[kind]; }
     p.evo += hits; p.energy = clamp(p.energy - 20); p.hunger = clamp(p.hunger - 10);
     if (!hits) p.mood = clamp(p.mood - 6);
     saveGame();
@@ -1131,7 +1291,7 @@ async function gainXP(p, amount){
   p.xp += Math.max(0, Math.round(amount)); const ups = [];
   while (p.xp >= XP_NEED(p.level) && p.level < 99){
     p.xp -= XP_NEED(p.level); p.level++;
-    const g = growthOf(p); g[pick(['atk', 'int', 'spd'])] += 1; g.hp += 2;
+    const g = growthOf(p), gk = pick(['atk', 'int', 'def', 'spd']); g[gk] = (g[gk] || 0) + 1; g.hp += 2;
     ups.push(p.level);
   }
   saveGame();
@@ -1188,7 +1348,10 @@ function doMove(att, def, mv){
   const crit = Math.random() < Math.max(0.04, Math.min(0.25, 0.06 + (att.st.spd - def.st.spd) * 0.01));
   const am = attrMult(att.attr, def.attr);
   const base = (mv.kind === 'phys' || mv.kind === 'atk' ? att.st.atk : att.st.int) * (mv.power || 1) * (att.buff || 1);
-  const dmg = Math.max(1, Math.round(base * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1)));
+  // DEF softens both physical (ATK) and SP-powered attacks; equal attack and defense keeps damage about where it was
+  const aStat = mv.kind === 'phys' || mv.kind === 'atk' ? att.st.atk : att.st.int, dStat = def.st.def || 0;
+  const defFactor = 1.35 * (2 * aStat) / (2 * aStat + dStat);
+  const dmg = Math.max(1, Math.round(base * defFactor * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1)));
   def.hp = Math.max(0, def.hp - dmg);
   let text = `${att.name} used ${mv.name}! ${dmg} damage.`;
   if (mv.kind === 'drain'){ const h = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + h); text += ' Drained ' + h + ' HP.'; }
@@ -1312,8 +1475,8 @@ async function battle(diff){
   p.energy = clamp(p.energy - 25); p.hunger = clamp(p.hunger - 10);
   let summary;
   if (outcome === 'win'){
-    const g = growthOf(p), k = pick(['atk', 'int', 'spd', 'hp']), v = k === 'hp' ? 3 + p.stage : 1 + Math.floor(p.stage / 2);
-    g[k] += v; if (k === 'hp') g.sp += 1;
+    const g = growthOf(p), k = pick(['atk', 'int', 'def', 'spd', 'hp', 'sp']), v = k === 'hp' ? 3 + p.stage : k === 'sp' ? 2 : 1 + Math.floor(p.stage / 2);
+    g[k] = (g[k] || 0) + v;
     const ev = Math.max(1, Math.round(3 * diff.reward)), dd = Math.round((4 + 3 * p.stage) * diff.reward);
     p.wins++; p.evo += ev; p.mood = clamp(p.mood + 8); G.data += dd;
     summary = p.name + ' won! +' + ev + ' digivolution points, +' + v + ' ' + STAT_LABEL[k] + ', +' + dd + ' DigiData.';
@@ -1756,7 +1919,7 @@ async function evolveTo(id){
 
 // ---------- image processing: cut out the white background, optional retro pixel look ----------
 // Done on this device from the official art; silhouettes need the cutout so they show a shape, not a square.
-const IMG_SEL = '.slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
+const IMG_SEL = '.bcell img, .bhead img, .slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
 let retroOn = !!store.get('dx_retro', false);
 const imgCache = new Map();
 function processArt(src, res, retro){
@@ -1911,6 +2074,7 @@ $('#raisedOnly').addEventListener('click', e => { state.raisedOnly = !state.rais
 window.addEventListener('popstate', route);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !busy){ tick(); renderPartner(); } });
 setInterval(() => { if (!busy && !document.hidden && state.tab === 'partner' && P()){ tick(); renderPartner(); } }, 60000);
+setInterval(() => { updateBoxBadge(); if (!busy && !document.hidden && state.tab === 'box') renderBox(); }, 15000);
 
 renderRail();
 setRetro(retroOn);
