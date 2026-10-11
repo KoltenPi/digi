@@ -309,6 +309,10 @@ img.sil{filter:var(--silf)}
 .quest.done .evotrack i{background:var(--good)}
 .quest.empty,.quest.locked{opacity:.7;border-style:dashed}
 .qrefresh .act{width:100%}
+.quest .qtop b{flex:1}
+.qlock{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:2px 7px;font-size:.9rem;line-height:1.4;flex:none}
+.qlock[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent)}
+.quest.kept{border-color:var(--accent)}
 .reveal{display:grid;justify-items:center;gap:6px;text-align:center}
 .reveal img{width:160px;height:160px;object-fit:contain}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.card:active,.act:active{transform:none}}
@@ -2178,7 +2182,7 @@ function updateQuestBadge(){
 function rewardText(q){ return '+' + q.data + ' DigiData' + (q.item ? ' · ' + (q.item === 'egg' ? '🥚 Mystery Egg' : itemIcon(q.item) + ' ' + itemName(q.item)) : ''); }
 // replaces every quest except finished ones you haven't claimed yet
 function rerollQuests(){
-  const Q = G.quests, keep = Q.list.map(q => questDone(q) ? q : null);
+  const Q = G.quests, keep = Q.list.map(q => questDone(q) || (q && q.locked) ? q : null);
   Q.list = keep.map(q => q || null);
   for (let i = 0; i < Q.list.length; i++) if (!Q.list[i]) Q.list[i] = makeQuest(Q.list.filter(Boolean).map(x => x.t));
 }
@@ -2190,7 +2194,8 @@ function renderQuests(msg){
   const card = (q, i) => {
     if (!q) return '<div class="quest empty"><b>Quest complete</b><small>A new quest arrives when you refresh.</small></div>';
     const T = QUEST_TYPES.find(x => x.t === q.t), p = Math.min(q.n, questProg(q)), done = questDone(q);
-    return '<div class="quest' + (q.claimed ? ' claimed' : done ? ' done' : '') + '"><div class="qtop"><b>' + esc(T.text(q.n)) + '</b><span>' + p + ' / ' + q.n + '</span></div>' +
+    return '<div class="quest' + (q.claimed ? ' claimed' : done ? ' done' : '') + (q.locked ? ' kept' : '') + '"><div class="qtop"><b>' + esc(T.text(q.n)) + '</b><span>' + p + ' / ' + q.n + '</span>' +
+      '<button class="qlock" data-lock="' + i + '" aria-pressed="' + !!q.locked + '" aria-label="' + (q.locked ? 'Unlock quest' : 'Lock quest') + '">' + (q.locked ? '🔒' : '🔓') + '</button></div>' +
       '<div class="evotrack"><i style="width:' + (p / q.n * 100) + '%"></i></div>' +
       '<div class="qbot"><small>' + esc(rewardText(q)) + '</small>' + (done ? '<button class="act" data-claim="' + i + '">Claim</button>' : '') + '</div></div>';
   };
@@ -2201,7 +2206,7 @@ function renderQuests(msg){
     '<div class="qrefresh">' + (Q.freeUsed
       ? '<button class="act" id="qPaid"' + (G.data < cost ? ' disabled' : '') + '>🔄 Refresh now · ' + cost + ' DigiData<small>free again in ' + fmtLeft(nextHour) + ' · price goes up with each refresh</small></button>'
       : '<button class="act" id="qFree">🔄 Free refresh<small>1 per hour · next in ' + fmtLeft(nextHour) + '</small></button>') + '</div>' +
-    '<p class="ownline">Refreshing replaces every quest except finished ones waiting to be claimed. The refresh price goes back to ' + 50 + ' at the top of every hour. Unlock more quest slots by finding Digimon (battles, hatching, digivolving and expeditions all count).</p>' +
+    '<p class="ownline">Refreshing replaces every quest except locked ones (🔒) and finished ones waiting to be claimed. Tap 🔓 on a quest to lock it. The refresh price goes back to ' + 50 + ' at the top of every hour. Unlock more quest slots by finding Digimon (battles, hatching, digivolving and expeditions all count).</p>' +
     '<p id="qMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>';
   $('#questsView').querySelectorAll('[data-claim]').forEach(b => b.onclick = () => {
     const q = Q.list[+b.dataset.claim]; if (!questDone(q)) return;
@@ -2209,6 +2214,11 @@ function renderQuests(msg){
     if (q.item === 'egg') G.eggs.push('mystery'); else if (q.item) giveItem(q.item);
     Q.list[+b.dataset.claim] = null; saveGame(); updateCount();
     renderQuests('Claimed: ' + rewardText(q) + '!');
+  });
+  $('#questsView').querySelectorAll('[data-lock]').forEach(b => b.onclick = () => {
+    const q = Q.list[+b.dataset.lock]; if (!q) return;
+    q.locked = !q.locked; saveGame();
+    renderQuests(q.locked ? 'Locked. This quest will stay when you refresh.' : 'Unlocked. This quest can be replaced on refresh.');
   });
   const f = $('#qFree'); if (f) f.onclick = () => { if (Q.freeUsed) return; Q.freeUsed = true; rerollQuests(); saveGame(); renderQuests('New quests are in!'); };
   const pd = $('#qPaid'); if (pd) pd.onclick = () => { const c = questRefreshCost(); if (G.data < c) return; G.data -= c; Q.paid = (Q.paid || 0) + 1; rerollQuests(); saveGame(); updateCount(); renderQuests('Refreshed for ' + c + ' DigiData.'); };
