@@ -323,8 +323,7 @@ img.sil{filter:var(--silf)}
   <div class="wrap">
     <div class="top">
       <h1 class="brand">Digimon Index<small id="tagline">raise · digivolve · collect</small></h1>
-      <button id="retroBtn" class="favbtn" aria-pressed="false" title="Show Digimon as pixel sprites" style="margin-left:auto;padding:6px 10px">▦ Retro</button>
-      <span class="count" id="count" style="margin-left:0"></span>
+      <span class="count" id="count" style="margin-left:auto"></span>
     </div>
     <div id="indexChrome" hidden>
       <div class="search" id="searchRow">
@@ -2310,7 +2309,7 @@ async function evolveTo(id, reqs){
 // ---------- image processing: cut out the white background, optional retro pixel look ----------
 // Done on this device from the official art; silhouettes need the cutout so they show a shape, not a square.
 const IMG_SEL = '.lrow img, .bcell img, .bhead img, .slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
-let retroOn = !!store.get('dx_retro', false);
+let retroOn = false;   // retro pixel mode was removed; always show the official art
 const imgCache = new Map();
 function processArt(src, res, retro){
   const key = src + '|' + res + '|' + retro;
@@ -2436,10 +2435,8 @@ new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) i
   .observe(document.body, {childList: true, subtree: true});
 function setRetro(on){
   retroOn = on; store.set('dx_retro', on);
-  $('#retroBtn').setAttribute('aria-pressed', on);
   document.querySelectorAll(IMG_SEL).forEach(img => { delete img.dataset.mode; imgIO.observe(img); });
 }
-$('#retroBtn').onclick = () => setRetro(!retroOn);
 
 // ---------- events ----------
 $('#grid').addEventListener('click', e => {
@@ -2468,7 +2465,7 @@ setInterval(() => { updateBoxBadge(); if (!busy && !document.hidden && state.tab
 setInterval(() => { if (!busy && !document.hidden && state.tab === 'quests') renderQuests(); else { questInit(); updateQuestBadge(); } }, 30000);
 
 renderRail();
-setRetro(retroOn);
+setRetro(false);
 questInit(); updateQuestBadge();
 setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
