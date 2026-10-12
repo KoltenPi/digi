@@ -378,6 +378,77 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .hp{width:100%;height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}
 .hp i{display:block;height:100%;width:100%;background:var(--good);transition:width .5s}
 .vs{font:700 1rem var(--display);color:var(--muted)}
+/* ----- battle effects ----- */
+.arena{position:relative}
+.fighter{position:relative}
+.fx-lunge-r img{animation:fxLungeR .34s ease-out}
+.fx-lunge-l img{animation:fxLungeL .34s ease-out}
+@keyframes fxLungeR{40%{transform:translateX(26px) scale(1.1)}}
+@keyframes fxLungeL{40%{transform:translateX(-26px) scale(1.1)}}
+.fx-cast img{animation:fxCast .4s ease-out}
+@keyframes fxCast{40%{transform:translateY(-8px) scale(1.08);filter:brightness(1.35) drop-shadow(0 0 12px var(--fxc,#fff))}}
+.fx-hurt img{animation:fxHurt .45s}
+@keyframes fxHurt{0%,100%{transform:none;filter:none}12%{transform:translateX(-8px);filter:brightness(2.4) saturate(0)}32%{transform:translateX(7px);filter:brightness(1.2)}52%{transform:translateX(-4px);filter:brightness(1.8) saturate(0)}74%{transform:translateX(2px)}}
+.fx-dodge img{animation:fxDodge .45s ease-out}
+@keyframes fxDodge{40%{transform:translateX(var(--dodge,16px)) skewX(-10deg);opacity:.45}}
+.fx-heal img{animation:fxHeal .65s}
+@keyframes fxHeal{50%{filter:drop-shadow(0 0 14px #3ccf7a) brightness(1.2)}}
+.fx-buff img{animation:fxBuff .65s}
+@keyframes fxBuff{50%{filter:drop-shadow(0 0 14px #ff8a3d) brightness(1.25);transform:scale(1.1)}}
+.fx-guard::after{content:'';position:absolute;left:50%;top:48px;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;border:3px solid #6fb7ff;box-shadow:0 0 16px #6fb7ff inset,0 0 10px #6fb7ff;animation:fxShield .75s ease-out forwards;pointer-events:none}
+@keyframes fxShield{0%{transform:scale(.5);opacity:0}30%{transform:scale(1.06);opacity:1}100%{transform:scale(1);opacity:0}}
+.fx-ko img{animation:fxKo .8s ease-in forwards}
+@keyframes fxKo{to{transform:translateY(26px) rotate(-14deg);opacity:.15;filter:grayscale(1)}}
+.fx-shake{animation:fxShake .42s}
+@keyframes fxShake{20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-4px)}60%{transform:translate(-4px,2px)}80%{transform:translate(2px,-1px)}}
+.fxnum{position:absolute;left:50%;top:-2px;transform:translateX(-50%);font:800 1.3rem var(--display);color:#ff4d4d;text-shadow:0 2px 0 rgba(0,0,0,.35),0 0 8px rgba(0,0,0,.25);pointer-events:none;white-space:nowrap;animation:fxNum 1.05s ease-out forwards;z-index:3}
+.fxnum.heal{color:#2fd27a}.fxnum.miss{color:var(--muted);font-size:1.05rem}.fxnum.crit{color:#ffc61a;font-size:1.65rem}
+.fxnum.info{font-size:.78rem;top:30px;color:var(--accent)}.fxnum.dim{color:var(--muted)}
+@keyframes fxNum{0%{opacity:0;transform:translate(-50%,8px) scale(.6)}15%{opacity:1;transform:translate(-50%,-4px) scale(1.18)}30%{transform:translate(-50%,-8px) scale(1)}100%{opacity:0;transform:translate(-50%,-36px)}}
+.fxproj{position:absolute;left:0;top:0;width:30px;height:30px;font-size:28px;line-height:30px;text-align:center;pointer-events:none;z-index:4;filter:drop-shadow(0 0 8px var(--fxc,#fff))}
+.fxburst{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;background:radial-gradient(circle,#fff 0,var(--fxc,#ffd04d) 34%,transparent 70%);pointer-events:none;z-index:3;animation:fxBurst .38s ease-out forwards}
+@keyframes fxBurst{from{transform:scale(.2);opacity:1}to{transform:scale(1.5);opacity:0}}
+.fxslash{position:absolute;width:92px;height:92px;margin:-46px 0 0 -46px;pointer-events:none;z-index:3}
+.fxslash i{--r:-35deg;position:absolute;left:8%;top:50%;width:84%;height:4px;border-radius:4px;background:linear-gradient(90deg,transparent,#fff,transparent);box-shadow:0 0 10px var(--fxc,#fff);opacity:0;transform:rotate(var(--r)) scaleX(0);animation:fxSlash .32s ease-out forwards}
+.fxslash i:nth-child(2){--r:35deg;animation-delay:.08s}
+.fxslash i:nth-child(3){top:34%;animation-delay:.15s}
+@keyframes fxSlash{40%{opacity:1;transform:rotate(var(--r)) scaleX(1)}100%{opacity:0;transform:rotate(var(--r)) scaleX(1.1)}}
+.fxflash{position:absolute;inset:-8px;border-radius:12px;background:#fff;pointer-events:none;z-index:5;animation:fxFlash .28s ease-out forwards}
+@keyframes fxFlash{from{opacity:.7}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.fxproj,.fxburst,.fxslash,.fxflash{display:none}}
+/* ----- cloud save ----- */
+.cloudcard{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--sunk)}
+.cloudcard.on{border-color:var(--good)}
+.cloudhead{display:flex;align-items:center;gap:10px}
+.cloudhead b{font:700 1.05rem var(--display);display:block}
+.cloudhead small{color:var(--muted)}
+.cloudico{font-size:1.9rem;line-height:1}
+.cloudkey{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:10px;background:var(--panel);border:1px dashed var(--line)}
+.cloudkey small{flex-basis:100%;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.06em}
+.cloudkey b{font:700 1.02rem var(--mono);letter-spacing:.03em;flex:1;min-width:0;white-space:nowrap}
+.cloudwarn{display:grid;gap:6px;padding:10px 12px;border-radius:10px;border:1px solid var(--warn);background:var(--panel)}
+.cloudwarn span{font-size:.85rem}
+.cloudfound{display:grid;gap:4px;padding:10px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
+.cloudfound small{color:var(--muted)}
+/* ----- live battles ----- */
+.duelbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem;color:var(--muted);min-height:1.4em}
+.dutime{flex:1 1 100%;height:6px;border-radius:6px;background:var(--sunk);overflow:hidden}
+.dutime i{display:block;height:100%;background:var(--good);transition:width .25s linear}
+.dutime.low i{background:var(--bad)}
+.duelquit{opacity:.75}
+.duelwait{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:var(--sunk)}
+.duelwait img{width:64px;height:64px;object-fit:contain;animation:duBob 1.2s ease-in-out infinite}
+.duelwait div{display:grid;gap:4px}
+.duelwait small{color:var(--muted)}
+@keyframes duBob{50%{transform:translateY(-6px)}}
+.duelinv{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 10px);transform:translateX(-50%);z-index:60;width:min(520px,calc(100% - 20px));display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--panel);color:var(--fg);border:2px solid var(--accent);box-shadow:0 10px 30px rgba(0,0,0,.3);animation:duIn .35s cubic-bezier(.2,.9,.3,1.3)}
+.duelinv img{width:44px;height:44px;object-fit:contain;flex:none}
+.duelinv div{display:grid;flex:1 1 auto;min-width:0}
+.duelinv b{font-size:.92rem;line-height:1.25}
+.duelinv small{color:var(--muted);font-size:.78rem}
+.duelinv button{flex:0 0 auto;width:auto;margin:0;padding:9px 14px}
+.duelinv .ghost{padding:9px 11px}
+@keyframes duIn{from{transform:translate(-50%,-30px);opacity:0}}
 .blog{font-size:.88rem;min-height:2.8em;color:var(--muted)}
 .choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;max-height:52vh;overflow:auto}
 .choice{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px;display:grid;justify-items:center;gap:4px;text-align:center}
@@ -1784,7 +1855,7 @@ function fighter(name, image, st, attr, moves, mood){
   return { name, image, st: s, hp: s.hp, sp: s.sp, attr, moves, guard: false };
 }
 function doMove(att, def, mv){
-  if (mv.kind === 'heal'){ att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h); return { text: att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.' }; }
+  if (mv.kind === 'heal'){ att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h); return { text: att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.', heal: h }; }
   if (mv.kind === 'buff'){ att.sp -= mv.cost || 0; att.buff = Math.min(1.9, (att.buff || 1) * mv.power); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' }; }
   if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: `${att.name} guards and recovers ${g} SP.` }; }
   att.sp -= mv.cost || 0;
@@ -1798,8 +1869,8 @@ function doMove(att, def, mv){
   const defFactor = 1.35 * (2 * aStat) / (2 * aStat + dStat);
   const dmg = Math.max(1, Math.round(base * defFactor * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1) * skyMult(att) * (att.tdm || 1) * (def.ttk || 1)));
   def.hp = Math.max(0, def.hp - dmg);
-  let text = `${att.name} used ${mv.name}! ${dmg} damage.`;
-  if (mv.kind === 'drain'){ const h = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + h); text += ' Drained ' + h + ' HP.'; }
+  let text = `${att.name} used ${mv.name}! ${dmg} damage.`, heal = 0;
+  if (mv.kind === 'drain'){ const h = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + h); heal = h; text += ' Drained ' + h + ' HP.'; }
   if (crit) text += ' Critical hit!';
   if (am > 1) text += ' Super effective!'; else if (am < 1) text += ' Not very effective…';
   if (em !== 1 && ELEMS[att.elem] && ELEMS[def.elem]) text += ' (' + ELEMS[att.elem].icon + '→' + ELEMS[def.elem].icon + ')';
@@ -1808,7 +1879,7 @@ function doMove(att, def, mv){
   if (def.status && def.status.k === 'slp' && def.hp > 0){ def.status = null; text += ' ' + def.name + ' woke up!'; }
   const sk = moveStatus(mv);
   if (sk && def.hp > 0 && !def.status && !def.noStatus && Math.random() < (sk === 'par' && curWeather().par ? 0.45 : 0.3)){ def.status = { k: sk, t: sk === 'slp' ? 1 + (Math.random() * 3 | 0) : sk === 'par' ? 3 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
-  return { text, dmg };
+  return { text, dmg, crit, am, heal };
 }
 function foeChoice(f, me){
   const usable = f.moves.filter(m => m.kind !== 'guard' && (m.cost || 0) <= f.sp);
@@ -1821,6 +1892,48 @@ function foeChoice(f, me){
   if (!dmg.length || (f.hp < f.st.hp * 0.3 && Math.random() < 0.15)) return guard;
   const score = m => (m.kind === 'phys' ? f.st.atk : f.st.int) * m.power * (0.7 + Math.random() * 0.6);
   return dmg.sort((a, b) => score(b) - score(a))[0];
+}
+
+// ----- battle effects: lunges, element shots, slashes, damage numbers, crit shake -----
+var FX_COL = { fire: '#ff7a2f', water: '#3fa9ff', plant: '#3ccf7a', wind: '#8fe3cf', machine: '#b8c2d6', beast: '#e6a85c', holy: '#ffe36e', dark: '#a65cff' };
+const fxCalm = () => { try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch{ return false; } };
+function fxClass(el, c, ms){ if (!el) return; el.classList.remove(c); void el.offsetWidth; el.classList.add(c); setTimeout(() => el.classList.remove(c), ms || 700); }
+function fxFloat(el, text, cls){ if (!el) return; const s = document.createElement('span'); s.className = 'fxnum ' + (cls || ''); s.textContent = text; el.appendChild(s); setTimeout(() => s.remove(), 1150); }
+function fxCenter(el, box){ const a = el.querySelector('img') || el, r = a.getBoundingClientRect(), b = box.getBoundingClientRect(); return [r.left - b.left + r.width / 2, r.top - b.top + r.height / 2]; }
+// plays one move: attacker sel, defender sel, the move, doMove's result, the attacker's element, and a callback for the moment it lands
+async function moveFx(aSel, dSel, mv, r, elem, onHit){
+  const A = $(aSel), D = $(dSel), box = A && A.closest('.arena');
+  let landed = false; const hit = () => { if (!landed){ landed = true; if (onHit) onHit(); } };
+  if (!A || !D || !box || !mv){ hit(); return; }
+  const col = FX_COL[elem] || '#ffd04d', calm = fxCalm();
+  [A, D, box].forEach(e => e.style.setProperty('--fxc', col));
+  const dir = fxCenter(D, box)[0] >= fxCenter(A, box)[0] ? 1 : -1;
+  if (mv.kind === 'heal'){ fxClass(A, 'fx-heal'); hit(); fxFloat(A, '+' + (r.heal || 0), 'heal'); await sleep(calm ? 200 : 600); return; }
+  if (mv.kind === 'buff'){ fxClass(A, 'fx-buff'); hit(); fxFloat(A, '⬆ Power up', 'info'); await sleep(calm ? 200 : 600); return; }
+  if (mv.kind === 'guard'){ fxClass(A, 'fx-guard', 800); hit(); fxFloat(A, '🛡️ Guard', 'info'); await sleep(calm ? 200 : 450); return; }
+  const ranged = mv.kind === 'mag' || mv.kind === 'drain';
+  if (!calm){
+    if (ranged){
+      fxClass(A, 'fx-cast', 420); await sleep(170);
+      const [x0, y0] = fxCenter(A, box), [x1, y1] = fxCenter(D, box);
+      const p = document.createElement('span'); p.className = 'fxproj'; p.textContent = (ELEMS[elem] || {}).icon || '✦'; box.appendChild(p);
+      const tf = (x, y, s, a) => 'translate(' + (x - 15) + 'px,' + (y - 15) + 'px) scale(' + s + ') rotate(' + a + 'deg)';
+      try{ await p.animate([{ transform: tf(x0, y0, .5, 0), opacity: .4 }, { transform: tf((x0 + x1) / 2, Math.min(y0, y1) - 36, 1.25, dir * 180), opacity: 1, offset: .5 }, { transform: tf(x1, y1, 1, dir * 360), opacity: 1 }], { duration: 400, easing: 'ease-in' }).finished; }catch{ await sleep(400); }
+      p.remove();
+    } else { fxClass(A, dir > 0 ? 'fx-lunge-r' : 'fx-lunge-l', 420); await sleep(150); }
+  }
+  if (r.miss){ D.style.setProperty('--dodge', (dir * 18) + 'px'); fxClass(D, 'fx-dodge', 500); fxFloat(D, 'MISS', 'miss'); hit(); await sleep(calm ? 200 : 480); return; }
+  if (!calm){
+    const [x1, y1] = fxCenter(D, box), b = document.createElement('span');
+    b.className = ranged ? 'fxburst' : 'fxslash'; if (!ranged) b.innerHTML = '<i></i><i></i><i></i>';
+    b.style.left = x1 + 'px'; b.style.top = y1 + 'px'; box.appendChild(b); setTimeout(() => b.remove(), 650);
+  }
+  fxClass(D, 'fx-hurt', 480); hit();
+  fxFloat(D, (r.crit ? 'CRIT ' : '') + '-' + (r.dmg || 0), r.crit ? 'crit' : '');
+  if (r.am > 1) setTimeout(() => fxFloat(D, 'Super effective!', 'info'), 140); else if (r.am < 1) setTimeout(() => fxFloat(D, 'Not very effective', 'info dim'), 140);
+  if (mv.kind === 'drain' && r.heal) fxFloat(A, '+' + r.heal, 'heal');
+  if (r.crit && !calm){ fxClass(box.closest('.sheet'), 'fx-shake', 450); const f = document.createElement('span'); f.className = 'fxflash'; box.appendChild(f); setTimeout(() => f.remove(), 320); }
+  await sleep(calm ? 260 : 560);
 }
 
 // ----- difficulty: tougher foes, bigger rewards -----
@@ -1940,23 +2053,22 @@ async function battle(diff, opts){
           const im = $('#fMe img'); if (im){ delete im.dataset.orig; delete im.dataset.mode; im.src = f.image; }
           hitFx('#fMe'); log(p.name + ' changed into ' + f.name + '! ATK, INT, DEF and SPD rose.'); draw(); await sleep(1100); continue;
         }
-        const r = doMove(me, foe, me.moves[+choice]);
-        if (r.dmg) hitFx('#fFoe');
-        log(r.text);
+        const mv = me.moves[+choice], r = doMove(me, foe, mv);
+        log(r.text); await moveFx('#fMe', '#fFoe', mv, r, me.elem, draw);
       } else {
         await sleep(350);
-        const r = doMove(foe, me, foeChoice(foe, me));
-        if (r.dmg) hitFx('#fMe');
-        log(r.text);
+        const mv = foeChoice(foe, me), r = doMove(foe, me, mv);
+        log(r.text); await moveFx('#fFoe', '#fMe', mv, r, foe.elem, draw);
       }
       draw();
-      await sleep(autoOn ? 650 : 1000);
+      await sleep(autoOn ? 300 : 550);
       if (foe.hp <= 0) outcome = 'win'; else if (me.hp <= 0) outcome = 'lose';
     }
     // a little SP comes back every round
     if (!outcome) for (const f of [me, foe]) f.sp = Math.min(f.st.sp, f.sp + 1);
   }
   if (!outcome) outcome = me.hp / me.st.hp >= foe.hp / foe.st.hp ? 'win' : 'lose';
+  { const ko = outcome === 'win' && foe.hp <= 0 ? $('#fFoe') : outcome === 'lose' && me.hp <= 0 ? $('#fMe') : null; if (ko) ko.classList.add('fx-ko'); }
   if (opts.onDone){
     if (opts.carry){ opts.carry.hp = me.hp; opts.carry.sp = me.sp; opts.carry.max = me.st.hp; }
     if (outcome === 'win'){ bump('wins'); questProgress('win'); addBond(p, 1); }
@@ -3365,7 +3477,7 @@ function updateTrainerBadge(){
 function trainerScreen(tab, msg){
   tab = tab || (tamerInit().pts ? 'tamer' : dailyReady() ? 'daily' : 'ach');
   busy = true;
-  const tabs = [['tamer', 'Tamer'], ['daily', 'Daily'], ['ach', 'Achievements'], ['col', 'Collection'], ['titles', 'Titles'], ['alerts', '🔔 Alerts'], ['backup', 'Backup']];
+  const tabs = [['tamer', 'Tamer'], ['daily', 'Daily'], ['ach', 'Achievements'], ['col', 'Collection'], ['titles', 'Titles'], ['alerts', '🔔 Alerts'], ['backup', '☁️ Backup']];
   let body = '';
   if (tab === 'tamer'){ body = tamerBody(); G.tamerNote = ''; }
   else if (tab === 'daily'){
@@ -3392,7 +3504,7 @@ function trainerScreen(tab, msg){
   } else if (tab === 'alerts'){ body = alertsBody();
   } else {
     const last = G.lastBackup ? new Date(G.lastBackup).toLocaleString() : 'never';
-    body = '<p class="ownline">Your save lives only on this device. Copy this code somewhere safe (Notes, a message to yourself) and paste it back here to restore your game or move it to another device. Last backup: ' + esc(last) + '.</p>' +
+    body = cloudBody() + '<h5 class="lockh">Backup code</h5><p class="ownline">You can also keep an offline copy. Copy this code somewhere safe (Notes, a message to yourself) and paste it back here to restore your game or move it to another device. Last backup: ' + esc(last) + '.</p>' +
       '<button class="big" id="bkMake">Make a backup code</button><textarea id="bkOut" class="bkbox" readonly hidden></textarea><div class="bkrow" id="bkBtns" hidden><button class="act" id="bkCopy">Copy code</button><button class="act" id="bkFile">Save as file</button></div>' +
       '<h5 class="lockh">Restore from a code</h5><textarea id="bkIn" class="bkbox" placeholder="Paste a save code (starts with DXSAVE1:)"></textarea><button class="act" id="bkLoad">Restore this save</button>' +
       '<p class="ownline">Restoring replaces everything on this device with the saved game.</p>';
@@ -3403,7 +3515,7 @@ function trainerScreen(tab, msg){
   const again = m => { updateTrainerBadge(); updateCount(); trainerScreen(tab, m); };
   $('#trClose').onclick = () => { closeOv(); updateTrainerBadge(); if (state.tab === 'partner') renderPartner(); };
   $('#overlay').querySelectorAll('[data-tt]').forEach(b => b.onclick = () => trainerScreen(b.dataset.tt));
-  tamerHandlers(again); alertsHandlers(again);
+  tamerHandlers(again); alertsHandlers(again); cloudHandlers(again);
   const dc = $('#dailyClaim'); if (dc) dc.onclick = () => { const r = claimDaily(); if (r) again('Day ' + r.s + ' claimed: ' + rewardLine(r.r.data, r.r.item) + '!'); };
   $('#overlay').querySelectorAll('[data-ach]').forEach(b => b.onclick = () => { const a = ACH.find(x => x.id === b.dataset.ach); if (!a || !achDone(a) || (G.achClaimed || {})[a.id]) return;
     G.achClaimed = G.achClaimed || {}; G.achClaimed[a.id] = true; G.data += a.data; grantItem(a.item); if (!G.title) G.title = a.name; saveGame(); paintTitle(); again('Unlocked “' + a.name + '”: ' + rewardLine(a.data, a.item) + '!'); });
@@ -4129,7 +4241,7 @@ async function netSync(){
   const O = onl(); if (!O.name) return;
   const N = await net(), F = N.F, p = P();
   await F.setDoc(F.doc(N.db, 'users', N.uid), jclean({ name: O.name, code: myCode(N.uid), title: titleOf() || '', tamerLv: (G.tamer && G.tamer.lv) || 1, found: foundCount(),
-    bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0,
+    bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0, pvp: (G.stats && G.stats.pvpWins) || 0,
     partner: p ? { id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1 } : null, team: teamSnap() }));
   O.synced = Date.now(); saveGame();
 }
@@ -4161,6 +4273,7 @@ async function onlineView(msg){
     const N = await net();
     const cd = $('#onlCode'); if (cd) cd.textContent = 'Friend code ' + myCode(N.uid);
     if (!O.synced || Date.now() - O.synced > 60000) netSync().catch(() => {});
+    duelListen().catch(() => {});
     const body = $('#onlBody'); if (!body) return;
     if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else await viewFriends(body);
   }catch(e){
@@ -4171,7 +4284,7 @@ async function onlineView(msg){
 }
 
 // ----- leaderboards -----
-var BOARDS = [['tamerLv', '⭐ Tamer level'], ['found', '📖 Digimon found'], ['bestStreak', '🔥 Win streak'], ['colo', '🏟️ Colosseum']];
+var BOARDS = [['tamerLv', '⭐ Tamer level'], ['found', '📖 Digimon found'], ['bestStreak', '🔥 Win streak'], ['colo', '🏟️ Colosseum'], ['pvp', '⚡ Live wins']];
 const boardVal = (k, v) => k === 'colo' ? (v ? COLO[Math.min(v, COLO.length) - 1].name : '—') : (v || 0).toLocaleString();
 async function viewRanks(el){
   const N = await net(), F = N.F, k = state.onlBoard || 'tamerLv';
@@ -4337,9 +4450,10 @@ async function viewFriends(el){
     '<div class="lbs">' + (docs.filter(Boolean).length ? docs.map((f, i) => !f ? '' : '<div class="tcard">' + (f.partner && f.partner.image ? '<img alt="" src="' + esc(f.partner.image) + '">' : '<span></span>') +
       '<div><b>' + esc(f.name) + '</b><small>' + (f.title ? '★ ' + esc(f.title) + ' · ' : '') + 'Tamer Lv ' + (f.tamerLv || 1) + ' · ' + (f.found || 0) + ' found</small>' +
       '<small>' + (f.team || []).map(m => esc(m.name) + ' Lv ' + m.level).join(', ') + '</small></div>' +
-      '<div class="fbtns">' + (f.team || []).map((m, j) => '<button class="act" data-fbat="' + i + ':' + j + '">⚔️ ' + esc(m.name) + '</button>').join('') + '<button class="ghost" data-fdel="' + i + '">Remove</button></div></div>').join('')
+      '<div class="fbtns"><button class="act flive" data-flive="' + i + '">⚡ Live battle<small>Real-time vs ' + esc(f.name) + '</small></button>' + (f.team || []).map((m, j) => '<button class="act" data-fbat="' + i + ':' + j + '">⚔️ ' + esc(m.name) + '</button>').join('') + '<button class="ghost" data-fdel="' + i + '">Remove</button></div></div>').join('')
       : '<p class="ownline">No friends yet. Swap friend codes and add each other!</p>') + '</div>' +
-    '<p class="ownline">Battles use your friend\'s real team (stats and moves from the last time they were online). The first win against each friend every day gives +60 DigiData.</p>';
+    '<p class="ownline">⚡ Live battle: challenge a friend who has the game open. You each pick a move every turn (' + DUEL_TURN + ' seconds) with your current partners. Wins give +40 DigiData, and your first win against each friend every day gives +100 more.</p>' +
+    '<p class="ownline">⚔️ Practice battles (the other buttons) use your friend\'s real team (stats and moves from the last time they were online). The first win against each friend every day gives +60 DigiData.</p>';
   $('#fCopy').onclick = async () => { try{ await navigator.clipboard.writeText(myCode(N.uid)); onlSay('Friend code copied.'); }catch{ onlSay('Your code: ' + myCode(N.uid)); } };
   $('#fAdd').onclick = async () => {
     const code = String($('#fCode').value || '').trim().toUpperCase(); if (code.length < 8){ onlSay('Friend codes are 8 characters.'); return; }
@@ -4351,6 +4465,7 @@ async function viewFriends(el){
       O.friends.push({ uid: d.id, name: d.data().name }); saveGame(); onlineView('Added ' + d.data().name + ' as a friend!');
     }catch(e){ onlSay(netErr(e)); }
   };
+  el.querySelectorAll('[data-flive]').forEach(b => b.onclick = () => { const f = docs[+b.dataset.flive]; if (f) duelChallenge(f.uid, f.name); });
   el.querySelectorAll('[data-fdel]').forEach(b => b.onclick = () => {
     if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap to remove'; return; }
     O.friends.splice(+b.dataset.fdel, 1); saveGame(); onlineView();
@@ -4369,6 +4484,392 @@ async function viewFriends(el){
     } });
   });
 }
+
+// ================= CLOUD SAVE: your game backed up online under a secret recovery code =================
+// The recovery code is the key to the save: anyone with it can restore the game, so it is long and random.
+var CLOUD_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function cloudInit(){ if (!G.cloud) G.cloud = { on: false, key: '', last: 0, seen: 0 }; return G.cloud; }
+function cloudDev(){ let d = store.get('dx_dev', ''); if (!d){ d = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); store.set('dx_dev', d); } return d; }
+function cloudNewKey(){ const a = new Uint32Array(16); crypto.getRandomValues(a); let s = ''; for (let i = 0; i < 16; i++) s += CLOUD_ABC[a[i] % 32]; return s; }
+const cloudPretty = k => String(k || '').replace(/(.{4})(?=.)/g, '$1-');
+const cloudClean = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const b64 = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+// squeeze the backup code with gzip when the browser can (saves are mostly repeated keys, so this shrinks them a lot)
+async function cloudPack(code){
+  if (typeof CompressionStream === 'undefined') return code;
+  try{ const z = await new Response(new Blob([code]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer(); return 'DXZ1:' + b64(new Uint8Array(z)); }catch{ return code; }
+}
+async function cloudUnpack(s){
+  if (!String(s).startsWith('DXZ1:')) return s;
+  if (typeof DecompressionStream === 'undefined') throw new Error('This browser is too old to open that cloud save.');
+  return await new Response(new Blob([unb64(s.slice(5))]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+}
+var cloudBusy = false, cloudHash = '';
+const cloudSig = () => { let s = ''; try{ s = localStorage.getItem('dx_game_v1') || ''; }catch{} let h = 0; for (let i = 0; i < s.length; i += 7) h = (h * 31 + s.charCodeAt(i)) | 0; return s.length + ':' + h; };
+// upload this device's game; refuses (unless forced) when another device saved something newer
+async function cloudPush(force){
+  const C = cloudInit(); if (!C.on || !C.key || cloudBusy) return { skipped: true };
+  cloudBusy = true;
+  try{
+    const N = await net(), F = N.F, ref = F.doc(N.db, 'cloud', C.key);
+    if (!force){
+      const cur = await F.getDoc(ref);
+      if (cur.exists()){ const r = cur.data(); if (r.dev !== cloudDev() && (r.at || 0) > (C.seen || 0)){ C.conflict = { at: r.at, name: r.name || '', lv: r.lv || 1, found: r.found || 0 }; saveGame(); return { conflict: C.conflict }; } }
+    }
+    const at = Date.now(); C.last = at; C.seen = at; C.conflict = null; saveGame();
+    const d = await cloudPack(makeBackup());
+    if (d.length > 950000) throw new Error('Your save is too big for the cloud (' + Math.round(d.length / 1024) + ' KB).');
+    const p = P();
+    await F.setDoc(ref, { d, at, dev: cloudDev(), v: 1, name: (G.online && G.online.name) || (p ? p.name : ''), lv: (G.tamer && G.tamer.lv) || 1, found: foundCount(), partner: p ? p.name : '' });
+    cloudHash = cloudSig();
+    return { ok: true, at, kb: Math.round(d.length / 1024) };
+  } finally { cloudBusy = false; }
+}
+async function cloudFetch(key){
+  const N = await net(), F = N.F, s = await F.getDoc(F.doc(N.db, 'cloud', key));
+  if (!s.exists()) throw new Error('No cloud save found with that code.');
+  return s.data();
+}
+async function cloudRestore(key, r){
+  const o = readBackup(await cloudUnpack(r.d));
+  for (const k of SAVE_KEYS){ try{ localStorage.removeItem(k); }catch{} }
+  for (const [k, v] of Object.entries(o.keys)) if (SAVE_KEYS.includes(k)){ try{ localStorage.setItem(k, v); }catch{} }
+  // keep backing up to the same code from this device
+  try{ const g = JSON.parse(localStorage.getItem('dx_game_v1')); g.cloud = Object.assign(g.cloud || {}, { on: true, key, seen: r.at || Date.now(), conflict: null }); localStorage.setItem('dx_game_v1', JSON.stringify(g)); }catch{}
+  location.reload();
+}
+// quiet automatic backups: when you leave the app, and every few minutes while you play if anything changed
+function cloudAuto(){ const C = cloudInit(); if (!C.on || !navigator.onLine) return; if (cloudSig() === cloudHash && Date.now() - (C.last || 0) < 6 * 3600e3) return; cloudPush(false).catch(() => {}); }
+document.addEventListener('visibilitychange', () => { if (document.hidden) cloudAuto(); });
+setInterval(cloudAuto, 5 * 60000);
+setTimeout(cloudAuto, 20000);
+
+function cloudBody(){
+  const C = cloudInit(), when = t => t ? new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never';
+  const conflict = C.on && C.conflict ? '<div class="cloudwarn"><b>⚠️ A newer save is in the cloud</b><span>Another device backed up ' + esc(C.conflict.name || 'a game') + ' (Tamer Lv ' + C.conflict.lv + ', ' + C.conflict.found + ' found) on ' + esc(when(C.conflict.at)) + '. Auto-backup is paused so it doesn\'t get overwritten.</span><div class="bkrow"><button class="act" id="clTake">Load that save</button><button class="ghost" id="clKeep">Keep this device\'s game</button></div></div>' : '';
+  return '<div class="cloudcard' + (C.on ? ' on' : '') + '"><div class="cloudhead"><span class="cloudico">☁️</span><div><b>Cloud save</b><small>' + (C.on ? 'On · last backup ' + esc(when(C.last)) : 'Off · your game only lives on this device') + '</small></div></div>' +
+    (C.on ? '<div class="cloudkey"><small>Your recovery code</small><b id="clKey">' + esc(cloudPretty(C.key)) + '</b><button class="favbtn" id="clCopy">Copy</button></div>' +
+      '<p class="ownline">Your game backs up automatically when you leave the app and every few minutes while you play. To move to a new phone or get your game back, enter this code under “Restore from the cloud”. Keep it secret: anyone with it can load your game.</p>' +
+      '<div class="bkrow"><button class="act" id="clNow">Back up now</button><button class="ghost" id="clOff">Turn off</button></div>'
+      : '<p class="ownline">Back up your game online so it\'s safe if your phone\'s storage gets cleared, and so you can move it to another device. You\'ll get a recovery code to keep.</p><button class="big" id="clOn">Turn on cloud save</button>') +
+    conflict +
+    '<h5 class="lockh">Restore from the cloud</h5><div class="bkrow"><input id="clIn" class="onlin" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX"><button class="act" id="clLoad">Find save</button></div><div id="clFound"></div></div>';
+}
+function cloudHandlers(again){
+  const C = cloudInit(), msg = t => { const m = $('#trMsg'); if (m) m.textContent = t; };
+  const on = $('#clOn'); if (on) on.onclick = async () => {
+    on.disabled = true; msg('Connecting…');
+    C.on = true; if (!C.key) C.key = cloudNewKey(); saveGame();
+    try{ const r = await cloudPush(false); if (r.conflict){ again('That code already has a newer save on it.'); return; } again('☁️ Cloud save is on (' + r.kb + ' KB). Write down or screenshot your recovery code!'); }
+    catch(e){ C.on = false; saveGame(); on.disabled = false; msg(e.code ? netErr(e) : e.message); }
+  };
+  const now = $('#clNow'); if (now) now.onclick = async () => {
+    now.disabled = true; msg('Backing up…');
+    try{ const r = await cloudPush(false); again(r.conflict ? 'Another device saved something newer. Pick which game to keep below.' : r.skipped ? 'A backup is already running.' : 'Backed up (' + r.kb + ' KB).'); }
+    catch(e){ now.disabled = false; msg(e.code ? netErr(e) : e.message); }
+  };
+  const off = $('#clOff'); if (off) off.onclick = () => {
+    if (!off.dataset.armed){ off.dataset.armed = '1'; off.textContent = 'Tap again to stop backing up'; return; }
+    C.on = false; saveGame(); again('Cloud save is off. Your last backup stays online, and your code still restores it.');
+  };
+  const cp = $('#clCopy'); if (cp) cp.onclick = async () => { try{ await navigator.clipboard.writeText(cloudPretty(C.key)); msg('Recovery code copied. Keep it somewhere safe.'); }catch{ msg('Your recovery code: ' + cloudPretty(C.key)); } };
+  const keep = $('#clKeep'); if (keep) keep.onclick = async () => {
+    if (!keep.dataset.armed){ keep.dataset.armed = '1'; keep.textContent = 'Tap again to overwrite the cloud save'; return; }
+    try{ await cloudPush(true); again('This device\'s game is now the cloud save.'); }catch(e){ msg(e.code ? netErr(e) : e.message); }
+  };
+  const take = $('#clTake'); if (take) take.onclick = async () => {
+    if (!take.dataset.armed){ take.dataset.armed = '1'; take.textContent = 'Tap again to replace this device\'s game'; return; }
+    try{ msg('Loading…'); await cloudRestore(C.key, await cloudFetch(C.key)); }catch(e){ msg(e.code ? netErr(e) : e.message); }
+  };
+  const ld = $('#clLoad'); if (ld) ld.onclick = async () => {
+    const key = cloudClean($('#clIn').value), box = $('#clFound');
+    if (key.length !== 16){ msg('Recovery codes are 16 letters and numbers.'); return; }
+    ld.disabled = true; msg('Looking for your save…');
+    try{
+      const r = await cloudFetch(key);
+      box.innerHTML = '<div class="cloudfound"><b>' + esc(r.name || 'Saved game') + '</b><small>Tamer Lv ' + (r.lv || 1) + ' · ' + (r.found || 0) + ' found' + (r.partner ? ' · partner ' + esc(r.partner) : '') + '</small><small>Saved ' + esc(new Date(r.at).toLocaleString()) + '</small><button class="act" id="clUse">Restore this game</button></div>';
+      msg('Found it! Restoring replaces everything on this device.');
+      $('#clUse').onclick = async e => { const b = e.currentTarget; if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap again to replace this device\'s game'; return; } b.disabled = true; msg('Restoring…'); try{ await cloudRestore(key, r); }catch(err){ b.disabled = false; msg(err.message); } };
+    }catch(e){ msg(e.code ? netErr(e) : e.message); }
+    ld.disabled = false;
+  };
+}
+
+// ================= LIVE BATTLES: real-time, turn-by-turn fights against a friend =================
+// Both phones replay the same moves with the same random seed, so they always agree on what happened.
+var DUEL_V = 1, DUEL_TURN = 40, DUEL_WAIT = 120;   // rules version, seconds to pick a move, seconds an invite stays open
+var duelSess = null, duelInvUnsub = null, duelInvSeen = {};
+function duelRng(seed){ let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// your partner as it fights: stats, moves and perks, frozen when the battle starts
+async function duelFighter(){
+  const p = P(); let d = null; try{ d = await getDetail(p.id); }catch{}
+  await syncMoves(p);
+  const f = applyPerks(fighter(p.name, p.image, partnerStats(p), mainAttr(d), partnerMoves(p), p.mood), p);
+  return jclean({ id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1, st: f.st, attr: f.attr, elem: elemOf(d),
+    moves: f.moves.map(m => ({ name: m.name, kind: m.kind, power: m.power || 0, cost: m.cost || 0, desc: m.desc || '' })),
+    crit: f.critBonus || 0, tdm: f.tdm || 1, ttk: f.ttk || 1, endure: Math.min(1, f.endureChance || 0), noStatus: !!f.noStatus });
+}
+function duelUnit(s){
+  s = s || {}; const st = {}; STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round(+((s.st || {})[k]) || 1)));
+  const moves = (s.moves || []).filter(m => m && m.name).slice(0, 6); if (!moves.length) moves.push(Object.assign({ cost: 0 }, BASIC), GUARD);
+  return { name: s.name || '?', image: s.image || '', st, hp: st.hp, sp: st.sp, attr: s.attr || 'Free', elem: s.elem || 'beast', moves, critBonus: +s.crit || 0, tdm: +s.tdm || 1, ttk: +s.ttk || 1, endureChance: +s.endure || 0, noStatus: !!s.noStatus, guard: false, buff: 1, status: null };
+}
+function duelStatus(u, R){
+  const s = u.status; if (!s) return { skip: false, text: '' };
+  if (s.k === 'slp'){ s.t--; if (s.t <= 0){ u.status = null; return { skip: false, text: u.name + ' woke up!' }; } return { skip: true, text: u.name + ' is fast asleep…' }; }
+  if (s.k === 'par'){ s.t--; const stuck = R() < 0.3; if (s.t <= 0) u.status = null; return { skip: stuck, text: stuck ? u.name + ' is paralyzed and can\'t move!' : '' }; }
+  const d = Math.max(1, Math.round(u.st.hp / 12)); u.hp = Math.max(0, u.hp - d); s.t--; if (s.t <= 0) u.status = null;
+  return { skip: false, text: u.name + ' is hurt by poison (' + d + ').' };
+}
+// the same damage rules as normal battles, minus local weather and time of day (which differ between phones)
+function duelMove(att, def, mv, R){
+  if (mv.kind === 'heal'){ att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h); return { text: att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.', heal: h }; }
+  if (mv.kind === 'buff'){ att.sp -= mv.cost || 0; att.buff = Math.min(1.9, (att.buff || 1) * mv.power); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' }; }
+  if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: att.name + ' guards and recovers ' + g + ' SP.' }; }
+  att.sp -= mv.cost || 0;
+  const evade = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012));
+  if (R() < evade) return { text: att.name + ' used ' + mv.name + '… but ' + def.name + ' dodged!', miss: true };
+  const crit = R() < Math.max(0.04, Math.min(0.33, 0.06 + (att.critBonus || 0) + (att.st.spd - def.st.spd) * 0.01));
+  const em = elemMult(att.elem, def.elem), am = attrMult(att.attr, def.attr) * em;
+  const phys = mv.kind === 'phys' || mv.kind === 'atk', aStat = phys ? att.st.atk : att.st.int;
+  const defFactor = 1.35 * (2 * aStat) / (2 * aStat + (def.st.def || 0));
+  const dmg = Math.max(1, Math.round(aStat * (mv.power || 1) * (att.buff || 1) * defFactor * (0.85 + R() * 0.3) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1) * (att.tdm || 1) * (def.ttk || 1)));
+  def.hp = Math.max(0, def.hp - dmg);
+  let text = att.name + ' used ' + mv.name + '! ' + dmg + ' damage.', heal = 0;
+  if (mv.kind === 'drain'){ heal = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + heal); text += ' Drained ' + heal + ' HP.'; }
+  if (crit) text += ' Critical hit!';
+  if (am > 1) text += ' Super effective!'; else if (am < 1) text += ' Not very effective…';
+  if (def.guard) text += ' (guarded)';
+  if (def.hp <= 0 && def.endureChance && !def.endured && R() < def.endureChance){ def.hp = 1; def.endured = true; text += ' ' + def.name + ' hung on with 1 HP!'; }
+  if (def.status && def.status.k === 'slp' && def.hp > 0){ def.status = null; text += ' ' + def.name + ' woke up!'; }
+  const sk = moveStatus(mv);
+  if (sk && def.hp > 0 && !def.status && !def.noStatus && R() < 0.3){ def.status = { k: sk, t: sk === 'slp' ? 1 + Math.floor(R() * 3) : sk === 'par' ? 3 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
+  return { text, dmg, crit, am, heal };
+}
+// replay every turn both players have picked a move for
+function duelSim(D){
+  const A = duelUnit(D.teamA), B = duelUnit(D.teamB), R = duelRng(D.seed), mA = D.mA || {}, mB = D.mB || {}, turns = [];
+  const snap = () => ({ hp: [A.hp, B.hp], sp: [A.sp, B.sp], ss: [A.status ? A.status.k : '', B.status ? B.status.k : ''] });
+  let out = null, t = 1;
+  while (!out && t <= 40 && mA[t] != null && mB[t] != null){
+    const ev = [];
+    if (+mA[t] < 0 || +mB[t] < 0){ const quit = +mA[t] < 0 ? A : B; out = quit === A ? 'B' : 'A'; ev.push(Object.assign({ text: quit.name + '\'s Tamer gave up.' }, snap())); turns.push(ev); break; }
+    const order = A.st.spd > B.st.spd || (A.st.spd === B.st.spd && R() < 0.5) ? [A, B] : [B, A];
+    for (const u of order){
+      const side = u === A ? 'A' : 'B', o = u === A ? B : A;
+      u.guard = false;
+      const s = duelStatus(u, R);
+      if (s.text) ev.push(Object.assign({ side, text: s.text }, snap()));
+      if (A.hp <= 0 || B.hp <= 0) break;
+      if (s.skip) continue;
+      let mv = u.moves[+(side === 'A' ? mA : mB)[t]] || u.moves[0];
+      if ((mv.cost || 0) > u.sp) mv = u.moves[0];
+      const r = duelMove(u, o, mv, R);
+      ev.push(Object.assign({ side, mv, r, text: r.text }, snap()));
+      if (A.hp <= 0 || B.hp <= 0) break;
+    }
+    if (A.hp <= 0 || B.hp <= 0) out = A.hp > 0 ? 'A' : 'B';
+    else { A.sp = Math.min(A.st.sp, A.sp + 1); B.sp = Math.min(B.st.sp, B.sp + 1); }
+    turns.push(ev); t++;
+  }
+  if (!out && t > 40) out = A.hp / A.st.hp >= B.hp / B.st.hp ? 'A' : 'B';
+  return { A, B, turns, out, next: t };
+}
+
+// ----- starting, accepting and leaving a battle -----
+async function duelChallenge(fuid, fname){
+  const p = P(), O = onl(); if (!p){ onlSay('You need a partner Digimon to battle.'); return; }
+  if (busy) return;
+  busy = true; openOv('<h4>⚡ Live battle</h4><div class="status">Getting ' + esc(p.name) + ' ready…</div>');
+  try{
+    const N = await net(), F = N.F, team = await duelFighter();
+    const ref = await F.addDoc(F.collection(N.db, 'duels'), { a: N.uid, aName: O.name, b: fuid, bName: fname, status: 'invite', v: DUEL_V, seed: Math.floor(Math.random() * 4294967296) >>> 0, created: Date.now(), teamA: team, mA: {}, mB: {} });
+    await duelView(ref.id, 'A');
+  }catch(e){ duelGone(null, netErr(e)); }
+}
+async function duelAccept(inv){
+  const el = $('#duelInv'), note = t => { const s = el && el.querySelector('small'); if (s) s.textContent = t; };
+  if (!P()){ note('You need a partner Digimon to battle.'); return; }
+  if ((inv.v || 0) !== DUEL_V){ note('You\'re on different versions. Both of you: close the app fully and reopen it.'); return; }
+  if (busy){ note('Finish what you\'re doing first, then tap Accept.'); return; }
+  duelInvSeen[inv.id] = 1; if (el) el.remove();
+  busy = true; openOv('<h4>⚡ Live battle</h4><div class="status">Joining ' + esc(inv.aName) + '\'s battle…</div>');
+  try{
+    const N = await net(), F = N.F, team = await duelFighter();
+    await F.updateDoc(F.doc(N.db, 'duels', inv.id), { status: 'live', teamB: team, acceptedAt: Date.now() });
+    await duelView(inv.id, 'B');
+  }catch(e){ duelGone(null, /not-found|No document/.test(String(e && (e.code || e.message))) ? inv.aName + ' cancelled the battle.' : netErr(e)); }
+}
+async function duelView(id, side){
+  const N = await net(), F = N.F, ref = F.doc(N.db, 'duels', id);
+  duelEnd(); busy = true;
+  const S = duelSess = { id, side, ref, F, shown: 0, built: false, queue: Promise.resolve(), D: null, sim: null, timer: null };
+  S.unsub = F.onSnapshot(ref, snap => {
+    if (duelSess !== S) return;
+    if (!snap.exists()){ if (!S.finished) duelGone(S, S.side === 'A' ? 'The battle was cancelled.' : 'Your friend cancelled the battle.'); return; }
+    S.D = snap.data(); S.queue = S.queue.then(() => duelSess === S && duelStep(S)).catch(e => console.warn('duel', e));
+  }, e => { if (duelSess === S) duelGone(S, netErr(e)); });
+}
+function duelEnd(){ const S = duelSess; if (!S) return; duelSess = null; try{ S.unsub && S.unsub(); }catch{} clearInterval(S.timer); }
+function duelGone(S, text){
+  if (!S || duelSess === S) duelEnd();
+  const sh = $('#overlay .sheet'); if (!sh) return;
+  sh.innerHTML = '<h4>⚡ Live battle</h4><p style="margin:0">' + esc(text) + '</p><button class="big" id="duBack">Back</button>';
+  $('#duBack').onclick = () => { closeOv(); if (state.tab === 'world' && state.worldSub === 'online') renderWorld('online'); };
+}
+const duelThem = S => S.side === 'A' ? S.D.bName : S.D.aName;
+const duelSel = (S, side) => side === S.side ? '#fMe' : '#fFoe';
+
+// ----- one update from the server: wait, play new turns, then ask for the next move -----
+async function duelStep(S){
+  if (S.finished) return;
+  const D = S.D, them = duelThem(S);
+  if ((D.v || 0) !== DUEL_V){ duelGone(S, 'You and ' + them + ' are on different versions of the game. Both of you: close the app fully and reopen it, then try again.'); return; }
+  if (D.status === 'declined'){ duelGone(S, them + ' said no this time.'); return; }
+  if (D.status === 'invite'){ if (S.side === 'A' && !S.waiting) duelWaitInvite(S); return; }
+  clearInterval(S.timer); S.waiting = false;
+  const sim = duelSim(D); S.sim = sim;
+  if (!S.built) duelBuild(S);
+  while (S.shown < sim.turns.length){
+    for (const e of sim.turns[S.shown]){
+      if (duelSess !== S) return;
+      duelLog(e.text);
+      if (e.mv){ const u = e.side === 'A' ? sim.A : sim.B; await moveFx(duelSel(S, e.side), duelSel(S, e.side === 'A' ? 'B' : 'A'), e.mv, e.r, u.elem, () => duelPaint(S, e)); await sleep(500); }
+      else { duelPaint(S, e); await sleep(850); }
+    }
+    S.shown++;
+  }
+  duelPaint(S, null);
+  const winner = sim.out || (D.status === 'done' ? D.winner : null);
+  if (winner){ duelFinish(S, winner, sim.out ? (D.reason === 'timeout' ? '' : 'ko') : D.reason); return; }
+  duelControls(S, sim);
+}
+function duelLog(t){ const b = $('#blog'); if (b && t) b.textContent = t; }
+function duelBuild(S){
+  const D = S.D, mine = S.side === 'A' ? D.teamA : D.teamB, theirs = S.side === 'A' ? D.teamB : D.teamA;
+  const side = (f, id) => '<div class="fighter" id="' + id + '"><img alt="" src="' + esc(f.image) + '"><b>' + esc(f.name) + '</b><span class="attr">' + esc(f.attr || 'Free') + ' · ' + elemTag(f.elem) + '</span>' +
+    '<div class="bars"><div class="hp"><i></i></div><small class="hpt"></small><div class="hp spb"><i></i></div><small class="spt"></small></div></div>';
+  const sh = $('#overlay .sheet'); if (!sh) return;
+  sh.innerHTML = '<h4>⚡ Live vs ' + esc(duelThem(S)) + ' <span class="stage">Lv ' + (theirs.level || 1) + '</span></h4><div class="arena">' + side(mine, 'fMe') + '<div class="vs">VS</div>' + side(theirs, 'fFoe') + '</div>' +
+    '<div class="blog" id="blog" aria-live="polite">Battle start! ' + esc((S.side === 'A' ? D.teamA : D.teamB).st.spd >= (S.side === 'A' ? D.teamB : D.teamA).st.spd ? mine.name + ' is faster.' : theirs.name + ' is faster.') + '</div>' +
+    '<div class="duelbar" id="duBar"></div><div class="bact" id="bact"></div>';
+  S.built = true;
+}
+// draw both health bars, either at a moment in the replay (e) or at the current state
+function duelPaint(S, e){
+  const sim = S.sim; if (!sim) return;
+  [['A', 0], ['B', 1]].forEach(([side, i]) => {
+    const u = side === 'A' ? sim.A : sim.B, el = $(duelSel(S, side)); if (!el) return;
+    const hp = e ? e.hp[i] : u.hp, sp = e ? e.sp[i] : u.sp, ss = e ? e.ss[i] : (u.status ? u.status.k : ''), hpP = hp / u.st.hp * 100;
+    const hb = el.querySelector('.hp:not(.spb) i'); hb.style.width = hpP + '%'; hb.style.background = meterColor(hpP);
+    el.querySelector('.spb i').style.width = (sp / u.st.sp * 100) + '%';
+    el.querySelector('.hpt').textContent = 'HP ' + hp + '/' + u.st.hp; el.querySelector('.spt').textContent = 'SP ' + sp + '/' + u.st.sp;
+    el.querySelector('b').textContent = u.name + (ss ? ' ' + STATUS[ss].icon : '');
+  });
+}
+function duelWaitInvite(S){
+  const D = S.D, sh = $('#overlay .sheet'); if (!sh) return; S.waiting = true;
+  sh.innerHTML = '<h4>⚡ Live battle</h4><div class="duelwait"><img alt="" src="' + esc(D.teamA.image) + '"><div><b>Waiting for ' + esc(D.bName) + '…</b><small>They\'ll see your challenge if they have the game open. Send them a message to let them know!</small><small id="duWaitT"></small></div></div><button class="ghost" id="duCancel">Cancel</button>';
+  const cancel = async why => { clearInterval(S.timer); S.finished = true; try{ await S.F.deleteDoc(S.ref); }catch{} duelGone(S, why); };
+  $('#duCancel').onclick = () => cancel('Challenge cancelled.');
+  const tick = () => { const left = Math.max(0, DUEL_WAIT - Math.floor((Date.now() - (D.created || Date.now())) / 1000)), t = $('#duWaitT'); if (t) t.textContent = 'The challenge expires in ' + left + 's.'; if (!left) cancel(D.bName + ' didn\'t answer in time. Try again when they\'re online.'); };
+  tick(); S.timer = setInterval(tick, 1000);
+}
+function duelAutoPick(sim, S){
+  const u = S.side === 'A' ? sim.A : sim.B, o = S.side === 'A' ? sim.B : sim.A, mv = foeChoice(u, o), i = u.moves.indexOf(mv);
+  return i >= 0 ? i : 0;
+}
+async function duelSend(S, t, v){
+  if (S.sending) return; S.sending = true;
+  $('#bact').querySelectorAll('button').forEach(b => b.disabled = true);
+  try{ await S.F.updateDoc(S.ref, { ['m' + S.side + '.' + t]: v }); }
+  catch(e){ duelLog(netErr(e) + ' Try again.'); if (S.sim) duelControls(S, S.sim); }
+  S.sending = false;
+}
+function duelControls(S, sim){
+  const D = S.D, t = sim.next, them = duelThem(S), u = S.side === 'A' ? sim.A : sim.B;
+  const mineIn = (D['m' + S.side] || {})[t] != null, theirsIn = (D[S.side === 'A' ? 'mB' : 'mA'] || {})[t] != null;
+  const bact = $('#bact'), bar = $('#duBar'); if (!bact || !bar) return;
+  clearInterval(S.timer);
+  if (!mineIn){
+    if (S.pickT !== t){ S.pickT = t; S.deadline = Date.now() + DUEL_TURN * 1000; }
+    duelLog('Turn ' + t + ': what should ' + u.name + ' do?');
+    bact.innerHTML = u.moves.map((m, i) => '<button class="act" data-dmv="' + i + '"' + ((m.cost || 0) > u.sp ? ' disabled' : '') + '>' + esc(m.name) + '<small>' + esc(moveLabel(m)) + '</small></button>').join('') +
+      '<button class="act duelquit" data-dmv="-1">Give up<small>Lose this battle</small></button>';
+    bact.querySelectorAll('[data-dmv]').forEach(b => b.onclick = () => {
+      const v = +b.dataset.dmv;
+      if (v < 0 && !b.dataset.armed){ b.dataset.armed = '1'; b.firstChild.textContent = 'Tap again to give up'; return; }
+      clearInterval(S.timer); duelSend(S, t, v);
+    });
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((S.deadline - Date.now()) / 1000));
+      bar.innerHTML = '<span class="dutime' + (left <= 10 ? ' low' : '') + '"><i style="width:' + (left / DUEL_TURN * 100) + '%"></i></span><span>⏱️ ' + left + 's</span><span>' + (theirsIn ? '✅ ' + esc(them) + ' is ready' : '💭 ' + esc(them) + ' is choosing') + '</span>';
+      if (!left){ clearInterval(S.timer); duelLog('Time\'s up! ' + u.name + ' acted on its own.'); duelSend(S, t, duelAutoPick(sim, S)); }
+    };
+    tick(); S.timer = setInterval(tick, 250);
+  } else {
+    if (S.waitT !== t){ S.waitT = t; S.waitSince = Date.now(); }
+    bact.innerHTML = '<div class="status" style="padding:12px 0">Move locked in. Waiting for ' + esc(them) + '…</div>';
+    const tick = () => {
+      const w = Math.floor((Date.now() - S.waitSince) / 1000);
+      bar.innerHTML = '<span>⏳ ' + esc(them) + ' is choosing… ' + w + 's</span>';
+      if (w >= DUEL_TURN + 25 && !$('#duClaim')){
+        bact.insertAdjacentHTML('beforeend', '<button class="act" id="duClaim">Claim the win<small>' + esc(them) + ' seems to have left</small></button>');
+        $('#duClaim').onclick = async () => { try{ await S.F.updateDoc(S.ref, { status: 'done', winner: S.side, reason: 'timeout' }); }catch(e){ duelLog(netErr(e)); } };
+      }
+    };
+    tick(); S.timer = setInterval(tick, 1000);
+  }
+}
+function duelFinish(S, winner, reason){
+  clearInterval(S.timer); S.finished = true;
+  const D = S.D, won = winner === S.side, them = duelThem(S), p = P(), O = onl(), friend = S.side === 'A' ? D.b : D.a;
+  const lose = $(won ? '#fFoe' : '#fMe'); if (lose && reason !== 'timeout') lose.classList.add('fx-ko');
+  if (D.status !== 'done') S.F.updateDoc(S.ref, { status: 'done', winner, reason: reason || 'ko' }).catch(() => {});
+  G.duels = G.duels || {}; G.stats = G.stats || {};
+  let line = won ? '🏆 You beat ' + them + '!' : '😤 ' + them + ' won this time.';
+  if (reason === 'timeout') line = won ? '🏆 ' + them + ' left the battle, so you win!' : '⌛ You were away too long, so ' + them + ' wins.';
+  if (!G.duels[S.id]){
+    G.duels[S.id] = Date.now();
+    const ids = Object.keys(G.duels); if (ids.length > 60) ids.sort((a, b) => G.duels[a] - G.duels[b]).slice(0, ids.length - 60).forEach(k => delete G.duels[k]);
+    if (won){
+      let dd = 40; O.lw = O.lw || {};
+      if (O.lw[friend] !== dayKey()){ O.lw[friend] = dayKey(); dd += 100; }
+      G.data += dd; G.stats.pvpWins = (G.stats.pvpWins || 0) + 1; if (p) addBond(p, 2);
+      line += ' +' + dd + ' DigiData' + (dd > 40 ? ' (includes +100 for your first win against ' + them + ' today)' : '') + '.';
+    } else { G.data += 10; G.stats.pvpLosses = (G.stats.pvpLosses || 0) + 1; line += ' +10 DigiData for a good fight.'; }
+    saveGame(); updateCount(); netSync().catch(() => {});
+  }
+  duelLog(line);
+  const bar = $('#duBar'); if (bar) bar.innerHTML = '<span>⚔️ Live record: ' + (G.stats.pvpWins || 0) + ' wins · ' + (G.stats.pvpLosses || 0) + ' losses</span>';
+  const bact = $('#bact'); if (!bact) return;
+  bact.innerHTML = '<button class="act" id="duAgain">⚡ Rematch</button><button class="big" id="duDone">Done</button>';
+  const back = () => { duelEnd(); closeOv(); state.onlSub = 'friends'; if (state.tab === 'world' && state.worldSub === 'online') renderWorld('online'); };
+  $('#duDone').onclick = back;
+  $('#duAgain').onclick = () => { duelEnd(); closeOv(); duelChallenge(friend, them); };
+}
+
+// ----- incoming challenges pop up wherever you are in the app -----
+async function duelListen(){
+  if (duelInvUnsub || !onl().name) return;
+  const N = await net(), F = N.F;
+  duelInvUnsub = F.onSnapshot(F.query(F.collection(N.db, 'duels'), F.where('b', '==', N.uid), F.where('status', '==', 'invite')), snap => {
+    const now = Date.now(), list = snap.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(d => now - (d.created || 0) < DUEL_WAIT * 1000 && !duelInvSeen[d.id]);
+    duelBanner(list.sort((a, b) => b.created - a.created)[0] || null);
+  }, () => { duelInvUnsub = null; });
+}
+function duelBanner(inv){
+  let el = $('#duelInv');
+  if (!inv){ if (el) el.remove(); return; }
+  if (!el){ el = document.createElement('div'); el.id = 'duelInv'; el.className = 'duelinv'; el.setAttribute('role', 'alert'); document.body.appendChild(el); }
+  const tA = inv.teamA || {};
+  el.innerHTML = '<img alt="" src="' + esc(tA.image || '') + '"><div><b>⚡ ' + esc(inv.aName) + ' challenges you!</b><small>' + esc(tA.name || '') + ' · Lv ' + (tA.level || 1) + ' wants a live battle</small></div><button class="act" id="duAcc">Accept</button><button class="ghost" id="duDec" aria-label="Decline">✕</button>';
+  $('#duAcc').onclick = () => duelAccept(inv);
+  $('#duDec').onclick = async () => { duelInvSeen[inv.id] = 1; el.remove(); try{ const N = await net(); await N.F.updateDoc(N.F.doc(N.db, 'duels', inv.id), { status: 'declined' }); }catch{} };
+  clearTimeout(el._t); el._t = setTimeout(() => { if ($('#duelInv') === el){ duelInvSeen[inv.id] = 1; el.remove(); } }, Math.max(1000, DUEL_WAIT * 1000 - (Date.now() - (inv.created || 0))));
+}
+setTimeout(() => { if (onl().name) duelListen().catch(() => {}); }, 3000);
 
 setRetro(false);
 // light / dark mode: follows the phone until you pick one, then remembers it
