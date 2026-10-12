@@ -275,7 +275,11 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);gap:4px}
 .dpad button{border:1px solid var(--line);background:var(--panel);border-radius:10px;font-size:1rem;touch-action:manipulation}
 .dpad button:active{background:var(--sunk)}
-.dside{display:grid;gap:6px}
+.dside{display:grid;gap:6px;grid-template-columns:1fr 1fr}
+.dside #dgSkill{grid-column:1/-1}
+.dside #dgQuit{grid-column:1/-1}
+.dside .ghost.on{border-color:var(--accent);color:var(--accent)}
+.dside button:disabled{opacity:.45}
 .dside .act{padding:7px 6px}
 .dside .ghost{padding:7px}
 .wallet{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font:600 .74rem var(--mono);color:var(--muted)}
@@ -2095,6 +2099,37 @@ function dgReveal(){
 
 function dgLog(t){ dg.log.push(t); if (dg.log.length > 3) dg.log.shift(); const el = $('#dlog'); if (el) el.innerHTML = dg.log.map(esc).join('<br>'); }
 
+// ----- range and aiming: energy/beam moves (MAG, DRAIN) fly up to 5 tiles at any enemy in sight; physical moves hit next to you -----
+const DG_RANGE = 5;
+const dgRanged = mv => mv && (mv.kind === 'mag' || mv.kind === 'drain');
+const dgRange = mv => !mv || mv.kind === 'heal' || mv.kind === 'buff' || mv.kind === 'guard' ? 0 : dgRanged(mv) ? DG_RANGE : 1;
+// a clear straight line between two tiles: no walls and nobody standing in between
+function dgLine(ax, ay, bx, by){
+  const n = Math.max(Math.abs(bx - ax), Math.abs(by - ay));
+  for (let i = 1; i < n; i++){
+    const x = Math.round(ax + (bx - ax) * i / n), y = Math.round(ay + (by - ay) * i / n);
+    if (!dgFloor(x, y) || dgUnitAt(x, y)) return false;
+  }
+  return true;
+}
+const dgDist = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+// enemies a unit could hit with a move, nearest first
+function dgTargets(u, mv, seenOnly){
+  const r = dgRange(mv); if (!r) return [];
+  return dg.enemies.filter(e => (!seenOnly || dgVisible(e.x, e.y)) && (r === 1 ? Math.abs(e.x - u.x) + Math.abs(e.y - u.y) === 1 : dgDist(u, e) <= r && dgLine(u.x, u.y, e.x, e.y)))
+    .sort((a, b) => (Math.abs(a.x - u.x) + Math.abs(a.y - u.y)) - (Math.abs(b.x - u.x) + Math.abs(b.y - u.y)));
+}
+// is an enemy roughly in the direction a unit faces? (the bigger of the two offsets decides)
+function dgInDir(u, e, dir){ const dx = e.x - u.x, dy = e.y - u.y; return Math.abs(dx) >= Math.abs(dy) ? dir[1] === 0 && Math.sign(dx) === dir[0] : dir[0] === 0 && Math.sign(dy) === dir[1]; }
+// face toward a tile (the bigger of the two directions wins)
+function dgFaceTo(u, t){ const dx = t.x - u.x, dy = t.y - u.y; u.face = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? DIRS.right : DIRS.left) : (dy > 0 ? DIRS.down : DIRS.up); }
+// the target the next attack will go for: the one you picked if it's still in reach, else whatever you're facing, else the nearest
+function dgAim(m, mv){
+  const ts = dgTargets(m, mv, true); if (!ts.length) return null;
+  if (dg.tgt && ts.includes(dg.tgt)) return dg.tgt;
+  const ahead = ts.find(e => dgInDir(m, e, m.face));
+  return ahead || ts[0];
+}
 function dgHit(att, def, mv){
   const r = doMove(att, def, mv);
   dgLog(r.text);
@@ -2123,6 +2158,7 @@ function dgDown(u, by){
 function dgAct(action, dir){
   if (!dg || dg.over || dg.busy) return;
   const m = dg.me;
+  if (action === 'move' && dg.turnMode){ m.face = dir; dg.tgt = dgTargets(m, m.moves[dg.sel] || m.moves[0], true).find(e => dgInDir(m, e, dir)) || null; dgDraw(); return; }
   m.guard = false;
   if (m.status){
     const stt = statusTurn(m); if (stt.text) dgLog(stt.text);
@@ -2146,13 +2182,10 @@ function dgAct(action, dir){
     if ((mv.cost || 0) > m.sp){ dgLog('Not enough SP for ' + mv.name + '.'); return; }
     if (mv.kind === 'heal' || mv.kind === 'buff' || mv.kind === 'guard') dgHit(m, m, mv);
     else {
-      let target = null; const range = mv.cost ? 4 : 1;
-      for (let k = 1; k <= range; k++){
-        const x = m.x + m.face[0] * k, y = m.y + m.face[1] * k;
-        if (!dgFloor(x, y)) break;
-        const u = dgUnitAt(x, y); if (u && !dgIsMate(u)){ target = u; break; }
-      }
-      if (target) dgHit(m, target, mv); else { m.sp -= mv.cost || 0; dgLog(m.name + ' used ' + mv.name + ', but hit nothing.'); }
+      const target = dgAim(m, mv);
+      if (!target){ dgLog(dgRanged(mv) ? 'No enemy in sight within ' + DG_RANGE + ' tiles for ' + mv.name + '.' : 'No enemy next to ' + m.name + ' for ' + mv.name + '. Try a ranged move.'); dgDraw(); return; }
+      dgFaceTo(m, target); dg.tgt = target;
+      dgHit(m, target, mv);
     }
   } else if (action === 'meat'){
     if (!dg.bag.meat) return;
@@ -2189,7 +2222,10 @@ function dgWorld(){
     if (a.status){ const stt = statusTurn(a); if (stt.text) dgLog(stt.text); if (a.hp <= 0){ dgDown(a); continue; } if (stt.skip) continue; }
     const foe = dg.enemies.find(e => Math.abs(e.x - a.x) + Math.abs(e.y - a.y) === 1);
     a.guard = false;
+    const shot = !foe && a.moves.filter(mv => dgRanged(mv) && (mv.cost || 0) <= a.sp).sort((x, y) => y.power - x.power)[0];
+    const far = shot && dgTargets(a, shot, true)[0];
     if (foe) dgHit(a, foe, foeChoice(a, foe));
+    else if (far){ dgFaceTo(a, far); dgHit(a, far, shot); }
     else if (Math.abs(a.x - m.x) + Math.abs(a.y - m.y) > 1){ const s = dgStep(a, m.x, m.y, 20); if (s){ a.x = s.x; a.y = s.y; } }
   }
   if (dg.over) return;
@@ -2267,12 +2303,14 @@ function dgUI(){
       '<span></span><button data-d="up" aria-label="Move up">▲</button><span></span>' +
       '<button data-d="left" aria-label="Move left">◀</button><button data-d="wait" aria-label="Wait a turn">•</button><button data-d="right" aria-label="Move right">▶</button>' +
       '<span></span><button data-d="down" aria-label="Move down">▼</button><span></span></div>' +
-      '<div class="dside"><button class="act" id="dgSkill"></button><button class="act" id="dgMeat"></button><button class="act" id="dgDisk"></button><button class="ghost" id="dgNext">⇄ Switch move</button><button class="ghost" id="dgQuit">Leave</button></div></div>';
+      '<div class="dside"><button class="act" id="dgSkill"></button><button class="ghost" id="dgNext">⇄ Switch move</button><button class="ghost" id="dgTgt">🎯 Next target</button><button class="ghost" id="dgTurn" aria-pressed="false">↻ Turn in place</button><button class="act" id="dgMeat"></button><button class="act" id="dgDisk"></button><button class="ghost" id="dgQuit">Leave</button></div></div>';
   sheet.querySelectorAll('[data-d]').forEach(b => b.onclick = () => b.dataset.d === 'wait' ? dgAct('wait') : dgAct('move', DIRS[b.dataset.d]));
   $('#dgSkill').onclick = () => dgAct('skill');
   $('#dgMeat').onclick = () => dgAct('meat');
   $('#dgDisk').onclick = () => dgAct('disk');
   $('#dgNext').onclick = () => { dg.sel = (dg.sel + 1) % dg.me.moves.length; dgDraw(); };
+  $('#dgTgt').onclick = () => dgCycleTarget();
+  $('#dgTurn').onclick = () => { dg.turnMode = !dg.turnMode; dgDraw(); };
   $('#dteam').onclick = e => { const b = e.target.closest('[data-mate]'); if (b && dg && !dg.over) dgLead(dg.team[+b.dataset.mate]); };
   $('#dgQuit').onclick = () => { const q = $('#dgQuit'); if (q.dataset.armed) dgEnd('quit'); else { q.dataset.armed = '1'; q.textContent = 'Tap to leave'; } };
   dgLog(dg.log.pop() || '');
@@ -2281,11 +2319,19 @@ function dgUI(){
 const dgKeys = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
 document.addEventListener('keydown', e => {
   if (!dg || dg.over) return;
-  if (dgKeys[e.key]){ e.preventDefault(); dgAct('move', DIRS[dgKeys[e.key]]); }
+  if (dgKeys[e.key] && e.shiftKey){ e.preventDefault(); const t = dg.turnMode; dg.turnMode = true; dgAct('move', DIRS[dgKeys[e.key]]); dg.turnMode = t; dgDraw(); }
+  else if (dgKeys[e.key]){ e.preventDefault(); dgAct('move', DIRS[dgKeys[e.key]]); }
+  else if (e.key === 'e' || e.key === 'Tab'){ e.preventDefault(); dgCycleTarget(); }
   else if (e.key === ' '){ e.preventDefault(); dgAct('wait'); }
   else if (e.key === 'q'){ dgAct('skill'); }
 });
 
+function dgCycleTarget(){
+  if (!dg || dg.over) return;
+  const mv = dg.me.moves[dg.sel] || dg.me.moves[0], ts = dgTargets(dg.me, mv, true);
+  if (!ts.length){ dgLog('No enemy in reach of ' + mv.name + '.'); return; }
+  const cur = dgAim(dg.me, mv); dg.tgt = ts[(ts.indexOf(cur) + 1) % ts.length]; dgFaceTo(dg.me, dg.tgt); dgDraw();
+}
 function dgDraw(){
   const cv = $('#dgc'); if (!cv || !dg) return;
   const m = dg.me;
@@ -2299,7 +2345,10 @@ function dgDraw(){
   if (tm) tm.innerHTML = dg.team.length < 2 ? '' : dg.team.map((u, i) => '<button class="dmate' + (u === m ? ' on' : '') + (u.hp <= 0 ? ' out' : '') + '" data-mate="' + i + '"' + (u.hp <= 0 ? ' disabled' : '') + '>' +
     '<b>' + esc(u.name) + (u.status ? ' ' + STATUS[u.status.k].icon : '') + '</b><small>' + (u.hp > 0 ? u.hp + '/' + u.max : 'fainted') + '</small>' + bar(Math.max(0, u.hp), u.max, 'h') + '</button>').join('');
   const smv = m.moves[dg.sel] || m.moves[0];
-  const sk = $('#dgSkill'); if (sk){ sk.innerHTML = esc(smv.name) + '<small>' + esc(moveLabel(smv)) + (smv.kind === 'phys' || smv.kind === 'mag' || smv.kind === 'drain' ? ' · range ' + (smv.cost ? 4 : 1) : '') + '</small>'; sk.disabled = (smv.cost || 0) > m.sp; }
+  const aim = dgAim(m, smv), rng = dgRange(smv);
+  const sk = $('#dgSkill'); if (sk){ sk.innerHTML = esc(smv.name) + '<small>' + esc(moveLabel(smv)) + (rng ? ' · ' + (rng > 1 ? '🏹 ranged ' + rng : 'melee') + (aim ? ' → ' + esc(aim.name) : ' · no target') : '') + '</small>'; sk.disabled = (smv.cost || 0) > m.sp; }
+  const tb = $('#dgTgt'); if (tb){ const n = rng ? dgTargets(m, smv, true).length : 0; tb.disabled = n < 2; tb.textContent = '🎯 Next target' + (n > 1 ? ' (' + n + ')' : ''); }
+  const tn = $('#dgTurn'); if (tn){ tn.setAttribute('aria-pressed', dg.turnMode ? 'true' : 'false'); tn.textContent = dg.turnMode ? '↻ Turning: tap arrows' : '↻ Turn in place'; tn.classList.toggle('on', !!dg.turnMode); }
   const mt = $('#dgMeat'); if (mt){ mt.innerHTML = 'Meat ×' + dg.bag.meat + '<small>+40% HP</small>'; mt.disabled = !dg.bag.meat; }
   const dk = $('#dgDisk'); if (dk){ dk.innerHTML = 'SP Disk ×' + dg.bag.disk + '<small>+60% SP</small>'; dk.disabled = !dg.bag.disk; }
 
@@ -2357,6 +2406,14 @@ function dgDraw(){
   for (const u of dgMates()) drawUnit(u, false);
   drawUnit(m, false);
   if (inView(m.x, m.y) && dg.team.length > 1){ x.strokeStyle = col('--accent'); x.lineWidth = 2; x.beginPath(); x.ellipse((m.x - ox) * T + T / 2, (m.y - oy) * T + T * .85, T * .42, T * .15, 0, 0, 7); x.stroke(); }
+  // aim: a dashed line to the target and a reticle on it
+  if (aim && inView(aim.x, aim.y)){
+    const ax = (aim.x - ox) * T + T / 2, ay = (aim.y - oy) * T + T / 2, bx = (m.x - ox) * T + T / 2, by = (m.y - oy) * T + T / 2;
+    x.strokeStyle = col('--bad'); x.lineWidth = 2;
+    if (rng > 1){ x.setLineDash([4, 4]); x.beginPath(); x.moveTo(bx, by); x.lineTo(ax, ay); x.stroke(); x.setLineDash([]); }
+    x.beginPath(); x.arc(ax, ay, T * .46, 0, 7); x.stroke();
+    x.beginPath(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ x.moveTo(ax + dx * T * .3, ay + dy * T * .3); x.lineTo(ax + dx * T * .56, ay + dy * T * .56); } x.stroke();
+  }
   // facing marker
   const fx = (m.x - ox) * T + T / 2 + m.face[0] * T * .55, fy = (m.y - oy) * T + T / 2 + m.face[1] * T * .55;
   x.fillStyle = col('--accent'); x.beginPath(); x.arc(fx, fy, Math.max(2, T * .08), 0, 7); x.fill();
