@@ -320,6 +320,44 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
   padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 .sheet{width:100%;max-width:520px;background:var(--panel);color:var(--fg);border-radius:18px;padding:18px;display:grid;gap:12px;max-height:88vh;overflow:auto}
 .sheet h4{margin:0;font:700 1.2rem var(--display)}
+.xsum{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--sunk);font-size:.9rem}
+.xsum b{font:700 1.05rem var(--display)}
+.xsum .xs-data b{color:var(--link)}.xsum .xs-xp b{color:var(--good)}.xsum .xs-loot b{color:var(--star)}
+.xrs{display:grid;gap:10px}
+.xr{--band:#3aa86b;--band2:#8fd16a;position:relative;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden;animation:xrIn .45s cubic-bezier(.2,.8,.3,1.2) both;animation-delay:var(--d,0ms)}
+.xr.ruins{--band:#b06a0c;--band2:#d39a2a}
+.xr.dark{--band:#6a3fc4;--band2:#c04fa8}
+.xr.rough{--band:#8a8fa3;--band2:#b9bdcb}
+.xr-top{display:flex;align-items:center;gap:10px;padding:10px 12px;background:linear-gradient(110deg,var(--band),var(--band2));color:#fff}
+.xr-pic{width:52px;height:52px;object-fit:contain;flex:none;border-radius:50%;background:rgba(255,255,255,.22);padding:3px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+.xr-id{display:grid;min-width:0;flex:1}
+.xr-id b{font:700 1.05rem var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.xr-id span{font-size:.8rem;opacity:.95}
+.xr-badge{flex:none;font:700 .72rem var(--display);letter-spacing:.04em;text-transform:uppercase;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.45)}
+.xr-body{display:grid;gap:9px;padding:10px 12px 12px}
+.xr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:6px}
+.xr-stat{display:grid;justify-items:center;padding:7px 4px;border-radius:10px;background:var(--sunk);line-height:1.15}
+.xr-stat b{font:700 1.15rem var(--display);font-variant-numeric:tabular-nums}
+.xr-stat small{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.xr-stat.data b{color:var(--link)}.xr-stat.xp b{color:var(--good)}
+.xr-stat.up{background:linear-gradient(135deg,var(--star),var(--accent));color:#fff}
+.xr-stat.up b{color:#fff}.xr-stat.up small{color:rgba(255,255,255,.9)}
+.xr-h{font:700 .72rem var(--display);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
+.xr-loot{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
+.xr-item{display:grid;justify-items:center;gap:2px;padding:8px 4px 6px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);text-align:center;animation:xrPop .35s cubic-bezier(.3,1.6,.5,1) both;animation-delay:calc(var(--d,0ms) + 250ms + var(--i,0) * 70ms)}
+.xr-item i{font-style:normal;font-size:1.6rem;line-height:1.1}
+.xr-item small{font-size:.7rem;line-height:1.2;overflow-wrap:anywhere}
+.xr-item.rare{border-color:var(--link);background:linear-gradient(180deg,rgba(80,120,255,.12),transparent)}
+.xr-item.epic{border-color:var(--star);background:linear-gradient(180deg,rgba(255,200,40,.2),transparent);box-shadow:0 0 0 1px var(--star) inset}
+.xr-item.epic small::before{content:'★ ';color:var(--star)}
+.xr-none{margin:0;font-size:.82rem;color:var(--muted)}
+.xr-seen{display:flex;flex-wrap:wrap;gap:6px}
+.xr-seen span{display:flex;align-items:center;gap:4px;padding:2px 8px 2px 2px;border-radius:999px;background:var(--sunk);font-size:.78rem}
+.xr-seen img{width:26px;height:26px;object-fit:contain}
+.xr-note{margin:0;font-size:.8rem;color:var(--muted)}
+.xr-note.learn{color:var(--good);font-weight:700}
+@keyframes xrIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes xrPop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
 .tmeter{position:relative;height:34px;border-radius:8px;background:var(--sunk);overflow:hidden}
 .tmeter .zone{position:absolute;top:0;bottom:0;background:var(--good);opacity:.45}
 .tmeter .mark{position:absolute;top:-2px;bottom:-2px;width:5px;margin-left:-2px;background:var(--fg);border-radius:2px}
@@ -1345,36 +1383,59 @@ function expeditionPicker(m){
 
 async function collectExpeditions(list){
   busy = true;
-  const lines = [];
+  const res = [];
   for (const m of list){
     if (!expDone(m)) continue;
     const ex = EXPEDITIONS.find(x => x.key === m.exp.key) || EXPEDITIONS[0];
     const ok = Math.random() < expOdds(m, ex), est = expEstimate(m, ex);
     const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5) * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav'))), xp = Math.round(est.xp * (ok ? 1 : 0.5));
     G.data += data;
-    let extra = '';
+    const loot = [], got = (icon, name, tier) => loot.push({ icon, name, tier: tier || '' });
     if (ok && ex.egg && Math.random() < Math.min(0.9, ex.egg * (evOn('eggs') ? 3 : 1) * (1 + 0.15 * perk('eggs')))){
       const rare = Math.random() < ex.rare / ex.egg, r2 = Math.random();
       const k = rare ? 'rare' : ex.key === 'dark' && r2 < 0.5 ? pick(['rookie', 'dragon', 'dark', 'xegg', 'lucky', ...Object.keys(ELEMS).map(k => 'e' + k)]) : ex.key === 'ruins' && r2 < 0.3 ? pick(['lucky', 'rookie']) : 'mystery';
-      G.eggs.push(k); extra += ' Found a ' + eggName(k) + '!';
+      G.eggs.push(k); got('🥚', eggName(k), k === 'rare' ? 'epic' : 'rare');
     }
-    if (ok && ex.relic && Math.random() < ex.relic){ const k = randomDigimental(); giveItem(k); extra += ' Found a ' + itemName(k) + '!'; }
-    if (ok && ex.crest && Math.random() < ex.crest){ const k = randomCrest(); if (k){ giveItem(k); extra += ' Found the ' + itemName(k) + '!'; } }
-    if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); extra += ' Found an X-Antibody!'; }
-    if (ex.chip && Math.random() < ex.chip * (ok ? 1 : 0.5)){ const k = randomChip(); giveItem(k); extra += (k === 'vit:def' ? ' Found a ' : ' Found an ') + itemName(k) + '!'; }
-    if (ex.clean && Math.random() < ex.clean * (ok ? 1 : 0.5)){ giveItem('clean'); extra += ' Found a Clean Slate!'; }
-    if (ok && ex.key !== 'fields' && Math.random() < (ex.key === 'dark' ? 0.15 : 0.06)){ giveItem('pers:?'); extra += ' Found a Mystery Mint!'; }
+    if (ok && ex.relic && Math.random() < ex.relic){ const k = randomDigimental(); giveItem(k); got(itemIcon(k), itemName(k), 'rare'); }
+    if (ok && ex.crest && Math.random() < ex.crest){ const k = randomCrest(); if (k){ giveItem(k); got(itemIcon(k), itemName(k), 'epic'); } }
+    if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); got(itemIcon('xab'), itemName('xab'), 'epic'); }
+    if (ex.chip && Math.random() < ex.chip * (ok ? 1 : 0.5)){ const k = randomChip(); giveItem(k); got(itemIcon(k), itemName(k)); }
+    if (ex.clean && Math.random() < ex.clean * (ok ? 1 : 0.5)){ giveItem('clean'); got(itemIcon('clean'), itemName('clean')); }
+    if (ok && ex.key !== 'fields' && Math.random() < (ex.key === 'dark' ? 0.15 : 0.06)){ giveItem('pers:?'); got(itemIcon('pers:?'), itemName('pers:?')); }
     const pool = (state.stageIds[m.stage] || []).filter(id => state.byId.has(id) && !known(id));
-    const found = [];
-    for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; found.push(state.byId.get(id).name); } }
-    if (found.length) extra += ' Spotted ' + found.join(', ') + '.';
+    const seen = [];
+    for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; const d = state.byId.get(id); seen.push({ name: d.name, image: d.image }); } }
     nfCancel(nfUid(m)); m.exp = null;
     const lv = await gainXP(m, xp);
     questProgress('exp'); bump('exps');
-    lines.push('<div><b>' + esc(m.name) + '</b> · ' + esc(ex.name) + (ok ? '' : ' (rough trip)') + '<br><small>+' + data + ' DigiData · +' + xp + ' XP.' + esc(levelText(lv) + extra) + '</small></div>');
+    res.push({ m, ex, ok, data, xp, lv, loot, seen });
   }
   saveGame();
-  openOv('<h4>Expedition results</h4><div class="hist">' + (lines.join('') || '<div>Nothing to collect yet.</div>') + '</div><button class="big" id="exDone">Nice!</button>');
+  const XR_ICON = { fields: '🌾', ruins: '🏛️', dark: '🌑' };
+  const card = (r, n) => {
+    const up = r.lv && r.lv.ups.length ? r.lv.ups[r.lv.ups.length - 1] : 0;
+    return '<div class="xr ' + r.ex.key + (r.ok ? '' : ' rough') + '" style="--d:' + n * 140 + 'ms">' +
+      '<div class="xr-top"><img class="xr-pic" alt="" src="' + esc(r.m.image) + '"><div class="xr-id"><b>' + esc(r.m.name) + '</b><span>' + XR_ICON[r.ex.key] + ' ' + esc(r.ex.name) + '</span></div>' +
+      '<span class="xr-badge">' + (r.ok ? '✓ Smooth trip' : '⚠ Rough trip') + '</span></div>' +
+      '<div class="xr-body">' +
+      '<div class="xr-stats"><span class="xr-stat data"><b data-count="' + r.data + '">+' + r.data + '</b><small>💾 DigiData</small></span><span class="xr-stat xp"><b data-count="' + r.xp + '">+' + r.xp + '</b><small>⭐ XP</small></span>' +
+      (up ? '<span class="xr-stat up"><b>Lv ' + up + '</b><small>⬆ Level up!</small></span>' : '') + '</div>' +
+      (r.lv && r.lv.learned.length ? '<p class="xr-note learn">✨ Learned ' + esc(r.lv.learned.join(', ')) + '!</p>' : '') +
+      (r.loot.length ? '<p class="xr-h">Found</p><div class="xr-loot">' + r.loot.map((it, i) => '<span class="xr-item ' + it.tier + '" style="--i:' + i + '"><i>' + it.icon + '</i><small>' + esc(it.name) + '</small></span>').join('') + '</div>' : '<p class="xr-none">No items this time.</p>') +
+      (r.seen.length ? '<p class="xr-h">Spotted · added to your Digidex</p><div class="xr-seen">' + r.seen.map(s => '<span><img alt="" src="' + esc(s.image) + '">' + esc(s.name) + '</span>').join('') + '</div>' : '') +
+      (r.ok ? '' : '<p class="xr-note">Ran into trouble, so rewards were halved. Higher levels make trips safer.</p>') +
+      '</div></div>';
+  };
+  const tot = res.reduce((a, r) => (a.data += r.data, a.xp += r.xp, a.loot += r.loot.length, a), { data: 0, xp: 0, loot: 0 });
+  const sum = res.length > 1 ? '<div class="xsum"><span>🧭 <b>' + res.length + '</b> teams back</span><span class="xs-data">💾 <b>+' + tot.data + '</b></span><span class="xs-xp">⭐ <b>+' + tot.xp + '</b> XP</span><span class="xs-loot">🎁 <b>' + tot.loot + '</b> item' + (tot.loot === 1 ? '' : 's') + '</span></div>' : '';
+  openOv('<h4>' + (res.length ? 'Expedition results' : 'Nothing to collect yet') + '</h4>' + sum + '<div class="xrs">' + res.map(card).join('') + '</div><button class="big" id="exDone">' + (tot.loot ? 'Nice haul!' : 'Nice!') + '</button>');
+  // count the numbers up as each card lands
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) $('#overlay').querySelectorAll('[data-count]').forEach((b, i) => {
+    const to = +b.dataset.count, t0 = performance.now() + Math.floor(i / 2) * 140 + 200;
+    b.textContent = '+0';
+    const step = t => { const k = Math.min(1, Math.max(0, (t - t0) / 700)); b.textContent = '+' + Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1 && b.isConnected) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
   $('#exDone').onclick = () => { closeOv(); renderBox(); updateCount(); };
 }
 
@@ -2837,7 +2898,7 @@ async function evolveTo(id, reqs){
 
 // ---------- image processing: cut out the white background, optional retro pixel look ----------
 // Done on this device from the official art; silhouettes need the cutout so they show a shape, not a square.
-const IMG_SEL = '.tthumb img, .thead img, .lrow img, .bcell img, .bhead img, .slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img';
+const IMG_SEL = '.tthumb img, .thead img, .lrow img, .bcell img, .bhead img, .slot img, .pic, .evo img, #sprite, .art, .lineage img, .choice img, .fighter img, .reveal img, .xr img';
 let retroOn = false;   // retro pixel mode was removed; always show the official art
 const imgCache = new Map();
 function processArt(src, res, retro){
