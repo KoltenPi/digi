@@ -2416,7 +2416,7 @@ function dgDraw(){
   for (const it of dg.items){
     if (!dg.seen[it.y * DG.W + it.x] || !inView(it.x, it.y) || !dgVisible(it.x, it.y)) continue;
     const ix = (it.x - ox) * T + T / 2, iy = (it.y - oy) * T + T / 2;
-    x.font = Math.round(T * (it.type === 'chest' ? .72 : .58)) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = Math.round(T * (it.type === 'chest' ? .72 : .58)) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#ffffff';
     x.fillText(DG_ICON[it.type] || '❔', ix, iy + T * .04); x.textAlign = 'start'; x.textBaseline = 'alphabetic';
   }
   const drawUnit = (u, enemy) => {
