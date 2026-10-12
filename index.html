@@ -1695,7 +1695,7 @@ async function battle(diff, opts){
   try{ [myD, foeD] = await Promise.all([getDetail(p.id), getDetail(foeBase.id)]); }catch{}
   await syncMoves(p);
   const mine = partnerStats(p), myBase = baseStats(p.id, p.stage), fb = baseStats(foeBase.id, p.stage + (rareUp ? 1 : 0));
-  const foeSt = {}; STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round((fb[k] * rand(0.92, 1.1) + 0.55 * (mine[k] - myBase[k])) * diff.foe * (opts.mult || R.foe))));
+  const foeSt = {}; STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round((fb[k] * rand(0.92, 1.1) + 0.33 * (mine[k] - myBase[k])) * diff.foe * (opts.mult || R.foe))));
   const me = applyPerks(fighter(p.name, p.image, mine, mainAttr(myD), partnerMoves(p), p.mood), p);
   const modes = modeFormsOf(p.name), modeCost = Math.max(2, Math.round(me.st.sp * 0.4));
   const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), foeMoves(foeBase.id, foeD, p.stage, diff.lv));
@@ -1993,7 +1993,7 @@ function dgSpawn(avoidRoom){
   const id = pick(dg.species), b = state.byId.get(id); if (!b) return;
   const base = baseStats(id, dg.stage), mine = partnerStats(P()), myBase = baseStats(P().id, P().stage);
   const scale = (1 + 0.07 * (dg.floor - 1)) * dg.diff.foe * curRegion().foe, st = {};
-  STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round((base[k] + 0.4 * (mine[k] - myBase[k])) * scale)));
+  STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round((base[k] + 0.25 * (mine[k] - myBase[k])) * scale)));
   const e = dgUnit(id, b.name, st, 'Free', foeMoves(id, null, dg.stage, dg.diff.lv), 0.45);
   e.x = s.x; e.y = s.y; e.awake = false;
   dg.enemies.push(e);
@@ -2006,7 +2006,7 @@ function dgSpawnBoss(avoid){
   const bs = Math.min(5, dg.stage + 1), pool = (state.stageIds[bs] || []).filter(id => state.byId.has(id)); if (!pool.length) return;
   const id = pick(pool), b = state.byId.get(id), base = baseStats(id, dg.stage), mine = partnerStats(P()), myBase = baseStats(P().id, P().stage);
   const scale = (1.2 + 0.07 * (dg.floor - 1)) * dg.diff.foe, st = {};
-  STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round((base[k] + 0.5 * (mine[k] - myBase[k])) * scale)));
+  STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round((base[k] + 0.3 * (mine[k] - myBase[k])) * scale)));
   const e = dgUnit(id, b.name, st, 'Free', foeMoves(id, null, bs, dg.diff.lv + 6), 2.2);
   e.x = s.x; e.y = s.y; e.awake = false; e.boss = true; dg.enemies.push(e); dg.boss = e;
   getDetail(id).then(d => { e.attr = mainAttr(d); e.elem = elemOf(d); e.moves = foeMoves(id, d, bs, dg.diff.lv + 6); }).catch(() => {});
