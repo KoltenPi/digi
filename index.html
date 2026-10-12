@@ -501,6 +501,70 @@ const raised = id => G.col[id] === 'raised';
 const known = id => !!G.col[id];
 const shown = (id, name) => known(id) ? name : '???';
 
+// ===== newer Digimon from the official Digimon Encyclopedia (digimon.net/reference_en) that the community database doesn't list yet =====
+// [page name, name, level, type, attribute, special moves, related Digimon (page names, or database ids)]
+const EXTRA = [["ficusmon","Ficusmon","Adult","Parasite","Virus",["Armed Tendril"],["suzumon","sekiryumon","rootmon"]],["rootmon","Rootmon","Baby I","Parasite","",["Entwine"],["ficusmon","suzumon","sekiryumon"]],["sekiryumon","Sekiryumon","Adult","Beast Dragon","Data",["Amanagi Blade","Gyokuun"],["ficusmon","rootmon","suzumon"]],["suzumon","Suzumon","Baby II","Lesser","",["Naribi"],["ficusmon","rootmon","sekiryumon"]],["volvemon","Volvemon","Ultimate","Unidentified","Unknown",["Revolutio Rerum"],["atratusmon","albatusmon","kekomon"]],["nosferamon","Nosferamon","Ultimate","Undead","Virus",["Rampage Bullet","Anesthesia Gaze"],["scourgechiropmon","bearcatmon","armalizamon"]],["artiomon","Artiomon","Ultimate","Beast Man","Vaccine",["Doom Buster","Decapitate Claw"],["bearcatmon","heliosboamon","scourgechiropmon"]],["atratusmon","Atratusmon","Ultimate","Mutant","Data",["Eclipse Impact","Void Cannon"],["monarchlizamon","albatusmon","kekkomon"]],["albatusmon","Albatusmon","Ultimate","Mutant","Data",["Demise Sphere","Absorption Circle"],["heliosboamon","atratusmon","nightchiropmon"]],["heliosboamon","HeliosBoamon","Perfect","Reptile","Data",["Soul Pulverizer","Restrict Eye"],["albatusmon","monarchlizamon",1207]],["habakirimon","Habakirimon","Ultimate","Deity","Virus",["Habakiri","Aramasa"],["murasamemon","kekkomon","hyemon"]],["bearcatmon","Bearcatmon","Perfect","Beast Man","Vaccine",["Penetrate Blow","Murderize Rush","Beardown Spinning Kick"],["wolvermon","gekkomon","chiropmon"]],["taowumon","Taowumon","Ultimate","Dark Beast","Virus",["Skull Iceshards","Thunderous Upheaval","Freezing Tusk"],["yihumon",1436,"taotiemon"]],["scourgechiropmon","ScourgeChiropmon","Perfect","Machine","Virus",["Triangulation Scan","Despair Blast","Eliminate Rain","Silent Scream"],["murasamemon","volvemon","armalizamon"]],["monarchlizamon","Monarchlizamon","Perfect","Cyborg","Data",["Annihilate Edge","Monarch Ordinance","Final Judgment"],["atratusmon","armalizamon","kekkomon"]],["armamon_burstmode","Armamon:Burst Mode","Ultimate","Weapon","Free",["Sword of meteor","Infinity sword rain"],[1019,973,1157]],["vortexdramon","Vortexdramon","Ultimate","Bird Dragon","Data",["Frozen Gust","Blazing Gust","Laevateinn"],["styracomon","turbomon",1481]],["azhdarmon","Azhdarmon","Perfect","Pterosaur","Virus",["Tomahawk Strike","Tri Carve Rain","Trinity Lightning"],["rhamphomon","wolvermon","nightchiropmon"]],["tengumon","Tengumon","Ultimate","Bird Man","Virus",["Apostate's Stiletto","Sonten Firestorm"],["mococomon","kakamon","wankomon"]],["amaterasumon","Amaterasumon","Ultimate","Deity","Vaccine",["Izu no Mitama","All-Encompassing Sunbeams"],["darumamon","mococomon","fukamon"]],["enmamon","Enmamon","Ultimate","Evil King","Virus",["Mirror of Retribution","Yama's Descent"],["kakamon","tomorimon","fujamon"]],["seitengokuwmon","SeitenGokuumon","Ultimate","Tathāgata","Virus",["Fiery Eyes","Hakkai Scorcher","Gojo Water Tomb","Supreme Lightning Canon"],["enmamon",1115,"darumamon"]],["exmaquinamon","ExMaquinamon","Ultimate","Unique","Data",["Escaton"],[1480,"mockingbirdmon",1487]],["dalphomon","Dalphomon","Ultimate","Beast","Virus",["Prophet elijah","Jail maon","Brutal halo"],[1463,"nyabootmon","magneticdramon"]],["shishimamon","Shishimamon","Perfect","Holy Beast","Vaccine",["Kagura Flash","Evil-Quelling Effulgence"],["amaterasumon","takinmon","kakamon"]],["darumamon","Darumamon","Perfect","Mutant","Vaccine",["Daruma Fire Charge","Daruma Execution"],["onibimon","hakubamon","amaterasumon"]],["rhamphomon","Rhamphomon","Adult","Pterosaur","Virus",["Crystal Cannon","Hammer Strike","No Hope Fall","Crystal Rain"],["azhdarmon","wolvermon",444]],["zombieplutomon","ZombiePlutomon","Ultimate","Undead","Virus",["Hazardous Hold","Hell Slicer","Marionette abomination"],[1012,928,1015]],["manekimon","Manekimon","Adult","Puppet","Vaccine",["Koban Toss","Welcoming Fist"],["darumamon"]],["hakubamon","Hakubamon","Adult","Holy Beast","Vaccine",["Severing Dragon Claw","Blazing Beads"],["tengumon","seitengokuwmon","takinmon"]],["wankomon","Wankomon","Child","Beast","Vaccine",["Crushing Ball","Stone Body"],["kakamon","tomorimon",470]],["gasamon","Gasamon","Child","Mollusk","Virus",["Wickerwork Whirlwind","Acidic Mucus"],[179]],["takinmon","Takinmon","Child","Beast","Vaccine",["Horn Rush","Rock Missile"],["hakubamon","fukamon","tengumon"]],["fujamon","Fujamon","Child","Aquatic","Virus",["Hydro Blast","Serpentine Fang"],["shishimamon","tengumon","tomorimon"]],["kakamon","Kakamon","Child","Beast","Vaccine",["Monkey Ball","Golden Howl"],["enmamon","tomorimon","seitengokuwmon"]],["armalizamon","Armalizamon","Adult","Reptile","Data",["Neutron Laser","Neutron Diffuser","Neutron Blade","Death Roll Press"],["albatusmon","cougarmon",444]],["onibimon","Onibimon","Baby II","Ghost","",["Ghastly Flames"],["mococomon","takinmon","amaterasumon"]],["tomorimon","Tomorimon","Baby I","Ghost","",["Will-o'-the-Wisp"],["onibimon","tengumon","hakubamon"]],["mococomon","Mococomon","Baby II","Smoke","",["Viscous Clouds"],["kakamon","takinmon","amaterasumon"]],["fukamon","Fukamon","Baby I","Smoke","",["Cloudcall"],["mococomon","hakubamon","darumamon"]],["nightchiropmon","Nightchiropmon","Adult","Beast Man","Virus",["Providence Scan","Shadow Arts","Giant Rang","Mesmer Burst"],["heliosboamon","atratusmon","nosferamon"]],["styracomon","Styracomon","Ultimate","Dragon Man","Data",["Crimson Crest","Dreadnought Stampede"],[1484,1469,"dalphomon"]],["taotiemon","Taotiemon","Ultimate","Demon","Virus",["Gorge Horns","Vile Vomit","Voracious Blast"],["taowumon","yihumon",1436]],["craniummon_enbarrmon","Craniamon + Enbarrmon","Ultimate","Holy Knight","Vaccine",["Ruthless Charge"],["enbarrmon",760,1015]],["enbarrmon","Enbarrmon","Perfect","Undead","Data",["Dead Angle Horn","Vain Answer"],[885,"skullseadramon",899]],["metatromon","Metatromon","Ultimate","Machine","Vaccine",["Iron Halo","Eyes of Enoch","Metatronios"],["mockingbirdmon","exmaquinamon",1479]],["greatgryzmon","GreatGrizzlymon","Perfect","Beast Man","Vaccine",["Spirited Claws","Incendiary Mist","GGS"],[883,898,878]],["titamon_skullbaluchimon","Titamon+SkullBaluchimon","Ultimate","Deity","Virus",["Senjin Kishinzan"],[901,898,906]],["cougarmon","Cougarmon","Adult","Mammal","Virus",["Ruthless Fang","Ruthless Claw","Wrath Roar"],["murasamemon","heliosboamon","artiomon"]],["masterblimpmon","MasterBlimpmon","Perfect","Machine","Data",["Zeppelin Circus","Daredevil Break"],[515,883,885]],["hyemon","Hyemon","Child","Beast","Data",["Curse Bite","Release Howling"],["monarchlizamon","nightchiropmon","volvemon"]],["murasamemon","Murasamemon","Perfect","Beast Man","Virus",["Gonozan: Murashigure","Jyunozan: Tsukishigure","Tsuinozan: Koku"],["cougarmon","habakirimon","chiropmon"]],["wolvermon","Wolvermon","Adult","Cyborg","Vaccine",["Rapid Burst","Scatter Rocket","Badger Slash","Tomboy Blaze"],[444,"volvemon","habakirimon"]],["chiropmon","Chiropmon","Child","Mammal","Virus",["Paralyze Echo","Analyze Echo","Curious Eyes","Condensed Echo"],["nightchiropmon","azhdarmon","habakirimon"]],["pristimon","Pristimon","Child","Puppet","Vaccine",["Pri Shot","Stab Claw","Tail Slap"],["wolvermon","nosferamon","volvemon"]],["dullahamon","Dullahamon","Ultimate","Ghost","Data",["Bercilak Edge","Sleepy Hollow"],[1481,"hanimon","magneticdramon"]],["gekkomon","GEKKOMON","Child","Reptile","Data",["Smash Beat","Break Throw","Swing Tackle"],["armalizamon","heliosboamon","azhdarmon"]],["kekkomon","Kekkomon","Baby II","Lesser","",["Beat Lick"],["gekkomon",1207,"albatusmon"]],["kekomon","Kekomon","Baby I","Slime","",["Adhesive Bubble Blow"],["kekkomon",444,"bearcatmon"]],["magneticdramon","Magneticdramon","Ultimate","Rock Dragon","Virus",["Stone Rail Gun","Electric Compression","Magnetic Tempest"],[1481,1463,"styracomon"]],["maneuvermon","Maneuvermon","Perfect","Beast","Virus",["Brutal Aerobatics","Folgore"],["turbomon",1475,1483]],["turbomon","Turbomon","Adult","Beast","Virus",["Brutal Wheel","Crush Gear Spin"],[1486,"nyabootmon","metatromon"]],["nyabootmon","Nyabootmon","Ultimate","Puppet","Virus",["Gravity Paw","Carabas Special","Secret Sword: Nine Lives"],["metatromon",1472,1481]],["yihumon","Yihumon","Ultimate","Beast Man","Vaccine",["Sky Rend","Featherblade Breeze","Ravaging Storm"],["taotiemon",1436,"taowumon"]],["ariemon","Ariemon","Ultimate","Aquatic","Data",["Entangling Algae","Tidal Spear","Cleansing Waters"],[1472,1485,1479]],["skullseadramon","SkullSeadramon","Perfect","Undead","Virus",["Lightning Javelin","Death Wrap"],[819,883,1012]],["sharkmon","Sharkmon","Perfect","Cyborg","Virus",["All-Out Bombardment","Plutodumon","Fang Charge"],[885,883,"greatgryzmon"]],["kaguyamon","Kaguyamon","Ultimate","Puppet","Data",["Bamboo Reaper","Heavenly Outpour"],[1461,1487,1483]],["karakurumon","Karakurumon","Perfect","Puppet","Data",["Hachikazuki Dance","Acid Deluge"],["kaguyamon",1475,"dalphomon"]],["kokeshimon","Kokeshimon","Adult","Puppet","Data",["Sophora Storm","Kideko Strike"],[1464,"dalphomon",1472]],["hanimon","Hanimon","Child","Puppet","Data",["Haniwa Flash","Tumulus Tackle"],[1485,"ariemon",1476]],["mockingbirdmon","MockingBirdmon","Perfect","Machine","Vaccine",["Iron Siphon","Tri-Airbots"],[1485,1463,1466]],["mulemon","Mulemon","Adult","Machine","Vaccine",["Iron Gallop","Missile Rodeo"],[1485,1465,"karakurumon"]],["yoxtuyoxtumon","Yoxtu!Yoxtu!mon","Adult","Puppet","Virus",["Rapper Coaster","One-Handed Swing","Torpedo Crossing"],[829,815,834]],["quetzalmon","Quetzalmon","Armor","Mythical Beast","Free",["Freezing Wave"],[356,309,326]],["yggdrasill7d6","King Drasil_7D6","Ultimate","9000","Unknown",["Crystal Shards","Huge Crystal","Self-Restore"],[855,867,817]]];
+const EXTRA_BASE = 90001;
+const EXTRA_IDX = new Map(EXTRA.map((e, i) => [e[0], i]));
+const isExtra = id => id >= EXTRA_BASE && id < EXTRA_BASE + EXTRA.length;
+const extraOf = id => EXTRA[id - EXTRA_BASE];
+const extraImg = e => 'https://digimon.net/cimages/digimon/' + e[0] + '.jpg';
+function addExtraItems(items){
+  const have = new Set(items.map(d => d.id));
+  return items.concat(EXTRA.map((e, i) => ({ id: EXTRA_BASE + i, name: e[1], href: '', image: extraImg(e), extra: true })).filter(d => !have.has(d.id)));
+}
+function addExtraLevels(){
+  EXTRA.forEach((e, i) => {
+    const id = EXTRA_BASE + i, s = STAGES.indexOf(e[2]);
+    if (s >= 0){
+      if (!state.stageIds[s].includes(id)) state.stageIds[s].push(id);
+      state.levelSets[e[2]].add(id); state.levelOf.set(id, s); state.stagesOf.set(id, [s]);
+    } else if (e[2] === 'Armor') state.armor.add(id);
+  });
+}
+function extraDetail(id){
+  const e = extraOf(id);
+  return { id, name: e[1], extra: true, images: [{ href: extraImg(e) }], levels: [{ level: e[2] }],
+    types: e[3] ? [{ type: e[3] }] : [], attributes: e[4] && e[4] !== 'Unknown' ? [{ attribute: e[4] }] : [], fields: [], releaseDate: '',
+    descriptions: [{ language: 'en_us', description: 'A newer Digimon from the official Digimon Encyclopedia. Special move' + (e[5].length === 1 ? '' : 's') + ': ' + e[5].join(', ') + '.' }],
+    skills: e[5].map(m => ({ skill: m, translation: '', description: '' })), priorEvolutions: [], nextEvolutions: [] };
+}
+// evolution links: related Digimon one level apart become evolutions; anything left without a way in or out
+// borrows a couple of Digimon from the neighbouring level, so every new Digimon can be raised and can keep growing
+let EXTRA_LINKS = null;
+function extraLinks(){
+  if (EXTRA_LINKS) return EXTRA_LINKS;
+  const next = new Map(), prev = new Map();
+  const add = (m, a, b) => { if (!m.has(a)) m.set(a, new Set()); m.get(a).add(b); };
+  const link = (lo, hi) => { add(next, lo, hi); add(prev, hi, lo); };
+  const stage = id => isExtra(id) ? STAGES.indexOf(extraOf(id)[2]) : state.levelOf.get(id);
+  const pickFrom = (s, salt, n) => {
+    const pool = (state.stageIds[s] || []).filter(x => !isExtra(x) && !state.armor.has(x)), out = [];
+    for (let k = 0; k < n * 4 && out.length < n && pool.length; k++){ const x = pool[Math.floor(Math.abs(seeded(salt, 500 + k)) * pool.length) % pool.length]; if (!out.includes(x)) out.push(x); }
+    return out;
+  };
+  EXTRA.forEach((e, i) => {
+    const id = EXTRA_BASE + i, s = stage(id);
+    const rel = e[6].map(r => typeof r === 'string' ? EXTRA_BASE + EXTRA_IDX.get(r) : r).filter(r => Number.isFinite(r) && state.byId.has(r));
+    if (e[2] === 'Armor'){ rel.filter(r => stage(r) === 2).forEach(r => link(r, id)); return; }
+    if (s < 0) return;
+    rel.forEach(r => { const t = stage(r); if (t === s + 1) link(id, r); else if (t === s - 1) link(r, id); });
+  });
+  EXTRA.forEach((e, i) => {
+    const id = EXTRA_BASE + i, s = stage(id);
+    if (e[2] === 'Armor'){ if (!prev.has(id)) pickFrom(2, id, 3).forEach(r => link(r, id)); return; }
+    if (s < 0) return;
+    if (s > 0 && !prev.has(id)) pickFrom(s - 1, id, 2).forEach(r => link(r, id));
+    if (s < 5 && !next.has(id)) pickFrom(s + 1, id + 7, 2).forEach(r => link(id, r));
+  });
+  return EXTRA_LINKS = { next, prev };
+}
+function linkExtras(d){
+  const L = extraLinks(), entry = x => { const b = state.byId.get(x); return { id: x, digimon: b ? b.name : '?', condition: '', image: b ? b.image : '', url: '' }; };
+  const more = (list, ids) => { const have = new Set((list || []).map(evoId)); return (list || []).concat([...(ids || [])].filter(x => !have.has(x) && state.byId.has(x)).map(entry)); };
+  return Object.assign({}, d, { nextEvolutions: more(d.nextEvolutions, L.next.get(d.id)), priorEvolutions: more(d.priorEvolutions, L.prev.get(d.id)), _xl: true });
+}
+
 async function getJSON(url){
   const r = await fetch(url);
   if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -508,7 +572,8 @@ async function getJSON(url){
 }
 async function getDetail(id){
   let d = state.details.get(id);
-  if (!d){ d = await getJSON(`${API}/digimon/${id}`); state.details.set(id, d); }
+  if (!d){ d = isExtra(id) ? extraDetail(id) : await getJSON(`${API}/digimon/${id}`); state.details.set(id, d); }
+  if (state.ready && !d._xl){ d = linkExtras(d); state.details.set(id, d); }
   return d;
 }
 
@@ -574,6 +639,7 @@ async function loadStages(){
       state.stagesOf.set(id, [...(state.stagesOf.get(id) || []), i]);
     }
   });
+  addExtraLevels();
   state.ready = true;
   tick();
   renderPartner();
@@ -588,9 +654,11 @@ async function loadArmor(){
     catch{ return; }
   }
   state.armor = new Set(c.ids);
+  EXTRA.forEach((e, i) => { if (e[2] === 'Armor') state.armor.add(EXTRA_BASE + i); });
 }
 
 function setAll(items){
+  items = addExtraItems(items);
   state.all = items;
   state.byId = new Map(items.map(d => [d.id, d]));
   $('#status').hidden = true;
@@ -669,6 +737,7 @@ async function setLevel(lv){
     try{
       const items = await pageAll(`${API}/digimon?level=${encodeURIComponent(lv)}`);
       state.levelSets[lv] = new Set(items.map(d => d.id));
+      EXTRA.forEach((e, i) => { if (e[2] === lv) state.levelSets[lv].add(EXTRA_BASE + i); });
       $('#status').hidden = true;
     }catch(e){
       showError(`Couldn't load that level (${esc(e.message)}).`, () => setLevel(lv));
@@ -786,7 +855,7 @@ function renderDetail(d){
       ${img ? `<img class="art${k ? '' : ' sil'}" alt="${esc(shown(d.id, d.name))}" src="${esc(img)}">` : '<div class="art"></div>'}
       <div>
         <h2>${esc(shown(d.id, d.name))}</h2>${k ? '' : '<div class="raisedline" style="color:var(--muted)">Not discovered yet. Battle it or raise it to reveal it.</div>'}
-        <div class="idline">#${String(d.id).padStart(4,'0')}${d.releaseDate ? ' · debut ' + esc(d.releaseDate) : ''}${d.xAntibody ? ' · X-Antibody' : ''}</div>
+        <div class="idline">${d.extra ? 'New · from digimon.net' : '#' + String(d.id).padStart(4,'0')}${d.releaseDate ? ' · debut ' + esc(d.releaseDate) : ''}${d.xAntibody ? ' · X-Antibody' : ''}</div>
         ${raised(d.id) ? '<div class="raisedline">✓ Raised by you</div>' : ''}
         <button class="star" id="star" aria-pressed="${fav}">${fav ? '★ Saved' : '☆ Save'}</button>
         <dl class="stats">
@@ -2661,7 +2730,7 @@ function processArt(src, res, retro){
   if (imgCache.has(key)) return imgCache.get(key);
   const job = new Promise(done => {
     const im = new Image(); im.crossOrigin = 'anonymous';
-    im.onerror = () => done(null);
+    im.onerror = () => done(/digimon\.net\//.test(src) ? src : null);   // the official site doesn't allow editing its pictures, so show them as they are
     im.onload = () => {
       try{ done(retro ? pixelSprite(im, res) : cutout(im, res)); }catch{ done(null); }
     };
@@ -2768,7 +2837,9 @@ async function processImg(img){
   if (img.dataset.mode === mode) return;
   img.dataset.orig = orig; img.dataset.mode = mode;
   const big = img.matches('#sprite, .art, .reveal img');
-  const url = await processArt(orig, retroOn ? (big ? 56 : 44) : (big ? 320 : 128), retroOn);
+  let url = await processArt(orig, retroOn ? (big ? 56 : 44) : (big ? 320 : 128), retroOn);
+  // pictures we can't cut out (from digimon.net) get a question-mark silhouette while undiscovered
+  if (url === orig && sil) url = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50" y="72" font-size="70" text-anchor="middle" font-family="sans-serif" font-weight="700">?</text></svg>');
   if (url && img.dataset.orig === orig && img.dataset.mode === mode){ img.src = url; img.style.imageRendering = retroOn ? 'pixelated' : ''; }
 }
 const imgIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ imgIO.unobserve(e.target); processImg(e.target); } }), {rootMargin: '300px'});
