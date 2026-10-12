@@ -424,6 +424,24 @@ img.sil{filter:var(--silf)}
 .nfsteps{margin:0;padding-left:20px;display:grid;gap:8px;font-size:.9rem}
 .nfsteps a{color:var(--link)}
 .nftopic{font:600 .85rem var(--mono);background:var(--sunk);padding:6px 10px;border-radius:8px;word-break:break-all;flex:1}
+.onlhead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.92rem}
+.onlhead .ghost{margin-left:auto;padding:4px 10px}
+.onlin{flex:1;min-width:0;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font:inherit}
+.lbs{display:grid;gap:6px}
+.lbrow{display:grid;grid-template-columns:36px 38px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.lbrow.me{border-color:var(--accent)}
+.lbrow img{width:36px;height:36px;object-fit:contain}
+.lbrow b{font:700 .85rem var(--mono)}
+.lbrow small{display:block;color:var(--muted);font-size:.72rem}
+.raidboss{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:center}
+.raidboss img{width:96px;height:96px;object-fit:contain}
+.tcard{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.tcard img{width:56px;height:56px;object-fit:contain}
+.tcard small{display:block;color:var(--muted);font-size:.74rem}
+.fbtns{display:grid;gap:4px}
+.fbtns .act,.fbtns .ghost{padding:5px 8px;font-size:.78rem}
+.tpick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px}
+.tpick .on{outline:2px solid var(--accent)}
 </style>
 </head>
 <body>
@@ -1779,16 +1797,19 @@ async function battle(diff, opts){
   openOv(`<h4>Searching for a wild Digimon…</h4><div class="status">Loading battle data…</div>`);
   const R = curRegion(), rareUp = !opts.foeId && evOn('rare') && p.stage < 5 && Math.random() < 0.3;
   const pool = regionPool(p.stage + (rareUp ? 1 : 0)).filter(id => id !== p.id);
-  const foeBase = state.byId.get(opts.foeId || pick(pool.length ? pool : (state.stageIds[p.stage] || []).filter(id => state.byId.has(id) && id !== p.id)));
+  const foeBase = opts.foe ? { id: opts.foe.id, name: opts.foe.name, image: opts.foe.image } : state.byId.get(opts.foeId || pick(pool.length ? pool : (state.stageIds[p.stage] || []).filter(id => state.byId.has(id) && id !== p.id)));
   let myD = null, foeD = null;
   try{ [myD, foeD] = await Promise.all([getDetail(p.id), getDetail(foeBase.id)]); }catch{}
   await syncMoves(p);
   const mine = partnerStats(p), myBase = baseStats(p.id, p.stage), fb = baseStats(foeBase.id, p.stage + (rareUp ? 1 : 0));
   const foeSt = {}; STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round((fb[k] * rand(0.92, 1.1) + 0.33 * (mine[k] - myBase[k])) * diff.foe * (opts.mult || R.foe))));
+  if (opts.foe) STAT_KEYS.forEach(k => foeSt[k] = Math.max(1, Math.round(+opts.foe.st[k] || 1)));
+  if (opts.hpMul) foeSt.hp = Math.round(foeSt.hp * opts.hpMul);
   const me = applyPerks(fighter(p.name, p.image, mine, mainAttr(myD), partnerMoves(p), p.mood), p);
   const modes = modeFormsOf(p.name), modeCost = Math.max(2, Math.round(me.st.sp * 0.4));
   const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), foeMoves(foeBase.id, foeD, p.stage, diff.lv));
   me.elem = elemOf(myD); foe.elem = elemOf(foeD);
+  if (opts.foe){ foe.moves = (opts.foe.moves || []).map(m => Object.assign({}, m)); if (!foe.moves.length) foe.moves = [toBattle(BASIC, opts.foe.stage || 0), GUARD]; foe.attr = opts.foe.attr || foe.attr; foe.elem = opts.foe.elem || foe.elem; }
   if (opts.carry){ if (opts.carry.hp != null) me.hp = Math.max(1, Math.min(me.st.hp, opts.carry.hp)); if (opts.carry.sp != null) me.sp = Math.max(0, Math.min(me.st.sp, opts.carry.sp)); }
   G.col[foeBase.id] = G.col[foeBase.id] || 'seen';
   saveGame();
@@ -1881,7 +1902,7 @@ async function battle(diff, opts){
     saveGame();
     log(outcome === 'win' ? me.name + ' defeated ' + foe.name + '!' : me.name + ' was defeated by ' + foe.name + '…');
     $('#bact').innerHTML = '<button class="big" id="bDone">Continue</button>';
-    $('#bDone').onclick = () => opts.onDone(outcome);
+    $('#bDone').onclick = () => opts.onDone(outcome, { dealt: foe.st.hp - Math.max(0, foe.hp), max: foe.st.hp });
     return;
   }
 
@@ -3547,6 +3568,8 @@ function renderWorld(sub, msg){
           '<small>Opponents: ' + foes.map(id => esc(shown(id, state.byId.get(id).name))).join(', ') + '</small>' +
           '<small>' + (done ? 'Replay: +' + Math.round(coloData(i) * 0.3) + ' DigiData' : 'First clear: +' + coloData(i) + ' DigiData' + (r.item ? ' · ' + esc(itemIcon(r.item) + ' ' + itemName(r.item)) : '')) + '</small>' +
           (open && p ? '<button class="act" data-colo="' + i + '"' + (p.energy < 30 ? ' disabled' : '') + '>' + (p.energy < 30 ? 'Too tired (30 energy)' : done ? 'Fight again' : 'Fight') + '</button>' : '') + '</div>'; }).join('') + '</div>';
+  } else if (sub === 'online'){
+    body = '<div id="onl"><div class="status">Connecting…</div></div>';
   } else {
     const F = farmInit(), pend = gymPending(), boxers = G.box.filter(m => !m.exp).length;
     body = '<p class="ownline">Plant crops and they grow in real time, even while the app is closed.' + (evOn('harvest') ? ' 🌾 Bumper Crop: everything grows twice as fast right now!' : '') + (weatherAt('file').farm ? ' 🌧️ It\'s raining on the farm, so crops grow 20% faster.' : '') + '</p>' +
@@ -3561,7 +3584,7 @@ function renderWorld(sub, msg){
   }
   v.innerHTML = '<div class="ptop"><h2>Digital World</h2><span class="stage">' + curRegion().icon + ' ' + esc(curRegion().name) + '</span><span class="stage">' + skyTag() + '</span></div>' + eventBanner() +
     '<div class="wallet"><span>DigiData <b>' + G.data.toLocaleString() + '</b></span></div>' +
-    '<div class="segs">' + [['map', '🗺️ Map'], ['colo', '🏟️ Colosseum'], ['farm', '🌾 DigiFarm']].map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-ws="' + k + '">' + l + '</button>').join('') + '</div>' +
+    '<div class="segs">' + [['map', '🗺️ Map'], ['colo', '🏟️ Colosseum'], ['farm', '🌾 DigiFarm'], ['online', '🌐 Online']].map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-ws="' + k + '">' + l + '</button>').join('') + '</div>' +
     body + '<p id="wMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>';
   v.querySelectorAll('[data-ws]').forEach(b => b.onclick = () => renderWorld(b.dataset.ws));
   v.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => {
@@ -3580,6 +3603,7 @@ function renderWorld(sub, msg){
   const fp = $('#farmPlot'); if (fp) fp.onclick = () => { const F = farmInit(), c = plotCost(); if (G.data < c || F.plots.length >= 6) return; G.data -= c; F.plots.push(null); saveGame(); updateCount(); renderWorld('farm', 'A new plot is ready to plant.'); };
   const gu = $('#gymUp'); if (gu) gu.onclick = async () => { const F = farmInit(), c = GYM[F.gym].cost; if (G.data < c) return; if (F.gym) await gymCollect(); G.data -= c; F.gym++; F.gymLast = Date.now(); saveGame(); updateCount(); renderWorld('farm', 'Training Gym is now level ' + F.gym + '!'); };
   const gc = $('#gymCollect'); if (gc) gc.onclick = async () => { gc.disabled = true; const t = await gymCollect(); renderWorld('farm', t || 'Nothing to collect yet.'); };
+  if (sub === 'online'){ const wm = $('#wMsg'); if (wm) wm.remove(); onlineView(msg); }
 }
 function updateWorldBadge(){
   const t = $('#tabWorld'); if (!t) return;
@@ -4002,6 +4026,289 @@ function boxOrder(k){
   return idx.sort((x, y) => (b[y].fav ? 1 : 0) - (b[x].fav ? 1 : 0) || cmp(x, y));
 }
 
+
+// ================= ONLINE: leaderboards, weekly raid boss, trade board, friends (Firebase) =================
+var FB_CONFIG = { apiKey: 'AIzaSyCygsCtli62MxM-b-vtg7Ns12RwwkdsYSw', authDomain: 'digi-5a8c0.firebaseapp.com', projectId: 'digi-5a8c0', storageBucket: 'digi-5a8c0.firebasestorage.app', messagingSenderId: '1036099243428', appId: '1:1036099243428:web:77d2b9fbad6458e8900531' };
+var FB_URL = 'https://www.gstatic.com/firebasejs/10.14.1/';
+var NET = null, netWait = null;
+// load Firebase only when it's needed, and sign in invisibly (each device gets its own anonymous account)
+function net(){
+  if (NET) return Promise.resolve(NET);
+  if (!netWait) netWait = (async () => {
+    const [App, Auth, F] = await Promise.all([import(FB_URL + 'firebase-app.js'), import(FB_URL + 'firebase-auth.js'), import(FB_URL + 'firebase-firestore.js')]);
+    const app = App.initializeApp(FB_CONFIG), auth = Auth.getAuth(app);
+    await auth.authStateReady();
+    const user = auth.currentUser || (await Auth.signInAnonymously(auth)).user;
+    NET = { F, db: F.initializeFirestore(app, { ignoreUndefinedProperties: true }), uid: user.uid };
+    return NET;
+  })().catch(e => { netWait = null; throw e; });
+  return netWait;
+}
+const onl = () => G.online || (G.online = { name: '', friends: [], claimed: {} });
+const myCode = uid => uid.slice(0, 8).toUpperCase();
+const cleanName = s => String(s || '').replace(/[^\p{L}\p{N} _.\-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+const jclean = o => JSON.parse(JSON.stringify(o));
+function netErr(e){
+  const c = String((e && e.code) || ''), m = String((e && e.message) || e || '');
+  if (/configuration-not-found|operation-not-allowed|admin-restricted/.test(c) || /has not been used|is disabled/.test(m)) return 'Online play isn\'t switched on yet in Firebase (sign-in or database).';
+  if (/permission/.test(c)) return 'The server refused that (permission denied).';
+  if (/unavailable|network/.test(c) || !navigator.onLine) return 'You seem to be offline. Check your connection.';
+  return 'Something went wrong (' + (c || m).slice(0, 80) + ').';
+}
+const onlSay = t => { const el = $('#onlMsg'); if (el) el.textContent = t || ''; };
+
+// ----- your public profile (what leaderboards and friends see) -----
+function teamSnap(){
+  return G.party.slice(0, 3).map(m => {
+    const d = state.details.get(m.id);
+    return { id: m.id, name: m.name, image: m.image, stage: m.stage, level: m.level || 1, st: partnerStats(m), attr: d ? mainAttr(d) : 'Free', elem: ELEM_CACHE[m.id] || 'beast', moves: partnerMoves(m) };
+  });
+}
+async function netSync(){
+  const O = onl(); if (!O.name) return;
+  const N = await net(), F = N.F, p = P();
+  await F.setDoc(F.doc(N.db, 'users', N.uid), jclean({ name: O.name, code: myCode(N.uid), title: titleOf() || '', tamerLv: (G.tamer && G.tamer.lv) || 1, found: foundCount(),
+    bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0,
+    partner: p ? { id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1 } : null, team: teamSnap() }));
+  O.synced = Date.now(); saveGame();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && NET && onl().name) netSync().catch(() => {}); });
+
+// ----- the Online section of the World tab -----
+var ONL_TABS = [['ranks', '🏆 Ranks'], ['raid', '👑 Raid'], ['trades', '🔁 Trades'], ['friends', '👥 Friends']];
+async function onlineView(msg){
+  const el = $('#onl'); if (!el) return;
+  const O = onl();
+  if (!O.name){
+    el.innerHTML = '<p class="ownline">Play with other Tamers: leaderboards, a weekly raid boss everyone fights together, a trade board, and battles against your friends\' teams. Pick a Tamer name first. Other players will see it.</p>' +
+      '<div class="bkrow"><input id="onlName" class="onlin" maxlength="16" autocomplete="off" placeholder="Tamer name" value="' + esc(O.prev || '') + '"><button class="act" id="onlGo">Go online</button></div><p id="onlMsg" class="ownline"></p>';
+    $('#onlGo').onclick = async () => {
+      const n = cleanName($('#onlName').value); if (n.length < 3){ onlSay('Use 3 to 16 letters or numbers.'); return; }
+      $('#onlGo').disabled = true; onlSay('Connecting…'); O.name = n;
+      try{ await netSync(); }catch(e){ O.name = ''; saveGame(); onlSay(netErr(e)); $('#onlGo').disabled = false; return; }
+      onlineView('You\'re online as ' + n + '!');
+    };
+    return;
+  }
+  const sub = state.onlSub || 'ranks';
+  el.innerHTML = '<div class="onlhead"><span>🌐 <b>' + esc(O.name) + '</b></span><span id="onlCode" class="stage"></span><button class="ghost" id="onlRename">Rename</button></div>' +
+    '<div class="segs">' + ONL_TABS.map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-onl="' + k + '">' + l + '</button>').join('') + '</div>' +
+    '<div id="onlBody"><div class="status">Connecting…</div></div><p id="onlMsg" class="ownline" style="color:var(--fg)">' + esc(msg || '') + '</p>';
+  el.querySelectorAll('[data-onl]').forEach(b => b.onclick = () => { state.onlSub = b.dataset.onl; onlineView(); });
+  $('#onlRename').onclick = () => { O.prev = O.name; O.name = ''; onlineView(); };
+  try{
+    const N = await net();
+    const cd = $('#onlCode'); if (cd) cd.textContent = 'Friend code ' + myCode(N.uid);
+    if (!O.synced || Date.now() - O.synced > 60000) netSync().catch(() => {});
+    const body = $('#onlBody'); if (!body) return;
+    if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else await viewFriends(body);
+  }catch(e){
+    const b = $('#onlBody'); if (!b) return;
+    b.innerHTML = '<div class="err">' + esc(netErr(e)) + '</div><button class="act" id="onlRetry">Try again</button>';
+    $('#onlRetry').onclick = () => onlineView();
+  }
+}
+
+// ----- leaderboards -----
+var BOARDS = [['tamerLv', '⭐ Tamer level'], ['found', '📖 Digimon found'], ['bestStreak', '🔥 Win streak'], ['colo', '🏟️ Colosseum']];
+const boardVal = (k, v) => k === 'colo' ? (v ? COLO[Math.min(v, COLO.length) - 1].name : '—') : (v || 0).toLocaleString();
+async function viewRanks(el){
+  const N = await net(), F = N.F, k = state.onlBoard || 'tamerLv';
+  const snap = await F.getDocs(F.query(F.collection(N.db, 'users'), F.orderBy(k, 'desc'), F.limit(25)));
+  const rows = snap.docs.map(d => Object.assign({ uid: d.id }, d.data()));
+  const row = (r, rank) => '<div class="lbrow' + (r.uid === N.uid ? ' me' : '') + '"><b>#' + rank + '</b>' + (r.partner && r.partner.image ? '<img alt="" src="' + esc(r.partner.image) + '">' : '<span></span>') +
+    '<span>' + esc(r.name || '?') + (r.title ? '<small>★ ' + esc(r.title) + '</small>' : r.partner ? '<small>' + esc(r.partner.name) + ' · Lv ' + (r.partner.level || 1) + '</small>' : '') + '</span><b>' + boardVal(k, r[k]) + '</b></div>';
+  let me = '';
+  if (!rows.some(r => r.uid === N.uid)){
+    const md = await F.getDoc(F.doc(N.db, 'users', N.uid));
+    if (md.exists()){ const r = Object.assign({ uid: N.uid }, md.data()), c = await F.getCountFromServer(F.query(F.collection(N.db, 'users'), F.where(k, '>', r[k] || 0))); me = '<p class="ownline">Your rank</p>' + row(r, c.data().count + 1); }
+  }
+  el.innerHTML = '<div class="segs">' + BOARDS.map(([b, l]) => '<button class="seg' + (b === k ? ' on' : '') + '" data-board="' + b + '">' + l + '</button>').join('') + '</div>' +
+    '<div class="lbs">' + (rows.length ? rows.map((r, i) => row(r, i + 1)).join('') : '<p class="ownline">No Tamers yet. You could be the first!</p>') + '</div>' + me +
+    '<p class="ownline">Your stats upload when you open this section and when you leave the app.</p>';
+  el.querySelectorAll('[data-board]').forEach(b => b.onclick = () => { state.onlBoard = b.dataset.board; viewRanks(el).catch(e => onlSay(netErr(e))); });
+}
+
+// ----- weekly raid: one huge boss shared by every player -----
+var RAID_PER = 1200;           // raid HP each new attacker adds, so the boss stays a challenge however many join
+var RAID_TRIES = 3;            // raid fights per day
+const raidWeek = () => 'w' + weekNo();
+function raidBossId(){ const pool = (state.stageIds[5] || []).filter(id => !isExtra(id) && !state.armor.has(id) && state.byId.has(id)); return pool[Math.floor(Math.abs(seeded(weekNo(), 4242)) * pool.length) % pool.length]; }
+function raidLocal(){
+  const w = raidWeek(), day = dayKey();
+  if (!G.raid || G.raid.week !== w) G.raid = { week: w, day, used: 0, dmg: 0, joined: false, claimed: false };
+  if (G.raid.day !== day){ G.raid.day = day; G.raid.used = 0; }
+  return G.raid;
+}
+async function raidDoc(){
+  const N = await net(), F = N.F, ref = F.doc(N.db, 'raids', raidWeek());
+  let s = await F.getDoc(ref);
+  if (!s.exists()){
+    const id = raidBossId(), b = state.byId.get(id);
+    try{ await F.setDoc(ref, { boss: { id, name: b.name, image: b.image }, hp: 0, hitters: 0, week: raidWeek() }); }catch{}
+    s = await F.getDoc(ref);
+  }
+  return s.data();
+}
+async function viewRaid(el){
+  const N = await net(), F = N.F, R = raidLocal(), d = await raidDoc(), p = P();
+  const max = RAID_PER * (d.hitters || 0), down = d.hitters > 0 && d.hp <= 0, left = RAID_TRIES - R.used;
+  const top = await F.getDocs(F.query(F.collection(N.db, 'raids', raidWeek(), 'hits'), F.orderBy('dmg', 'desc'), F.limit(10)));
+  const ends = (weekNo() + 1) * 7 * 864e5 - 3 * 864e5 - Date.now();
+  const block = !p ? 'no partner' : asleep(p) ? 'asleep' : careInit(p).sick ? 'sick' : p.energy < 25 ? 'too tired' : '';
+  el.innerHTML = '<div class="raidboss"><img alt="" src="' + esc(d.boss.image) + '"><div><h3 style="margin:0">👑 ' + esc(d.boss.name) + '</h3>' +
+      '<small class="ownline">This week\'s raid boss · ends in ' + fmtLeft(ends) + '</small>' +
+      '<div class="evotrack" style="margin-top:6px"><i style="width:' + (max ? Math.max(0, d.hp / max * 100) : 100) + '%;background:var(--bad)"></i></div>' +
+      '<small>' + (down ? 'Defeated! 🎉' : max ? 'HP ' + d.hp.toLocaleString() + ' / ' + max.toLocaleString() : 'Nobody has attacked yet') + ' · ' + (d.hitters || 0) + ' Tamer' + (d.hitters === 1 ? '' : 's') + '</small></div></div>' +
+    '<div class="wallet"><span>Your damage <b>' + R.dmg + '</b></span><span>Fights left today <b>' + Math.max(0, left) + ' / ' + RAID_TRIES + '</b></span></div>' +
+    (down ? (R.dmg && !R.claimed ? '<button class="big" id="raidClaim">Claim your raid reward</button>' : R.claimed ? '<p class="ownline">✓ Reward claimed. A new boss arrives next week.</p>' : '<p class="ownline">The boss was defeated before you joined. A new boss arrives next week.</p>')
+      : '<button class="big" id="raidGo"' + (block || left <= 0 ? ' disabled' : '') + '>' + (left <= 0 ? 'No fights left today' : block ? (p ? esc(p.name) + ' is ' + block : 'You need a partner') : '⚔️ Attack with ' + esc(p.name) + ' · 25 energy') + '</button>') +
+    '<p class="ownline">Each fight, your partner battles a copy of the boss. The more of its HP you knock out, the more raid damage you deal (win for a bonus). Everyone who helps gets a reward when the boss falls, bigger for more damage.</p>' +
+    '<h5 class="lockh">Top attackers</h5><div class="lbs">' + (top.docs.length ? top.docs.map((h, i) => '<div class="lbrow' + (h.id === N.uid ? ' me' : '') + '"><b>#' + (i + 1) + '</b><span></span><span>' + esc(h.data().name || '?') + '</span><b>' + (h.data().dmg || 0) + '</b></div>').join('') : '<p class="ownline">No attacks yet.</p>') + '</div>';
+  const go = $('#raidGo'); if (go) go.onclick = () => raidFight(d.boss);
+  const cl = $('#raidClaim'); if (cl) cl.onclick = () => {
+    const item = pick(['egg:golden', 'egg:rare', 'egg:champion', randomCrest() || 'h:band', randomHeld()]), data = 300 + R.dmg * 2;
+    R.claimed = true; G.data += data; grantItem(item); saveGame(); updateCount();
+    onlineView('Raid reward: +' + data + ' DigiData and ' + itemIcon(item) + ' ' + itemName(item) + '!');
+  };
+}
+function raidFight(boss){
+  const p = P(), R = raidLocal(); if (!p || R.used >= RAID_TRIES || p.energy < 25 || busy) return;
+  p.energy = clamp(p.energy - 25); R.used++; saveGame();
+  battle(DIFFS[2], { foeId: boss.id, mult: 1.25, hpMul: 5, title: '👑 Raid · ' + boss.name, noRun: true, onDone: async (outcome, info) => {
+    const pct = info && info.max ? Math.round(100 * Math.min(1, info.dealt / info.max)) : 0, dmg = pct + (outcome === 'win' ? 50 : 0), join = !R.joined;
+    R.dmg += dmg; R.joined = true; const reward = 20 + Math.round(dmg / 2); G.data += reward; addBond(p, 1); saveGame();
+    let line = 'You knocked out ' + pct + '% of its HP' + (outcome === 'win' ? ' and won (+50 bonus)' : '') + ': <b>' + dmg + ' raid damage</b>. +' + reward + ' DigiData.';
+    $('#overlay .sheet').innerHTML = '<h4>👑 Raid fight over</h4><p style="margin:0" id="raidRes">' + line + '<br><small>Sending your damage…</small></p><button class="big" id="raidBack">Back to the raid</button>';
+    $('#raidBack').onclick = () => { closeOv(); state.onlSub = 'raid'; setTab('world'); renderWorld('online'); };
+    try{
+      const N = await net(), F = N.F, ref = F.doc(N.db, 'raids', raidWeek());
+      const res = await F.runTransaction(N.db, async tx => {
+        const s = await tx.get(ref), d = s.data();
+        if (d.hitters > 0 && d.hp <= 0) return { over: true };
+        let hp = d.hp, hitters = d.hitters; if (join){ hp += RAID_PER; hitters++; }
+        hp = Math.max(0, hp - dmg); tx.update(ref, { hp, hitters }); return { hp, hitters };
+      });
+      await F.setDoc(F.doc(N.db, 'raids', raidWeek(), 'hits', N.uid), { name: onl().name, dmg: F.increment(dmg), t: F.serverTimestamp() }, { merge: true });
+      const el = $('#raidRes'); if (el) el.innerHTML = line + '<br><small>' + (res.over ? 'The boss was already defeated!' : res.hp <= 0 ? '🎉 You landed the final blow! The boss is down.' : 'Boss HP left: ' + res.hp.toLocaleString()) + '</small>';
+    }catch(e){ const el = $('#raidRes'); if (el) el.innerHTML = line + '<br><small>' + esc(netErr(e)) + ' Your damage still counts toward your reward.</small>'; }
+  } });
+}
+
+// ----- trade board -----
+async function viewTrades(el){
+  const N = await net(), F = N.F, O = onl(); O.claimed = O.claimed || {};
+  // first, settle any of your trades that someone took
+  const mine = await F.getDocs(F.query(F.collection(N.db, 'trades'), F.where('from', '==', N.uid)));
+  const sold = [];
+  for (const d of mine.docs){
+    const t = d.data(); if (t.status !== 'taken') continue;
+    if (!O.claimed[d.id]){ O.claimed[d.id] = 1; G.data += t.paid || 0; sold.push(t.monName + ' went to ' + (t.takerName || 'someone') + (t.paid ? ' for ' + t.paid + ' DigiData' : '')); }
+    F.deleteDoc(d.ref).catch(() => {});
+  }
+  if (sold.length){ saveGame(); updateCount(); }
+  const open = await F.getDocs(F.query(F.collection(N.db, 'trades'), F.where('status', '==', 'open'), F.limit(60)));
+  const list = open.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data())).sort((a, b) => ((b.t && b.t.seconds) || 0) - ((a.t && a.t.seconds) || 0));
+  const card = t => '<div class="tcard"><img alt="" src="' + esc(t.monImage) + '"><div><b>' + esc(t.monName) + '</b><small>' + LEVEL_EN[STAGES[t.monStage]] + ' · Lv ' + t.monLevel + ' · from ' + esc(t.fromName || '?') + '</small>' + (t.note ? '<small>“' + esc(t.note) + '”</small>' : '') + '</div>' +
+    (t.from === N.uid ? '<button class="ghost" data-tcancel="' + t.id + '">Cancel</button>' : '<button class="act" data-ttake="' + t.id + '"' + (G.data < (t.price || 0) ? ' disabled' : '') + '>' + (t.price ? t.price + ' DD' : 'Free') + '</button>') + '</div>';
+  el.innerHTML = (sold.length ? '<p class="ownline" style="color:var(--good)">💰 ' + esc(sold.join('. ')) + '.</p>' : '') +
+    '<div class="wallet"><span>DigiData <b>' + G.data.toLocaleString() + '</b></span><span>Box <b>' + G.box.length + ' / ' + G.boxCap + '</b></span></div>' +
+    '<button class="act wide" id="tPostBtn">📤 Post a Digimon from your Box</button><div id="tPost" hidden></div>' +
+    '<div class="lbs">' + (list.length ? list.map(card).join('') : '<p class="ownline">No trades posted yet.</p>') + '</div>' +
+    '<p class="ownline">Posting a Digimon takes it out of your Box until someone takes it or you cancel. When someone takes it, you get the price the next time you open this board.</p>';
+  $('#tPostBtn').onclick = () => tradePostForm($('#tPost'));
+  el.querySelectorAll('[data-ttake]').forEach(b => b.onclick = async () => {
+    const t = list.find(x => x.id === b.dataset.ttake); if (!t) return;
+    if (G.box.length >= G.boxCap){ onlSay('Your Box is full. Make room first.'); return; }
+    if (G.data < (t.price || 0)){ onlSay('Not enough DigiData.'); return; }
+    if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap to confirm'; return; }
+    b.disabled = true;
+    try{
+      await F.runTransaction(N.db, async tx => {
+        const s = await tx.get(t.ref); if (!s.exists() || s.data().status !== 'open') throw { code: 'gone' };
+        tx.update(t.ref, { status: 'taken', taker: N.uid, takerName: O.name, paid: t.price || 0 });
+      });
+      const m = Object.assign({}, t.mon); delete m.exp; delete m.fav; m.last = Date.now();
+      G.data -= t.price || 0; G.box.push(m); if (!raised(m.id)) G.col[m.id] = 'raised'; saveGame(); updateCount();
+      onlineView('🔁 ' + t.monName + ' joined your Box!');
+    }catch(e){ onlSay(e && e.code === 'gone' ? 'Someone else got there first.' : netErr(e)); viewTrades(el).catch(() => {}); }
+  });
+  el.querySelectorAll('[data-tcancel]').forEach(b => b.onclick = async () => {
+    const t = list.find(x => x.id === b.dataset.tcancel); if (!t) return;
+    if (G.box.length >= G.boxCap){ onlSay('Your Box is full, so there\'s nowhere to put it back.'); return; }
+    b.disabled = true;
+    try{
+      const back = await F.runTransaction(N.db, async tx => { const s = await tx.get(t.ref); if (!s.exists() || s.data().status !== 'open') return false; tx.delete(t.ref); return true; });
+      if (back){ const m = Object.assign({}, t.mon); m.last = Date.now(); G.box.push(m); saveGame(); onlineView(t.monName + ' is back in your Box.'); }
+      else onlineView('Too late, someone already took it!');
+    }catch(e){ onlSay(netErr(e)); b.disabled = false; }
+  });
+}
+function tradePostForm(box){
+  if (!box.hidden){ box.hidden = true; return; }
+  const ok = G.box.map((m, i) => [m, i]).filter(([m]) => !m.exp && !m.fav);
+  box.hidden = false;
+  box.innerHTML = ok.length ? '<p class="ownline">Pick a Digimon (favorites and ones on expeditions can\'t be traded):</p><div class="tpick">' + ok.map(([m, i]) => '<button class="bcell" data-tpick="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + '</small></button>').join('') + '</div>' +
+      '<div class="bkrow"><input id="tPrice" class="onlin" type="number" min="0" max="9999" inputmode="numeric" placeholder="Price in DigiData (0 = free)"><input id="tNote" class="onlin" maxlength="40" placeholder="Note (optional)"></div><button class="big" id="tSend" disabled>Post trade</button>'
+    : '<p class="ownline">You have nothing to trade. Put a Digimon in your Box first.</p>';
+  let sel = null;
+  box.querySelectorAll('[data-tpick]').forEach(b => b.onclick = () => { sel = +b.dataset.tpick; box.querySelectorAll('[data-tpick]').forEach(x => x.classList.toggle('on', x === b)); $('#tSend').disabled = false; });
+  const send = $('#tSend'); if (send) send.onclick = async () => {
+    const m = G.box[sel]; if (!m) return;
+    const price = Math.max(0, Math.min(9999, Math.round(+$('#tPrice').value || 0))), note = String($('#tNote').value || '').replace(/[<>]/g, '').trim().slice(0, 40);
+    send.disabled = true;
+    try{
+      const N = await net(), F = N.F, mon = jclean(m); delete mon.exp; delete mon.fav; delete mon.msg;
+      G.box.splice(sel, 1); saveGame();
+      await F.addDoc(F.collection(N.db, 'trades'), { from: N.uid, fromName: onl().name, mon, monName: m.name, monImage: m.image, monStage: m.stage, monLevel: m.level || 1, price, note, status: 'open', t: F.serverTimestamp() });
+      onlineView('📤 ' + m.name + ' is on the trade board.');
+    }catch(e){ if (!G.box.includes(m)){ G.box.splice(sel, 0, m); saveGame(); } onlSay(netErr(e)); send.disabled = false; }
+  };
+}
+
+// ----- friends: add by code, battle their real team -----
+async function viewFriends(el){
+  const N = await net(), F = N.F, O = onl(); O.friends = O.friends || [];
+  const docs = await Promise.all(O.friends.map(f => F.getDoc(F.doc(N.db, 'users', f.uid)).then(s => s.exists() ? Object.assign({ uid: f.uid }, s.data()) : null).catch(() => null)));
+  const today = dayKey(); O.fb = O.fb || {};
+  el.innerHTML = '<div class="wallet"><span>Your friend code <b>' + myCode(N.uid) + '</b></span><button class="favbtn" id="fCopy">Copy</button></div>' +
+    '<div class="bkrow"><input id="fCode" class="onlin" maxlength="8" autocomplete="off" placeholder="Friend\'s code" style="text-transform:uppercase"><button class="act" id="fAdd">Add friend</button></div>' +
+    '<div class="lbs">' + (docs.filter(Boolean).length ? docs.map((f, i) => !f ? '' : '<div class="tcard">' + (f.partner && f.partner.image ? '<img alt="" src="' + esc(f.partner.image) + '">' : '<span></span>') +
+      '<div><b>' + esc(f.name) + '</b><small>' + (f.title ? '★ ' + esc(f.title) + ' · ' : '') + 'Tamer Lv ' + (f.tamerLv || 1) + ' · ' + (f.found || 0) + ' found</small>' +
+      '<small>' + (f.team || []).map(m => esc(m.name) + ' Lv ' + m.level).join(', ') + '</small></div>' +
+      '<div class="fbtns">' + (f.team || []).map((m, j) => '<button class="act" data-fbat="' + i + ':' + j + '">⚔️ ' + esc(m.name) + '</button>').join('') + '<button class="ghost" data-fdel="' + i + '">Remove</button></div></div>').join('')
+      : '<p class="ownline">No friends yet. Swap friend codes and add each other!</p>') + '</div>' +
+    '<p class="ownline">Battles use your friend\'s real team (stats and moves from the last time they were online). The first win against each friend every day gives +60 DigiData.</p>';
+  $('#fCopy').onclick = async () => { try{ await navigator.clipboard.writeText(myCode(N.uid)); onlSay('Friend code copied.'); }catch{ onlSay('Your code: ' + myCode(N.uid)); } };
+  $('#fAdd').onclick = async () => {
+    const code = String($('#fCode').value || '').trim().toUpperCase(); if (code.length < 8){ onlSay('Friend codes are 8 characters.'); return; }
+    if (code === myCode(N.uid)){ onlSay('That\'s your own code!'); return; }
+    try{
+      const q = await F.getDocs(F.query(F.collection(N.db, 'users'), F.where('code', '==', code), F.limit(1)));
+      if (!q.docs.length){ onlSay('No Tamer found with that code.'); return; }
+      const d = q.docs[0]; if (O.friends.some(f => f.uid === d.id)){ onlSay('Already friends!'); return; }
+      O.friends.push({ uid: d.id, name: d.data().name }); saveGame(); onlineView('Added ' + d.data().name + ' as a friend!');
+    }catch(e){ onlSay(netErr(e)); }
+  };
+  el.querySelectorAll('[data-fdel]').forEach(b => b.onclick = () => {
+    if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap to remove'; return; }
+    O.friends.splice(+b.dataset.fdel, 1); saveGame(); onlineView();
+  });
+  el.querySelectorAll('[data-fbat]').forEach(b => b.onclick = () => {
+    const [i, j] = b.dataset.fbat.split(':').map(Number), f = docs[i], foe = f && f.team && f.team[j], p = P();
+    if (!foe || !p || busy) return;
+    if (asleep(p) || careInit(p).sick || p.energy < 25){ onlSay(p.name + (asleep(p) ? ' is asleep.' : careInit(p).sick ? ' is sick.' : ' is too tired (25 energy).')); return; }
+    p.energy = clamp(p.energy - 25); saveGame();
+    battle(DIFFS[1], { foe, title: '🤝 vs ' + f.name + '\'s ' + foe.name, onDone: (outcome) => {
+      let line = outcome === 'win' ? p.name + ' beat ' + f.name + '\'s ' + foe.name + '!' : outcome === 'lose' ? f.name + '\'s ' + foe.name + ' won this time.' : 'You ran away.';
+      if (outcome === 'win' && O.fb[f.uid] !== today){ O.fb[f.uid] = today; G.data += 60; addBond(p, 2); line += ' +60 DigiData (first win today).'; }
+      saveGame(); updateCount();
+      $('#overlay .sheet').innerHTML = '<h4>🤝 Friend battle</h4><p style="margin:0">' + esc(line) + '</p><button class="big" id="fbBack">Back</button>';
+      $('#fbBack').onclick = () => { closeOv(); state.onlSub = 'friends'; setTab('world'); renderWorld('online'); };
+    } });
+  });
+}
+
 setRetro(false);
 // light / dark mode: follows the phone until you pick one, then remembers it
 function isDark(){ return document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); }
@@ -4019,7 +4326,7 @@ $('#trainerBtn').onclick = () => { if (!busy) trainerScreen(); };
 paintTitle();
 setInterval(updateTrainerBadge, 60000);
 evCheck(); updateWorldBadge();
-setInterval(() => { const before = G.ev && G.ev.key; evCheck(); updateWorldBadge(); if (busy || document.hidden) return; if (state.tab === 'world') renderWorld(); else if ((G.ev && G.ev.key) !== before && state.tab === 'partner') renderPartner(); }, 30000);
+setInterval(() => { const before = G.ev && G.ev.key; evCheck(); updateWorldBadge(); if (busy || document.hidden) return; if (state.tab === 'world' && state.worldSub !== 'online') renderWorld(); else if ((G.ev && G.ev.key) !== before && state.tab === 'partner') renderPartner(); }, 30000);
 questInit(); updateQuestBadge();
 setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
