@@ -259,6 +259,8 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .dsheet{gap:8px}
 .dhead{display:flex;flex-wrap:wrap;gap:4px 10px;font:600 .66rem var(--mono);color:var(--muted);align-items:center}
 .dhead b{color:var(--fg);font:700 .95rem var(--display)}
+.dauto{margin-left:auto;border:1.5px solid var(--accent);color:var(--accent);background:transparent;border-radius:999px;padding:5px 12px;font:700 .8rem var(--display);cursor:pointer}
+.dauto.on{background:var(--accent);color:var(--accent-ink)}
 .dbar{display:inline-block;width:40px;height:5px;border-radius:3px;background:var(--sunk);margin-left:4px;vertical-align:middle;overflow:hidden}
 .dbar i{display:block;height:100%;background:var(--good)}
 .dbar.s i{background:var(--link)}
@@ -2599,6 +2601,7 @@ function dgUI(){
   $('#dgTgt').onclick = () => dgCycleTarget();
   $('#dgTurn').onclick = () => { dg.turnMode = !dg.turnMode; dgDraw(); };
   $('#dgAuto').onclick = () => dgAutoToggle();
+  $('#dhead').onclick = e => { if (e.target.closest('[data-dauto]')) dgAutoToggle(); };
   // any other control takes over from auto-explore
   sheet.querySelector('.dctl').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.id !== 'dgAuto' && dg && dg.auto) dgAutoStop('You took over.'); }, true);
   $('#dteam').onclick = e => { const b = e.target.closest('[data-mate]'); if (b && dg && !dg.over) dgLead(dg.team[+b.dataset.mate]); };
@@ -2706,6 +2709,7 @@ function dgDraw(){
   const head = $('#dhead');
   const bar = (v, max, cls) => '<span class="dbar ' + cls + '"><i style="width:' + Math.max(0, v / max * 100) + '%"></i></span>';
   if (head) head.innerHTML = '<b>B' + dg.floor + 'F</b><span class="stage">' + dg.diff.name + '</span><span class="stage">' + esc(th.name) + '</span>' + (dg.keys ? '<span>🗝️ ' + dg.keys + '</span>' : '') +
+    '<button class="dauto' + (dg.auto ? ' on' : '') + '" data-dauto aria-pressed="' + (dg.auto ? 'true' : 'false') + '">' + (dg.auto ? '⏸ Stop auto' : '🧭 Auto') + '</button>' +
     '<span>' + esc(m.name) + ' HP ' + m.hp + '/' + m.max + bar(m.hp, m.max, 'h') + '</span>' +
     '<span>SP ' + m.sp + '/' + m.st.sp + bar(m.sp, m.st.sp, 's') + '</span>' +
     '<span>Belly ' + Math.round(P().hunger) + '</span><span>Data +' + dg.data + '</span>';
