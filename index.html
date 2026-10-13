@@ -2553,7 +2553,7 @@ function dgUI(){
       '<span></span><button data-d="up" aria-label="Move up">▲</button><span></span>' +
       '<button data-d="left" aria-label="Move left">◀</button><button data-d="wait" aria-label="Wait a turn">•</button><button data-d="right" aria-label="Move right">▶</button>' +
       '<span></span><button data-d="down" aria-label="Move down">▼</button><span></span></div>' +
-      '<div class="dside"><button class="act" id="dgSkill"></button><button class="ghost" id="dgNext">⇄ Switch move</button><button class="ghost" id="dgTgt">🎯 Next target</button><button class="ghost" id="dgTurn" aria-pressed="false">↻ Turn in place</button><button class="act" id="dgMeat"></button><button class="act" id="dgDisk"></button><button class="ghost" id="dgQuit">Leave</button></div></div>';
+      '<div class="dside"><button class="act" id="dgSkill"></button><button class="ghost" id="dgNext">⇄ Switch move</button><button class="ghost" id="dgTgt">🎯 Next target</button><button class="ghost" id="dgTurn" aria-pressed="false">↻ Turn in place</button><button class="act" id="dgMeat"></button><button class="act" id="dgDisk"></button><button class="ghost" id="dgAuto" aria-pressed="false">🧭 Auto-explore</button><button class="ghost" id="dgQuit">Leave</button></div></div>';
   sheet.querySelectorAll('[data-d]').forEach(b => b.onclick = () => b.dataset.d === 'wait' ? dgAct('wait') : dgAct('move', DIRS[b.dataset.d]));
   $('#dgSkill').onclick = () => dgAct('skill');
   $('#dgMeat').onclick = () => dgAct('meat');
@@ -2561,6 +2561,9 @@ function dgUI(){
   $('#dgNext').onclick = () => { dg.sel = (dg.sel + 1) % dg.me.moves.length; dgDraw(); };
   $('#dgTgt').onclick = () => dgCycleTarget();
   $('#dgTurn').onclick = () => { dg.turnMode = !dg.turnMode; dgDraw(); };
+  $('#dgAuto').onclick = () => dgAutoToggle();
+  // any other control takes over from auto-explore
+  sheet.querySelector('.dctl').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.id !== 'dgAuto' && dg && dg.auto) dgAutoStop('You took over.'); }, true);
   $('#dteam').onclick = e => { const b = e.target.closest('[data-mate]'); if (b && dg && !dg.over) dgLead(dg.team[+b.dataset.mate]); };
   $('#dgQuit').onclick = () => { const q = $('#dgQuit'); if (q.dataset.armed) dgEnd('quit'); else { q.dataset.armed = '1'; q.textContent = 'Tap to leave'; } };
   dgLog(dg.log.pop() || '');
@@ -2569,12 +2572,90 @@ function dgUI(){
 const dgKeys = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
 document.addEventListener('keydown', e => {
   if (!dg || dg.over) return;
+  if (e.key === 'x'){ dgAutoToggle(); return; }
+  if (dg.auto && (dgKeys[e.key] || [' ', 'q', 'e', 'Tab'].includes(e.key))) dgAutoStop('You took over.');
   if (dgKeys[e.key] && e.shiftKey){ e.preventDefault(); const t = dg.turnMode; dg.turnMode = true; dgAct('move', DIRS[dgKeys[e.key]]); dg.turnMode = t; dgDraw(); }
   else if (dgKeys[e.key]){ e.preventDefault(); dgAct('move', DIRS[dgKeys[e.key]]); }
   else if (e.key === 'e' || e.key === 'Tab'){ e.preventDefault(); dgCycleTarget(); }
   else if (e.key === ' '){ e.preventDefault(); dgAct('wait'); }
   else if (e.key === 'q'){ dgAct('skill'); }
 });
+
+// ----- auto-explore: fights what it meets, grabs items, explores the floor, then takes the stairs -----
+var DG_AUTO_MS = 150;
+function dgAutoToggle(on){
+  if (!dg || dg.over) return;
+  dg.auto = on === undefined ? !dg.auto : !!on;
+  clearTimeout(dg.autoT); dg.autoStuck = 0;
+  if (dg.auto){ dg.turnMode = false; dgLog('🧭 Auto-explore on. Tap any control to take over.'); dgDraw(); dg.autoT = setTimeout(dgAutoTick, 250); }
+  else { dgLog('🧭 Auto-explore off.'); dgDraw(); }
+}
+function dgAutoStop(why){ if (!dg || !dg.auto) return; dg.auto = false; clearTimeout(dg.autoT); if (why) dgLog('🧭 ' + why); dgDraw(); }
+function dgAutoTick(){
+  if (!dg || dg.over || !dg.auto) return;
+  if (!$('#dgc')){ dg.auto = false; return; }
+  const turn = dg.turn, floor = dg.floor, run = dg;
+  try{ dgAutoStep(); }catch(e){ console.warn('auto', e); dgAutoStop('Auto-explore hit a snag. Your move!'); return; }
+  if (dg !== run || dg.over || !dg.auto) return;
+  if (dg.turn === turn && dg.floor === floor){ if (++dg.autoStuck > 5){ dgAutoStop('Auto-explore is stuck here. Your move!'); return; } } else dg.autoStuck = 0;
+  dg.autoT = setTimeout(dgAutoTick, dg.floor !== floor ? 800 : DG_AUTO_MS);
+}
+// first step of the shortest known path to the nearest tile that passes goal(x, y); walks only on explored floor and steps around lava
+function dgAutoPath(u, goal){
+  const W = DG.W, start = u.y * W + u.x, prev = new Int32Array(W * DG.H).fill(-2), q = [start];
+  prev[start] = -1;
+  for (let qi = 0; qi < q.length; qi++){
+    const c = q[qi], cx = c % W, cy = (c / W) | 0;
+    if (c !== start && goal(cx, cy)){
+      let k = c; while (prev[k] !== start) k = prev[k];
+      return { x: k % W, y: (k / W) | 0 };
+    }
+    for (const d of Object.values(DIRS)){
+      const nx = cx + d[0], ny = cy + d[1], n = ny * W + nx;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= DG.H || prev[n] !== -2 || !dgFloor(nx, ny) || !dg.seen[n]) continue;
+      // enemies don't block the route: bumping into one just starts a fight
+      if (dg.tiles && dg.tiles.get(n) === 'lava' && !goal(nx, ny)) continue;
+      prev[n] = c; q.push(n);
+    }
+  }
+  return null;
+}
+function dgAutoStep(){
+  const m = dg.me, hpP = m.hp / m.max, seen = (x, y) => !!dg.seen[y * DG.W + x];
+  const foes = dg.enemies.filter(e => dgVisible(e.x, e.y));
+  // eat when hurt; stop if things look grim
+  if (hpP < 0.4 && dg.bag.meat){ dgAct('meat'); return; }
+  if (hpP < 0.3){ const fresh = dgMates().filter(u => u.hp > u.max * 0.6).sort((a, b) => b.hp / b.max - a.hp / a.max)[0]; if (fresh){ dgLead(fresh); return; } }
+  if (hpP < 0.25 && foes.length){ dgAutoStop(m.name + ' is badly hurt and out of meat, so auto-explore paused.'); return; }
+  if (foes.length){
+    // the hardest-hitting move that can reach someone right now (bosses first)
+    let best = null;
+    m.moves.forEach((mv, i) => {
+      if (!dgRange(mv) || (mv.cost || 0) > m.sp) return;
+      const ts = dgTargets(m, mv, true); if (!ts.length) return;
+      const score = (mv.kind === 'phys' ? m.st.atk : m.st.int) * (mv.power || 1);
+      if (!best || score > best.score) best = { i, score, t: ts.find(e => e.boss) || ts[0] };
+    });
+    if (best){ dg.sel = best.i; dg.tgt = best.t; dgAct('skill'); return; }
+    if (m.sp < m.st.sp * 0.2 && dg.bag.disk && m.moves.some(mv => dgRanged(mv) && mv.cost)){ dgAct('disk'); return; }
+    const near = foes.slice().sort((a, b) => dgDist(m, a) - dgDist(m, b))[0];
+    const step = dgAutoPath(m, (x, y) => x === near.x && y === near.y);
+    if (step){ dgAutoMove(step); return; }
+  }
+  // treasure first, then the campfire if the team is hurt, then unexplored ground, then the stairs
+  const items = dg.items.filter(it => seen(it.x, it.y) && (it.type !== 'chest' || dg.keys));
+  let step = items.length ? dgAutoPath(m, (x, y) => items.some(it => it.x === x && it.y === y)) : null;
+  const hurt = dg.team.some(u => u.hp <= 0 || u.hp < u.max * 0.6);
+  if (!step && hurt && dg.fire && !dg.fire.used && seen(dg.fire.x, dg.fire.y)) step = dgAutoPath(m, (x, y) => x === dg.fire.x && y === dg.fire.y);
+  if (!step) step = dgAutoPath(m, (x, y) => { for (const d of Object.values(DIRS)){ const nx = x + d[0], ny = y + d[1]; if (nx >= 0 && ny >= 0 && nx < DG.W && ny < DG.H && !dg.seen[ny * DG.W + nx]) return true; } return false; });
+  if (!step && dg.stairs && seen(dg.stairs.x, dg.stairs.y)) step = dgAutoPath(m, (x, y) => x === dg.stairs.x && y === dg.stairs.y);
+  if (!step){ dgAutoStop('Explored everything I can reach. Your move!'); return; }
+  dgAutoMove(step);
+}
+function dgAutoMove(step){
+  const m = dg.me, dir = Object.values(DIRS).find(d => m.x + d[0] === step.x && m.y + d[1] === step.y);
+  if (dir) dgAct('move', dir);
+}
 
 function dgCycleTarget(){
   if (!dg || dg.over) return;
@@ -2598,6 +2679,7 @@ function dgDraw(){
   const aim = dgAim(m, smv), rng = dgRange(smv);
   const sk = $('#dgSkill'); if (sk){ sk.innerHTML = esc(smv.name) + '<small>' + esc(moveLabel(smv)) + (rng ? ' · ' + (rng > 1 ? '🏹 ranged ' + rng : 'melee') + (aim ? ' → ' + esc(aim.name) : ' · no target') : '') + '</small>'; sk.disabled = (smv.cost || 0) > m.sp; }
   const tb = $('#dgTgt'); if (tb){ const n = rng ? dgTargets(m, smv, true).length : 0; tb.disabled = n < 2; tb.textContent = '🎯 Next target' + (n > 1 ? ' (' + n + ')' : ''); }
+  const au = $('#dgAuto'); if (au){ au.classList.toggle('on', !!dg.auto); au.setAttribute('aria-pressed', dg.auto ? 'true' : 'false'); au.textContent = dg.auto ? '⏸ Stop auto' : '🧭 Auto-explore'; }
   const tn = $('#dgTurn'); if (tn){ tn.setAttribute('aria-pressed', dg.turnMode ? 'true' : 'false'); tn.textContent = dg.turnMode ? '↻ Turning: tap arrows' : '↻ Turn in place'; tn.classList.toggle('on', !!dg.turnMode); }
   const mt = $('#dgMeat'); if (mt){ mt.innerHTML = 'Meat ×' + dg.bag.meat + '<small>+40% HP</small>'; mt.disabled = !dg.bag.meat; }
   const dk = $('#dgDisk'); if (dk){ dk.innerHTML = 'SP Disk ×' + dg.bag.disk + '<small>+60% SP</small>'; dk.disabled = !dg.bag.disk; }
