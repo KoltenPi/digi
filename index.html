@@ -2300,6 +2300,7 @@ function stageFloor(p){ const f = STAGE_MIN_LV[p.stage] || 1; if (!p.level || p.
 const BASIC = { name: 'Tackle', kind: 'phys', power: 1, desc: 'A basic body attack. Costs no SP.' };
 const GUARD = { name: 'Guard', kind: 'guard', power: 0, cost: 0 };
 const KIND_LABEL = { phys: 'PHY', mag: 'MAG', heal: 'HEAL', buff: 'BUFF', drain: 'DRAIN', guard: 'GRD' };
+const kindLabel = m => m.kind === 'buff' && moveTrait(m) === 'shield' ? 'GUARD' : m.kind === 'buff' && moveTrait(m) === 'haste' ? 'SPD' : KIND_LABEL[m.kind];
 const GENERIC = [
   { name: 'Data Shot', kind: 'mag', power: 1.3, desc: 'Fires a compact burst of data.' },
   { name: 'Quick Strike', kind: 'phys', power: 1.3, desc: 'A fast physical hit.' },
@@ -2345,25 +2346,30 @@ function moveCost(m, stage){
 function toBattle(m, stage){ return { name: m.name, kind: m.kind, power: m.power, cost: moveCost(m, stage), desc: m.desc }; }
 function moveLabel(m){
   const c = m.cost ? m.cost + ' SP · ' : 'free · ';
-  if (m.kind === 'phys') return c + 'ATK ×' + m.power;
-  if (m.kind === 'mag') return c + 'INT ×' + m.power;
-  if (m.kind === 'drain') return c + 'INT ×' + m.power + ', heals';
-  if (m.kind === 'heal') return c + 'heals ' + Math.round(m.power * 100) + '% HP';
+  const tr = moveTrait(m), ti = tr ? ' · ' + TRAITS[tr].icon : '';
+  if (m.kind === 'phys') return c + 'ATK ×' + m.power + ti;
+  if (m.kind === 'mag') return c + 'INT ×' + m.power + ti;
+  if (m.kind === 'drain') return c + 'INT ×' + m.power + ', heals' + ti;
+  if (m.kind === 'heal') return c + 'heals ' + Math.round(m.power * 100) + '% HP, cures';
+  if (m.kind === 'buff' && tr === 'shield') return c + '−40% damage taken, 3 turns';
+  if (m.kind === 'buff' && tr === 'haste') return c + '+30% SPD';
   if (m.kind === 'buff') return c + '+' + Math.round((m.power - 1) * 100) + '% damage';
   return 'halve damage, +SP';
 }
 // what a move actually does, in plain words (matches doMove)
-const STATUS_FX = { psn: 'poison the foe (it loses 1/12 of its max HP each turn for 4 turns)', par: 'paralyze the foe (30% chance each turn that it can\'t move, for 3 turns)', slp: 'put the foe to sleep (it skips 1–3 turns, or wakes up when hit)' };
+const STATUS_FX = { psn: 'poison the foe (it loses 1/12 of its max HP each turn for 4 turns)', par: 'paralyze the foe (30% chance each turn that it can\'t move, for 3 turns)', slp: 'put the foe to sleep (it skips 1–3 turns, or wakes up when hit)', brn: 'burn the foe (it loses 1/16 of its max HP each turn and deals 25% less damage, for 4 turns)', frz: 'freeze the foe (it loses its next turn)' };
 const dealsDamage = m => !!m && (m.kind === 'phys' || m.kind === 'atk' || m.kind === 'mag' || m.kind === 'drain');
 function moveEffect(m, withCost){
   const x = v => (Math.round(v * 100) / 100) + '×';
   const cost = withCost === false || m.kind === 'guard' ? '' : m.cost ? 'Costs ' + m.cost + ' SP. ' : 'Free. ';
-  const st = dealsDamage(m) && moveStatus(m);
-  const sx = st ? ' 30% chance to ' + STATUS_FX[st] + '.' : '';
+  const st = dealsDamage(m) && moveStatus(m), tr = moveTrait(m);
+  const sx = (st ? ' 30% chance to ' + STATUS_FX[st] + '.' : '') + (tr && dealsDamage(m) ? ' ' + TRAITS[tr].icon + ' ' + TRAITS[tr].name + ': ' + TRAITS[tr].tip : '');
   if (m.kind === 'phys' || m.kind === 'atk') return cost + 'Physical attack: deals damage equal to ' + x(m.power || 1) + ' your ATK, softened by the foe\'s DEF.' + sx;
   if (m.kind === 'mag') return cost + 'Special attack: deals damage equal to ' + x(m.power) + ' your INT, softened by the foe\'s DEF.' + sx;
   if (m.kind === 'drain') return cost + 'Draining attack: deals damage equal to ' + x(m.power) + ' your INT and heals you for half the damage dealt.' + sx;
-  if (m.kind === 'heal') return cost + 'Restores ' + Math.round(m.power * 100) + '% of your max HP.';
+  if (m.kind === 'heal') return cost + 'Restores ' + Math.round(m.power * 100) + '% of your max HP and cures poison, burns and other status problems.';
+  if (m.kind === 'buff' && tr === 'shield') return cost + TRAITS.shield.icon + ' Barrier: ' + TRAITS.shield.tip;
+  if (m.kind === 'buff' && tr === 'haste') return cost + TRAITS.haste.icon + ' Haste: ' + TRAITS.haste.tip + ' After two uses it gives +15% damage instead.';
   if (m.kind === 'buff') return cost + 'Powers up: your attacks deal +' + Math.round((m.power - 1) * 100) + '% damage for the rest of the battle (stacks, up to +90%).';
   if (m.kind === 'guard') return 'Free. Halves the damage you take until your next turn and recovers 20% of your max SP.';
   return cost;
@@ -2379,7 +2385,7 @@ function mxSet(foeId, att, name, am){
 const mxBadge = v => v == null ? '' : '<span class="mx' + (v > 1 ? ' up' : v < 1 ? ' dn' : '') + '">×' + v + (v > 1 ? ' ▲' : v < 1 ? ' ▼' : '') + '</span>';
 const mxWord = v => v > 1.4 ? 'super effective' : v > 1 ? 'effective' : v < 0.7 ? 'barely effective' : v < 1 ? 'not very effective' : 'normal damage';
 function moveTipHtml(m, foeName, mx, acc){
-  return '<div class="tt"><span class="mvk ' + (m.kind === 'atk' ? 'phys' : m.kind) + '">' + (KIND_LABEL[m.kind] || 'PHY') + '</span>' + esc(m.name) + '</div><div>' + esc(moveEffect(m)) + '</div>' +
+  return '<div class="tt"><span class="mvk ' + (m.kind === 'atk' ? 'phys' : m.kind) + '">' + (kindLabel(m) || 'PHY') + '</span>' + esc(m.name) + '</div><div>' + esc(moveEffect(m)) + '</div>' +
     (dealsDamage(m) ? '<div>🎯 ' + (acc != null ? '<b>' + acc + '% accuracy</b> against ' + esc(foeName) : '<b>' + ACC_TEXT + '</b>') + '</div>' : '') +
     (m.desc ? '<i>' + esc(m.desc) + '</i>' : '') +
     (dealsDamage(m) && foeName ? '<div class="tm">' + (mx != null ? 'Against ' + esc(foeName) + ': ' + mxBadge(mx) + ' ' + mxWord(mx) : 'Against ' + esc(foeName) + ': not tried yet. Use it once to see how well it works.') + '</div>' : '');
@@ -2460,12 +2466,12 @@ async function movesScreen(){
   const draw = () => {
     const eq = new Set(p.equip);
     const row = m => { const b = toBattle(m, p.stage), on = eq.has(m.name);
-      return '<button class="mvrow' + (on ? ' on' : '') + '" data-eq="' + esc(m.name) + '"><span class="mvk ' + m.kind + '">' + KIND_LABEL[m.kind] + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>' + esc(moveLabel(b)) + (dealsDamage(b) ? ' · 🎯95%' : '') + '</small><small class="mvfx">' + esc(moveEffect(b, false)) + '</small></span><span class="mvc">' + (on ? '✓' : '') + '</span></button>'; };
+      return '<button class="mvrow' + (on ? ' on' : '') + '" data-eq="' + esc(m.name) + '"><span class="mvk ' + m.kind + '">' + kindLabel(m) + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>' + esc(moveLabel(b)) + (dealsDamage(b) ? ' · 🎯' + (moveTrait(b) === 'quick' ? 100 : 95) + '%' : '') + '</small><small class="mvfx">' + esc(moveEffect(b, false)) + '</small></span><span class="mvc">' + (on ? '✓' : '') + '</span></button>'; };
     const next = d ? learnset(p.id, d, p.stage).filter(m => m.learn > p.level && !p.moves.some(k => k.name === m.name)) : [];
     $('#overlay .sheet').innerHTML = '<h4>Moves · ' + esc(p.name) + ' <span class="stage">Lv ' + p.level + '</span></h4>' +
       '<p style="margin:0;color:var(--muted);font-size:.85rem">Tap a move to equip or unequip it. In battle, press and hold a move to see what it does. 🎯 is accuracy against an equally fast foe: it drops against faster foes (down to 70%) and rises a little against slower ones. Up to 4 equipped moves are used in battles and dungeons, and Guard is always available. Moves stay learned when your Digimon digivolves.</p>' +
       '<div class="mvlist">' + p.moves.map(row).join('') + '</div>' +
-      (next.length ? '<h3 style="margin:6px 0 0">Coming up</h3><div class="mvlist">' + next.map(m => '<div class="mvrow locked"><span class="mvk ' + m.kind + '">' + KIND_LABEL[m.kind] + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>Learns at Lv ' + m.learn + ' · ' + esc(moveLabel(toBattle(m, p.stage))) + '</small><small class="mvfx">' + esc(moveEffect(toBattle(m, p.stage), false)) + '</small></span><span></span></div>').join('') + '</div>' : '') +
+      (next.length ? '<h3 style="margin:6px 0 0">Coming up</h3><div class="mvlist">' + next.map(m => '<div class="mvrow locked"><span class="mvk ' + m.kind + '">' + kindLabel(m) + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>Learns at Lv ' + m.learn + ' · ' + esc(moveLabel(toBattle(m, p.stage))) + '</small><small class="mvfx">' + esc(moveEffect(toBattle(m, p.stage), false)) + '</small></span><span></span></div>').join('') + '</div>' : '') +
       '<p id="mvMsg" style="margin:0;min-height:1.2em;font-size:.85rem;color:var(--bad)"></p><button class="big" id="mvDone">Done</button>';
     $('#overlay').querySelectorAll('[data-eq]').forEach(b => b.onclick = () => {
       const n = b.dataset.eq;
@@ -2485,45 +2491,116 @@ function fighter(name, image, st, attr, moves, mood){
 }
 // chance the defender dodges an attack: faster foes dodge more (3%–30%), plus weather like fog
 function evadeChance(att, def){ return Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (curWeather().evade || 0); }
-const hitPct = (att, def) => Math.max(0, Math.round(100 * (1 - evadeChance(att, def))));
+const hitPct = (att, def, mv) => mv && moveTrait(mv) === 'quick' ? 100 : Math.max(0, Math.round(100 * (1 - evadeChance(att, def))));
 const ACC_TEXT = '95% accuracy against an equally fast foe (97% vs slower ones, down to 70% vs much faster ones)';
-function doMove(att, def, mv){
-  if (mv.kind === 'heal'){ att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h); return { text: att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.', heal: h }; }
-  if (mv.kind === 'buff'){ att.sp -= mv.cost || 0; att.buff = Math.min(1.9, (att.buff || 1) * mv.power); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' }; }
-  if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: `${att.name} guards and recovers ${g} SP.` }; }
+// ----- move traits: a second effect on top of damage, so each move has a reason to be brought -----
+const TRAITS = {
+  pierce:   { name: 'Piercing',    icon: '🎯', tip: 'Ignores 60% of the foe\'s DEF and goes straight through Guard. 10% less base power.' },
+  multi:    { name: 'Multi-hit',   icon: '🔁', tip: 'Hits 2–4 times; each hit has 42% of the listed power (about 126% in total on average).' },
+  quick:    { name: 'Sure-hit',    icon: '💨', tip: 'Never misses and has +15% critical-hit chance. 10% less base power.' },
+  reckless: { name: 'Reckless',    icon: '💥', tip: '30% stronger, but you take 20% of the damage you deal as recoil.' },
+  burn:     { name: 'Burn',        icon: '🔥', tip: '30% chance to burn the foe: it loses 1/16 of its max HP each turn and deals 25% less damage, for 4 turns.' },
+  chill:    { name: 'Freeze',      icon: '🧊', tip: '25% chance to freeze the foe solid so it loses its next turn.' },
+  breaker:  { name: 'Armor break', icon: '🔨', tip: 'Every hit lowers the foe\'s DEF by 20% for the rest of the battle (stacks up to −60%).' },
+  scare:    { name: 'Intimidate',  icon: '😱', tip: 'Every hit lowers the damage the foe deals by 15% for the rest of the battle (stacks up to −45%).' },
+  finisher: { name: 'Finisher',    icon: '🗡️', tip: 'Deals 60% more damage when the foe is below 35% HP.' },
+  purify:   { name: 'Purify',      icon: '✨', tip: 'Wipes out the foe\'s power-ups and Barrier, and cures your own status problem.' },
+  shield:   { name: 'Barrier',     icon: '🛡️', tip: 'You take 40% less damage from the foe\'s next 3 turns.' },
+  haste:    { name: 'Haste',       icon: '⚡', tip: '+30% SPD for the rest of the battle (dodge more, crit more, act first). Stacks twice.' },
+};
+const TRAIT_RE = [
+  ['multi', /rapid|barrage|combo|flurry|rush|volley|gatling|machine ?gun|missiles|double|twin|dual|triple|hundred|thousand|rain|shower|swarm|storm|frenzy/],
+  ['pierce', /(?<!solar )(?:beam|\bray\b)|laser|pierc|needle|arrow|spear|lance|drill|snip|bullet|cannon|\bshot\b|blaster/],
+  ['quick', /quick|flash|sonic|speed|swift|instant|dash|blitz|zap|\bjet\b/],
+  ['reckless', /final|giga|ultimate|crash|explo|burst|meteor|nova|apocalyp|armageddon|destruct|big bang|kamikaze|dynamite|bomb/],
+  ['burn', /solar ray|fire|flame|blaze|burn|heat|inferno|magma|lava|scorch|pyro|solar|\bsun\b|pepper/],
+  ['chill', /\bice\b|icicle|frost|freez|blizzard|snow|cold|glacier|absolute zero|cryo|\bhail/],
+  ['breaker', /crush|break|smash|hammer|quake|shatter|crack|demoli|impact|\brock|boulder|stomp|press/],
+  ['scare', /roar|howl|scream|intimid|curse|terror|fear|evil|nightmare|shadow|\bdark|death|grudge|\bhell|ghost|phantom/],
+  ['finisher', /slash|\bcut|claw|fang|bite|blade|sword|edge|reap|scythe|guillotine|execut|judg|\bend\b|talon/],
+  ['purify', /holy|heaven|angel|saint|divine|light(?!ning)|sacred|grace|purif|bless|seraph/],
+];
+const traitCache = new Map();
+function moveTrait(m){
+  if (!m || !m.name || m.name === BASIC.name || m.kind === 'guard' || m.kind === 'heal') return null;
+  const key = m.kind + '|' + m.name; if (traitCache.has(key)) return traitCache.get(key);
+  const nm = m.name.toLowerCase(), t = nm + ' ' + String(m.desc || '').toLowerCase();
+  let tr = null;
+  if (m.kind === 'buff') tr = /barrier|shield|wall|protect|armor|fortress|defen|guard/.test(t) ? 'shield' : /speed|accel|haste|wing|evasi|agil|swift/.test(t) ? 'haste' : null;
+  else if (dealsDamage(m)){
+    tr = (TRAIT_RE.find(([, re]) => re.test(nm)) || TRAIT_RE.find(([, re]) => re.test(t)) || [null])[0];
+    // moves that already poison, paralyze or put to sleep keep just that; the rest get a trait picked from their name
+    if (!tr && !moveStatus(m)) tr = ['pierce', 'multi', 'quick', 'breaker', 'finisher', 'scare', null, null][strSeed(m.name) % 8];
+  }
+  traitCache.set(key, tr); return tr;
+}
+const traitTag = m => { const t = moveTrait(m); return t ? ' · ' + TRAITS[t].icon + ' ' + TRAITS[t].name : ''; };
+// how much a trait changes a hit's power, before multi-hit
+function traitPow(tr, def){ return tr === 'pierce' || tr === 'quick' ? 0.9 : tr === 'reckless' ? 1.3 : tr === 'finisher' && def && def.hp < def.st.hp * 0.35 ? 1.6 : tr === 'multi' ? 1.26 : 1; }
+// the one move engine every battle uses: R is the random source, local adds this phone's weather and time of day
+function moveCore(att, def, mv, R, local){
+  if (att.shield > 0) att.shield--;
+  if (mv.kind === 'heal'){
+    att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h);
+    let text = att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.';
+    if (att.status){ text += ' It is no longer ' + STATUS[att.status.k].name + '.'; att.status = null; }
+    return { text, heal: h };
+  }
+  if (mv.kind === 'buff'){
+    att.sp -= mv.cost || 0; const tr = moveTrait(mv);
+    if (tr === 'shield'){ att.shield = 3; return { text: att.name + ' used ' + mv.name + '! A barrier cuts the damage it takes.' }; }
+    if (tr === 'haste' && (att.hasted || 0) < 2){ att.hasted = (att.hasted || 0) + 1; att.st = Object.assign({}, att.st, { spd: Math.round(att.st.spd * 1.3) }); return { text: att.name + ' used ' + mv.name + '! It got faster.' }; }
+    att.buff = Math.min(1.9, (att.buff || 1) * (tr === 'haste' ? 1.15 : mv.power)); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' };
+  }
+  if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: att.name + ' guards and recovers ' + g + ' SP.' }; }
   att.sp -= mv.cost || 0;
-  const evade = evadeChance(att, def);
-  if (Math.random() < evade) return { text: `${att.name} used ${mv.name}… but ${def.name} dodged!`, miss: true };
-  const crit = Math.random() < Math.max(0.04, Math.min(0.33, 0.06 + (att.critBonus || 0) + (att.st.spd - def.st.spd) * 0.01));
+  const tr = moveTrait(mv);
+  const evade = tr === 'quick' ? 0 : Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (local ? curWeather().evade || 0 : 0);
+  if (R() < evade) return { text: att.name + ' used ' + mv.name + '… but ' + def.name + ' dodged!', miss: true };
+  const crit = R() < Math.max(0.04, Math.min(0.48, 0.06 + (att.critBonus || 0) + (tr === 'quick' ? 0.15 : 0) + (att.st.spd - def.st.spd) * 0.01));
   const em = elemMult(att.elem, def.elem), am = attrMult(att.attr, def.attr) * em;
-  const base = (mv.kind === 'phys' || mv.kind === 'atk' ? att.st.atk : att.st.int) * (mv.power || 1) * (att.buff || 1);
+  const phys = mv.kind === 'phys' || mv.kind === 'atk', aStat = phys ? att.st.atk : att.st.int;
   // DEF softens both physical (ATK) and SP-powered attacks; equal attack and defense keeps damage about where it was
-  const aStat = mv.kind === 'phys' || mv.kind === 'atk' ? att.st.atk : att.st.int, dStat = def.st.def || 0;
+  const dStat = (def.st.def || 0) * (1 - (def.defDown || 0)) * (tr === 'pierce' ? 0.4 : 1);
   const defFactor = 1.35 * (2 * aStat) / (2 * aStat + dStat);
-  const dmg = Math.max(1, Math.round(base * defFactor * rand(0.85, 1.15) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1) * skyMult(att) * (att.tdm || 1) * (def.ttk || 1)));
+  const hits = tr === 'multi' ? 2 + Math.floor(R() * 3) : 1, low = def.hp < def.st.hp * 0.35;
+  const pw = (tr === 'multi' ? 0.42 * hits : traitPow(tr, def)) * (mv.power || 1);
+  const mods = (att.buff || 1) * (1 - (att.weak || 0)) * (att.status && att.status.k === 'brn' ? 0.75 : 1) * (def.shield > 0 ? 0.6 : 1) * (def.guard && tr !== 'pierce' ? 0.5 : 1) * (local ? skyMult(att) : 1) * (att.tdm || 1) * (def.ttk || 1);
+  const dmg = Math.max(1, Math.round(aStat * pw * defFactor * (0.85 + R() * 0.3) * am * (crit ? 1.6 : 1) * mods));
   def.hp = Math.max(0, def.hp - dmg);
-  let text = `${att.name} used ${mv.name}! ${dmg} damage.`, heal = 0;
-  if (mv.kind === 'drain'){ const h = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + h); heal = h; text += ' Drained ' + h + ' HP.'; }
+  let text = att.name + ' used ' + mv.name + '! ' + (hits > 1 ? 'Hit ' + hits + ' times for ' : '') + dmg + ' damage.', heal = 0;
+  if (mv.kind === 'drain'){ heal = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + heal); text += ' Drained ' + heal + ' HP.'; }
   if (crit) text += ' Critical hit!';
   if (am > 1) text += ' Super effective!'; else if (am < 1) text += ' Not very effective…';
   if (em !== 1 && ELEMS[att.elem] && ELEMS[def.elem]) text += ' (' + ELEMS[att.elem].icon + '→' + ELEMS[def.elem].icon + ')';
-  if (def.guard) text += ' (guarded)';
-  if (def.hp <= 0 && def.endureChance && !def.endured && Math.random() < def.endureChance){ def.hp = 1; def.endured = true; text += ' ' + def.name + ' hung on with 1 HP!'; }
+  if (def.guard) text += tr === 'pierce' ? ' (pierced the guard)' : ' (guarded)';
+  if (def.shield > 0) text += ' (barrier)';
+  if (tr === 'finisher' && low) text += ' Finishing blow!';
+  if (tr === 'reckless'){ const rc = Math.max(1, Math.round(dmg * 0.2)); att.hp = Math.max(1, att.hp - rc); text += ' ' + att.name + ' took ' + rc + ' recoil.'; }
+  if (def.hp <= 0 && def.endureChance && !def.endured && R() < def.endureChance){ def.hp = 1; def.endured = true; text += ' ' + def.name + ' hung on with 1 HP!'; }
+  if (def.hp > 0){
+    if (tr === 'breaker' && (def.defDown || 0) < 0.6){ def.defDown = Math.min(0.6, (def.defDown || 0) + 0.2); text += ' ' + def.name + '\'s DEF fell!'; }
+    if (tr === 'scare' && (def.weak || 0) < 0.45){ def.weak = Math.min(0.45, (def.weak || 0) + 0.15); text += ' ' + def.name + ' is shaken (deals less damage)!'; }
+    if (tr === 'purify'){ if ((def.buff || 1) > 1 || def.shield > 0){ def.buff = 1; def.shield = 0; text += ' ' + def.name + '\'s power-ups were wiped away!'; } if (att.status){ text += ' ' + att.name + ' is no longer ' + STATUS[att.status.k].name + '.'; att.status = null; } }
+  }
   if (def.status && def.status.k === 'slp' && def.hp > 0){ def.status = null; text += ' ' + def.name + ' woke up!'; }
-  const sk = moveStatus(mv);
-  if (sk && def.hp > 0 && !def.status && !def.noStatus && Math.random() < (sk === 'par' && curWeather().par ? 0.45 : 0.3)){ def.status = { k: sk, t: sk === 'slp' ? 1 + (Math.random() * 3 | 0) : sk === 'par' ? 3 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
-  return { text, dmg, crit, am, heal };
+  const sk = moveStatus(mv) || (tr === 'burn' ? 'brn' : tr === 'chill' ? 'frz' : null);
+  const chance = sk === 'frz' ? 0.25 : sk === 'par' && local && curWeather().par ? 0.45 : 0.3;
+  if (sk && def.hp > 0 && !def.status && !def.noStatus && R() < chance){ def.status = { k: sk, t: sk === 'slp' ? 1 + Math.floor(R() * 3) : sk === 'par' ? 3 : sk === 'frz' ? 1 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
+  return { text, dmg, crit, am, heal, hits };
 }
+function doMove(att, def, mv){ return moveCore(att, def, mv, Math.random, true); }
 function foeChoice(f, me){
   const usable = f.moves.filter(m => m.kind !== 'guard' && (m.cost || 0) <= f.sp);
   const guard = f.moves.find(m => m.kind === 'guard') || GUARD;
   const heal = usable.find(m => m.kind === 'heal');
   if (heal && f.hp < f.st.hp * 0.35 && Math.random() < 0.6) return heal;
-  const buff = usable.find(m => m.kind === 'buff');
-  if (buff && (f.buff || 1) < 1.3 && f.hp > f.st.hp * 0.6 && Math.random() < 0.3) return buff;
+  const buff = usable.find(m => m.kind === 'buff' && !(moveTrait(m) === 'shield' && f.shield > 0) && !(moveTrait(m) === 'haste' && (f.hasted || 0) >= 2));
+  if (buff && (f.buff || 1) < 1.3 && f.hp > f.st.hp * (moveTrait(buff) === 'shield' ? 0.3 : 0.6) && Math.random() < 0.3) return buff;
+  if (heal && f.status && f.status.k !== 'slp' && f.hp < f.st.hp * 0.7 && Math.random() < 0.4) return heal;
   const dmg = usable.filter(m => m.kind === 'phys' || m.kind === 'mag' || m.kind === 'drain');
   if (!dmg.length || (f.hp < f.st.hp * 0.3 && Math.random() < 0.15)) return guard;
-  const score = m => (m.kind === 'phys' ? f.st.atk : f.st.int) * m.power * (0.7 + Math.random() * 0.6);
+  const score = m => (m.kind === 'phys' ? f.st.atk : f.st.int) * m.power * traitPow(moveTrait(m), me) * (0.7 + Math.random() * 0.6);
   return dmg.sort((a, b) => score(b) - score(a))[0];
 }
 
@@ -2542,7 +2619,7 @@ async function moveFx(aSel, dSel, mv, r, elem, onHit){
   [A, D, box].forEach(e => e.style.setProperty('--fxc', col));
   const dir = fxCenter(D, box)[0] >= fxCenter(A, box)[0] ? 1 : -1;
   if (mv.kind === 'heal'){ fxClass(A, 'fx-heal'); hit(); fxFloat(A, '+' + (r.heal || 0), 'heal'); await sleep(calm ? 200 : 600); return; }
-  if (mv.kind === 'buff'){ fxClass(A, 'fx-buff'); hit(); fxFloat(A, '⬆ Power up', 'info'); await sleep(calm ? 200 : 600); return; }
+  if (mv.kind === 'buff'){ fxClass(A, 'fx-buff'); hit(); fxFloat(A, { shield: '🛡️ Barrier', haste: '⚡ Haste' }[moveTrait(mv)] || '⬆ Power up', 'info'); await sleep(calm ? 200 : 600); return; }
   if (mv.kind === 'guard'){ fxClass(A, 'fx-guard', 800); hit(); fxFloat(A, '🛡️ Guard', 'info'); await sleep(calm ? 200 : 450); return; }
   const ranged = mv.kind === 'mag' || mv.kind === 'drain';
   if (!calm){
@@ -2656,7 +2733,7 @@ async function battle(diff, opts){
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
     <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
     <div class="autorow"><button class="seg${autoOn ? ' on' : ''}" id="autoBtn">🤖 Auto ${autoOn ? 'on' : 'off'}</button><span>${skyTag()}</span></div>
-    <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}${dealsDamage(m) ? ' · 🎯' + hitPct(me, foe) + '%' + mxBadge(mxGet(foeKey, me, m.name)) : ''}</small></button>`).join('')}
+    <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}${dealsDamage(m) ? ' · 🎯' + hitPct(me, foe, m) + '%' + mxBadge(mxGet(foeKey, me, m.name)) : ''}</small></button>`).join('')}
       ${modes.length ? `<button class="act modebtn" data-mv="mode">✨ Mode Change<small>${modeCost} SP · once per battle</small></button>` : ''}
       ${opts.noRun ? '' : '<button class="act" data-mv="run">Run<small>Escape (SPD)</small></button>'}</div>`;
   const draw = () => {
@@ -2676,7 +2753,7 @@ async function battle(diff, opts){
     const m = me.moves[+b.dataset.mv], off = !on || (m && m.cost > me.sp) || (b.dataset.mv === 'mode' && (me.moded || me.sp < modeCost));
     b.classList.toggle('dis', !!off); b.setAttribute('aria-disabled', off ? 'true' : 'false');
   });
-  $('#overlay').querySelectorAll('[data-mv]').forEach(b => { const m = me.moves[+b.dataset.mv]; if (m) moveHold(b, () => moveTipHtml(m, foe.name, mxGet(foeKey, me, m.name), hitPct(me, foe))); });
+  $('#overlay').querySelectorAll('[data-mv]').forEach(b => { const m = me.moves[+b.dataset.mv]; if (m) moveHold(b, () => moveTipHtml(m, foe.name, mxGet(foeKey, me, m.name), hitPct(me, foe, m))); });
   const playerMove = () => new Promise(res => {
     if (autoOn){ setTimeout(() => res(autoChoice(me, foe, modes, modeCost)), 250); return; }
     pendRes = res; setButtons(true);
@@ -4013,7 +4090,7 @@ function applyPerks(u, p){
 }
 
 // ----- status effects: poison, paralysis, sleep -----
-const STATUS = { psn: { name: 'poisoned', icon: '☠️' }, par: { name: 'paralyzed', icon: '⚡' }, slp: { name: 'asleep', icon: '💤' } };
+const STATUS = { psn: { name: 'poisoned', icon: '☠️' }, par: { name: 'paralyzed', icon: '⚡' }, slp: { name: 'asleep', icon: '💤' }, brn: { name: 'burned', icon: '🔥' }, frz: { name: 'frozen', icon: '🧊' } };
 function moveStatus(mv){
   const t = ((mv.name || '') + ' ' + (mv.desc || '')).toLowerCase();
   if (/poison|toxic|venom|acid|sting/.test(t)) return 'psn';
@@ -4023,13 +4100,14 @@ function moveStatus(mv){
 }
 function statusLabel(u){ return u.status ? STATUS[u.status.k].icon + ' ' + STATUS[u.status.k].name : ''; }
 // runs at the start of a unit's turn; returns { skip, text }
-function statusTurn(u){
+function statusTurn(u, R = Math.random){
   const s = u.status; if (!s) return { skip: false, text: '' };
   if (s.k === 'slp'){ s.t--; if (s.t <= 0){ u.status = null; return { skip: false, text: u.name + ' woke up!' }; } return { skip: true, text: u.name + ' is fast asleep…' }; }
-  if (s.k === 'par'){ s.t--; const stuck = Math.random() < 0.3; if (s.t <= 0) u.status = null; return { skip: stuck, text: stuck ? u.name + ' is paralyzed and can\'t move!' : '' }; }
-  const max = (u.st && u.st.hp) || u.max || 10, d = Math.max(1, Math.round(max / 12));
+  if (s.k === 'frz'){ u.status = null; return { skip: true, text: u.name + ' is frozen solid and can\'t move! (It thaws out.)' }; }
+  if (s.k === 'par'){ s.t--; const stuck = R() < 0.3; if (s.t <= 0) u.status = null; return { skip: stuck, text: stuck ? u.name + ' is paralyzed and can\'t move!' : '' }; }
+  const brn = s.k === 'brn', max = (u.st && u.st.hp) || u.max || 10, d = Math.max(1, Math.round(max / (brn ? 16 : 12)));
   u.hp = Math.max(0, u.hp - d); s.t--; if (s.t <= 0) u.status = null;
-  return { skip: false, text: u.name + ' is hurt by poison (' + d + ').' };
+  return { skip: false, text: u.name + ' is hurt by ' + (brn ? 'its burn' : 'poison') + ' (' + d + ').' };
 }
 
 // ----- mode changes: forms like "Dukemon(Crimson Mode)" from the API -----
@@ -4399,6 +4477,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 22, title: 'Move traits', items: ['Most attacks now have a trait on top of their damage, picked from the move\'s name: 🎯 Piercing (ignores DEF and Guard), 🔁 Multi-hit, 💨 Sure-hit (never misses), 💥 Reckless (stronger, with recoil), 🔥 Burn, 🧊 Freeze, 🔨 Armor break, 😱 Intimidate, 🗡️ Finisher (big damage on weak foes) and ✨ Purify.', 'Buff moves with barrier or shield names now raise a 🛡️ Barrier (−40% damage taken for 3 turns), and speed-themed ones give ⚡ Haste (+30% SPD).', 'Healing moves also cure poison, burns, paralysis and other status problems.', 'Two new status problems: 🔥 burned and 🧊 frozen.', 'Press and hold a move in battle (or open Moves) to see its trait.'] },
   { v: 21, title: 'Team expeditions use 1 slot', items: ['A team expedition now takes up just one expedition slot, however many Digimon go. Send up to 6 Digimon per team.'] },
   { v: 20, title: 'AI Tamers', items: ['14 computer-run AI Tamers 🤖 now play alongside you. They level up over time and show up on every leaderboard, marked with an AI tag.', 'They join the weekly raid and chip away at the boss each day, and they appear in Top attackers.', 'They post Digimon on the trade board every 6 hours (Rookies, Champions and the odd Ultimate) and may buy your listings that have been up a few hours if the price is fair.', 'Ranks has a new Recent activity feed showing what the AI Tamers have been doing.'] },
   { v: 19, title: 'New look: Trainer Card (and Retro)', items: ['The game has a brand-new look: bright paper cards with bold outlines, chunky buttons and your partner standing in a sky-and-grass scene.', 'Prefer the old days? Tap the look button at the top (🃏) and pick Retro: a Digivice with green LCD screens and pixel sprites. The Original look (dark or light) is still there too.', 'New 📟 Digivices tab in the Shop: buy and equip different shells for the Retro look, like the D-3, D-Ark, Xros Loader, Pendulum, Original V-Pet and a rare Gold Edition.', 'The Partner page is tidier: Feed, Play, Train and Battle up front, jobs that need doing now (cleaning, medicine, rest) appear only when needed, and the rest is under More.'] },
@@ -4941,8 +5020,10 @@ function estHit(att, def, m){
   const mult = attrMult(att.attr, def.attr) * elemMult(att.elem, def.elem) * skyMult(att) * (att.tdm || 1) * (def.ttk || 1) * (def.guard ? 0.5 : 1);
   const ev = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (curWeather().evade || 0);
   const cr = Math.max(0.04, Math.min(0.33, 0.06 + (att.critBonus || 0) + (att.st.spd - def.st.spd) * 0.01));
-  const raw = a * (m.power || 1) * (att.buff || 1) * defF * mult;
-  return { avg: raw * (1 - ev) * (1 + 0.6 * cr), low: raw * 0.85, hit: 1 - ev };
+  const tr = moveTrait(m), defF2 = tr === 'pierce' || def.defDown ? 1.35 * (2 * a) / (2 * a + dS * (1 - (def.defDown || 0)) * (tr === 'pierce' ? 0.4 : 1)) : defF;
+  const raw = a * (m.power || 1) * traitPow(tr, def) * (att.buff || 1) * (1 - (att.weak || 0)) * (att.status && att.status.k === 'brn' ? 0.75 : 1) * (def.shield > 0 ? 0.6 : 1) * defF2 * mult / (def.guard && tr === 'pierce' ? 0.5 : 1);
+  const ev2 = tr === 'quick' ? 0 : ev;
+  return { avg: raw * (1 - ev2) * (1 + 0.6 * cr), low: raw * (tr === 'multi' ? 0.55 : 0.85), hit: 1 - ev2 };
 }
 function autoHeur(me, foe, modes, modeCost){
   const moves = me.moves.map((m, i) => ({ m, i, cost: m.cost || 0 }));
@@ -4952,7 +5033,7 @@ function autoHeur(me, foe, modes, modeCost){
     const statusBonus = st && !foe.status && !foe.noStatus ? e.avg * (st === 'slp' ? 0.35 : st === 'par' ? 0.25 : 0.2) * 0.3 : 0;
     return Object.assign(x, { e, val: e.avg + statusBonus + (x.m.kind === 'drain' && me.hp < me.st.hp * 0.7 ? e.avg * 0.3 : 0) });
   });
-  const heal = can.find(x => x.m.kind === 'heal'), buff = can.find(x => x.m.kind === 'buff'), guard = moves.find(x => x.m.kind === 'guard');
+  const heal = can.find(x => x.m.kind === 'heal'), buff = can.find(x => x.m.kind === 'buff' && !(moveTrait(x.m) === 'shield' && me.shield > 0) && !(moveTrait(x.m) === 'haste' && (me.hasted || 0) >= 2)), guard = moves.find(x => x.m.kind === 'guard');
   // how hard can the foe hit back next turn?
   const foeMoves = (foe.moves || []).filter(m => (m.cost || 0) <= foe.sp + 1);
   const threat = Math.max(1, ...foeMoves.map(m => estHit(foe, Object.assign({}, me, { guard: false }), m).avg)) * 1.15;
@@ -5724,38 +5805,9 @@ function duelUnit(s){
   const moves = (s.moves || []).filter(m => m && m.name).slice(0, 6); if (!moves.length) moves.push(Object.assign({ cost: 0 }, BASIC), GUARD);
   return { name: s.name || '?', image: s.image || '', st, hp: st.hp, sp: st.sp, attr: s.attr || 'Free', elem: s.elem || 'beast', moves, critBonus: +s.crit || 0, tdm: +s.tdm || 1, ttk: +s.ttk || 1, endureChance: +s.endure || 0, noStatus: !!s.noStatus, guard: false, buff: 1, status: null };
 }
-function duelStatus(u, R){
-  const s = u.status; if (!s) return { skip: false, text: '' };
-  if (s.k === 'slp'){ s.t--; if (s.t <= 0){ u.status = null; return { skip: false, text: u.name + ' woke up!' }; } return { skip: true, text: u.name + ' is fast asleep…' }; }
-  if (s.k === 'par'){ s.t--; const stuck = R() < 0.3; if (s.t <= 0) u.status = null; return { skip: stuck, text: stuck ? u.name + ' is paralyzed and can\'t move!' : '' }; }
-  const d = Math.max(1, Math.round(u.st.hp / 12)); u.hp = Math.max(0, u.hp - d); s.t--; if (s.t <= 0) u.status = null;
-  return { skip: false, text: u.name + ' is hurt by poison (' + d + ').' };
-}
+function duelStatus(u, R){ return statusTurn(u, R); }
 // the same damage rules as normal battles, minus local weather and time of day (which differ between phones)
-function duelMove(att, def, mv, R){
-  if (mv.kind === 'heal'){ att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h); return { text: att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.', heal: h }; }
-  if (mv.kind === 'buff'){ att.sp -= mv.cost || 0; att.buff = Math.min(1.9, (att.buff || 1) * mv.power); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' }; }
-  if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: att.name + ' guards and recovers ' + g + ' SP.' }; }
-  att.sp -= mv.cost || 0;
-  const evade = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012));
-  if (R() < evade) return { text: att.name + ' used ' + mv.name + '… but ' + def.name + ' dodged!', miss: true };
-  const crit = R() < Math.max(0.04, Math.min(0.33, 0.06 + (att.critBonus || 0) + (att.st.spd - def.st.spd) * 0.01));
-  const em = elemMult(att.elem, def.elem), am = attrMult(att.attr, def.attr) * em;
-  const phys = mv.kind === 'phys' || mv.kind === 'atk', aStat = phys ? att.st.atk : att.st.int;
-  const defFactor = 1.35 * (2 * aStat) / (2 * aStat + (def.st.def || 0));
-  const dmg = Math.max(1, Math.round(aStat * (mv.power || 1) * (att.buff || 1) * defFactor * (0.85 + R() * 0.3) * am * (crit ? 1.6 : 1) * (def.guard ? 0.5 : 1) * (att.tdm || 1) * (def.ttk || 1)));
-  def.hp = Math.max(0, def.hp - dmg);
-  let text = att.name + ' used ' + mv.name + '! ' + dmg + ' damage.', heal = 0;
-  if (mv.kind === 'drain'){ heal = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + heal); text += ' Drained ' + heal + ' HP.'; }
-  if (crit) text += ' Critical hit!';
-  if (am > 1) text += ' Super effective!'; else if (am < 1) text += ' Not very effective…';
-  if (def.guard) text += ' (guarded)';
-  if (def.hp <= 0 && def.endureChance && !def.endured && R() < def.endureChance){ def.hp = 1; def.endured = true; text += ' ' + def.name + ' hung on with 1 HP!'; }
-  if (def.status && def.status.k === 'slp' && def.hp > 0){ def.status = null; text += ' ' + def.name + ' woke up!'; }
-  const sk = moveStatus(mv);
-  if (sk && def.hp > 0 && !def.status && !def.noStatus && R() < 0.3){ def.status = { k: sk, t: sk === 'slp' ? 1 + Math.floor(R() * 3) : sk === 'par' ? 3 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
-  return { text, dmg, crit, am, heal };
-}
+function duelMove(att, def, mv, R){ return moveCore(att, def, mv, R, false); }
 // replay every turn both players have picked a move for
 function duelSim(D){
   const A = duelUnit(D.teamA), B = duelUnit(D.teamB), R = duelRng(D.seed), mA = D.mA || {}, mB = D.mB || {}, turns = [];
