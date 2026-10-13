@@ -3187,19 +3187,49 @@ function processArt(src, res, retro){
   imgCache.set(key, job);
   return job;
 }
-// background = near-white pixels connected to the edges (inner whites like eyes and wings stay)
-function findBackground(p, S){
-  const N = S * S, bg = new Uint8Array(N), q = [];
+// background = pixels connected to the edges that match the background: white, or the picture's own flat backdrop colour
+// (some art sits on grey, black or blue instead of white). Inner whites like eyes and wings stay.
+function bgRef(p, S){
   const light = i => p[i*4+3] < 40 || (p[i*4] >= 250 && p[i*4+1] >= 250 && p[i*4+2] >= 250);
+  const edge = []; for (let i = 0; i < S; i++) edge.push(i, (S-1)*S + i, i*S, i*S + S - 1);
+  const solid = edge.filter(j => !light(j));
+  if (solid.length < edge.length * 0.4) return null;
+  return [0, 1, 2].map(c => solid.map(j => p[j*4+c]).sort((a, b) => a - b)[solid.length >> 1]);
+}
+function findBackground(p, S){
+  const N = S * S, bg = new Uint8Array(N), q = [], ref = bgRef(p, S);
+  const near = (i, c, t) => { const r = p[i*4] - c[0], g = p[i*4+1] - c[1], b = p[i*4+2] - c[2]; return r*r + g*g + b*b < t * t; };
+  const light = i => p[i*4+3] < 40 || (p[i*4] >= 250 && p[i*4+1] >= 250 && p[i*4+2] >= 250) || (ref && near(i, ref, 34));
   for (let i = 0; i < S; i++) for (const j of [i, (S-1)*S + i, i*S, i*S + S - 1]) if (!bg[j] && light(j)){ bg[j] = 1; q.push(j); }
   while (q.length){ const i = q.pop(), xx = i % S; for (const j of [i-1, i+1, i-S, i+S]){ if (j < 0 || j >= N || bg[j] || Math.abs((j % S) - xx) > 1) continue; if (light(j)){ bg[j] = 1; q.push(j); } } }
+  bg.ref = ref;
   return bg;
 }
 function cutout(im, res){
   const c = document.createElement('canvas'); c.width = c.height = res;
   const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, res, res);
-  const d = x.getImageData(0, 0, res, res), bg = findBackground(d.data, res);
-  for (let i = 0; i < res * res; i++) if (bg[i]) d.data[i*4+3] = 0;
+  const d = x.getImageData(0, 0, res, res), p = d.data, bg = findBackground(p, res), N = res * res;
+  let gone = 0; for (let i = 0; i < N; i++) gone += bg[i];
+  if (bg.ref && gone < N * 0.12){
+    // a painted scene behind the Digimon: keep it, as a rounded portrait with softly faded edges
+    const f = res * 0.1, rad = res * 0.18, h = res / 2, c0 = (res - 1) / 2;
+    for (let y = 0; y < res; y++) for (let xx = 0; xx < res; xx++){
+      const ax = Math.abs(xx - c0) - (h - rad), ay = Math.abs(y - c0) - (h - rad);
+      const sd = Math.hypot(Math.max(ax, 0), Math.max(ay, 0)) + Math.min(Math.max(ax, ay), 0) - rad;   // < 0 inside the rounded square
+      const t = Math.max(0, Math.min(1, -sd / f)), k = (y * res + xx) * 4 + 3;
+      p[k] = Math.round(p[k] * t * t * (3 - 2 * t));
+    }
+  } else {
+    for (let i = 0; i < N; i++) if (bg[i]) p[i*4+3] = 0;
+    // soften the rim left behind on coloured backdrops
+    if (bg.ref) for (let i = 0; i < N; i++){
+      if (bg[i]) continue; const xx = i % res;
+      if ((xx > 0 && bg[i-1]) || (xx < res - 1 && bg[i+1]) || (i >= res && bg[i-res]) || (i < N - res && bg[i+res])){
+        const r = p[i*4] - bg.ref[0], g = p[i*4+1] - bg.ref[1], b = p[i*4+2] - bg.ref[2];
+        if (r*r + g*g + b*b < 70 * 70) p[i*4+3] = Math.round(p[i*4+3] * 0.45);
+      }
+    }
+  }
   x.putImageData(d, 0, 0);
   return c.toDataURL();
 }
@@ -3281,7 +3311,6 @@ async function processImg(img){
   if (!orig || orig.startsWith('data:')) return;
   const sil = img.classList.contains('sil');
   if (!sil) img.classList.remove('silw');
-  if (!retroOn && !sil && !isDark()){ if (img.dataset.orig){ img.src = orig; img.style.imageRendering = ''; delete img.dataset.orig; delete img.dataset.mode; } return; }
   const mode = retroOn ? 'retro' : 'cut';
   if (img.dataset.mode === mode) return;
   img.dataset.orig = orig; img.dataset.mode = mode;
