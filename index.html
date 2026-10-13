@@ -228,6 +228,17 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .bcell.pick.on::after{content:'✓';position:absolute;top:4px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 .7rem/18px var(--mono);text-align:center}
 .teamsum{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:.85rem;color:var(--muted)}
 .teamsum b{color:var(--fg)}
+.synbar{display:flex;flex-wrap:wrap;gap:6px}
+.synchip{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;border:1px solid var(--accent);background:var(--panel);font:600 .74rem var(--body);color:var(--fg)}
+.synchip small{font:600 .66rem var(--mono);color:var(--muted)}
+.synchip.off{border-style:dashed;border-color:var(--line);opacity:.75}
+.synlist{display:grid;gap:6px}
+.synrow{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.synrow.on{border-color:var(--accent)}
+.synrow>span{font-size:1.3rem}
+.synrow b{display:block;font-size:.9rem}
+.synrow small{display:block;color:var(--muted);font-size:.76rem;line-height:1.35}
+.xr-note.syn{color:var(--accent)}
 .bcell.away img{opacity:.4}
 .bcell.empty{border-style:dashed;color:var(--muted);font:.68rem var(--mono);min-height:108px;align-content:center}
 .bhead{display:flex;gap:12px;align-items:center}
@@ -1302,7 +1313,7 @@ function renderPartner(){
   const p = P();
   if (!p) return renderEgg();
   initMoves(p);
-  const partyHtml = partyBar() + walletRow();
+  const partyHtml = partyBar() + synergyBar() + walletRow();
   const need = EVO_NEED[p.stage];
   const atTop = p.stage >= 5 || p.final;
   const sl = asleep(p), block = sl ? 'asleep' : careInit(p).sick ? 'sick' : '';
@@ -1413,6 +1424,7 @@ $('#partnerView').addEventListener('click', e => {
   if (k === 'bag') return bagScreen();
   if (k === 'tree') return treeScreen();
   if (k === 'jogress') return jogressScreen();
+  if (k === 'syn') return synergyScreen();
   if (k === 'daily') return trainerScreen('daily');
   if (k === 'line') return openDetail(p.id, false);
 });
@@ -1622,11 +1634,13 @@ function teamExpedition(exKey, sel){
     return;
   }
   for (const m of [...sel]) if (m.exp || !G.box.includes(m)) sel.delete(m);
-  const est = [...sel].reduce((a, m) => { const e = expEstimate(m, ex); a.data += e.data; a.xp += Math.round(e.xp * XP_MUL); return a; }, { data: 0, xp: 0 });
+  const tsyn = activeSyn([...sel]), mineSyn = m => tsyn.filter(a => synergiesOf(m).includes(a.g)).length;
+  const est = [...sel].reduce((a, m) => { const e = expEstimate(m, ex), b = 1 + SYN_EXP.data * mineSyn(m); a.data += Math.round(e.data * b); a.xp += Math.round(e.xp * XP_MUL * b); return a; }, { data: 0, xp: 0 });
   show('<h4>🧭 ' + esc(ex.name) + ' · ' + fmtLeft(expMs(ex)) + '</h4>' +
     '<div class="teamsum"><span>Team <b>' + sel.size + ' / ' + free + '</b></span>' + (sel.size ? '<span>~<b>' + est.data + '</b> DigiData</span><span>~<b>' + est.xp + '</b> XP total</span>' : '<span>Tap Digimon to add them to the team</span>') + '</div>' +
+    (tsyn.length ? '<div class="synbar">' + tsyn.map(a => '<span class="synchip">' + a.g.icon + ' ' + esc(a.g.name) + ' <small>×' + a.n + ' · +15% rewards</small></span>').join('') + '</div>' : '') +
     '<div class="bkrow"><button class="ghost" id="teBest">Pick the strongest ' + Math.min(free, idle.length) + '</button><button class="ghost" id="teClear"' + (sel.size ? '' : ' disabled') + '>Clear</button></div>' +
-    '<div class="boxgrid">' + idle.map((m, i) => '<button class="bcell pick' + (sel.has(m) ? ' on' : '') + '" data-tm="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + '</small><i>' + Math.round(expOdds(m, ex) * 100) + '% smooth</i></button>').join('') + '</div>' +
+    '<div class="boxgrid">' + idle.map((m, i) => '<button class="bcell pick' + (sel.has(m) ? ' on' : '') + '" data-tm="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + (synergiesOf(m).length ? ' · ' + synergiesOf(m).map(g => g.icon).join('') : '') + '</small><i>' + Math.round(expOdds(m, ex) * 100) + '% smooth</i></button>').join('') + '</div>' +
     '<p id="teMsg" style="margin:0;min-height:1.2em;font-size:.85rem;color:var(--bad)"></p>' +
     '<button class="big" id="teGo"' + (sel.size ? '' : ' disabled') + '>Send ' + (sel.size ? sel.size + ' Digimon' : 'the team') + ' to ' + esc(ex.name) + '</button>' +
     '<button class="ghost" id="teBack">← Choose another place</button>');
@@ -1654,6 +1668,7 @@ function boxMenu(i){
   const exName = away ? (EXPEDITIONS.find(e => e.key === m.exp.key) || EXPEDITIONS[0]).name : '';
   openOv('<div class="bhead"><img alt="" src="' + esc(m.image) + '"><div><h4>' + esc(m.name) + '</h4><div class="statrow"><span class="stage">Lv ' + m.level + '</span><span class="stage">' + lvName(m) + '</span></div></div></div>' +
     '<div class="row statrow">' + statChips(st) + '</div>' +
+    (synergiesOf(m).length ? '<p class="ownline" style="margin:0">🔗 Synergy groups: ' + synergiesOf(m).map(g => g.icon + ' ' + esc(g.name)).join(', ') + '</p>' : '') +
     (away ? '<p style="margin:0">' + (done ? esc(m.name) + ' is back from ' + esc(exName) + '!' : 'Exploring ' + esc(exName) + '. Back in ' + fmtLeft(m.exp.end - Date.now()) + '.') + '</p>' : '') +
     '<div class="bactions">' +
       (done ? '<button class="big" id="bxCollect">Collect rewards</button>' : '') +
@@ -1699,12 +1714,12 @@ function expeditionPicker(m){
 
 async function collectExpeditions(list){
   busy = true;
-  const res = [];
+  const res = [], synOf = new Map(list.map(m => [m, expSynergies(m)]));
   for (const m of list){
     if (!expDone(m)) continue;
-    const ex = EXPEDITIONS.find(x => x.key === m.exp.key) || EXPEDITIONS[0];
-    const ok = Math.random() < expOdds(m, ex), est = expEstimate(m, ex);
-    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5) * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav'))), xp = Math.round(est.xp * (ok ? 1 : 0.5));
+    const ex = EXPEDITIONS.find(x => x.key === m.exp.key) || EXPEDITIONS[0], syn = synOf.get(m) || [], sb = syn.length;
+    const ok = Math.random() < Math.min(0.99, expOdds(m, ex) + SYN_EXP.odds * sb), est = expEstimate(m, ex);
+    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5) * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav')) * (1 + SYN_EXP.data * sb)), xp = Math.round(est.xp * (ok ? 1 : 0.5) * (1 + SYN_EXP.xp * sb));
     G.data += data;
     const loot = [], got = (icon, name, tier) => loot.push({ icon, name, tier: tier || '' });
     if (ok && ex.egg && Math.random() < Math.min(0.9, ex.egg * (evOn('eggs') ? 3 : 1) * (1 + 0.15 * perk('eggs')))){
@@ -1724,7 +1739,7 @@ async function collectExpeditions(list){
     nfCancel(nfUid(m)); m.exp = null;
     const lv = await gainXP(m, xp);
     questProgress('exp'); bump('exps');
-    res.push({ m, ex, ok, data, xp: lv.gained, lv, loot, seen });
+    res.push({ m, ex, ok, data, xp: lv.gained, lv, loot, seen, syn });
   }
   saveGame();
   const XR_ICON = { fields: '🌾', ruins: '🏛️', dark: '🌑' };
@@ -1737,6 +1752,7 @@ async function collectExpeditions(list){
       '<div class="xr-stats"><span class="xr-stat data"><b data-count="' + r.data + '">+' + r.data + '</b><small>💾 DigiData</small></span><span class="xr-stat xp"><b data-count="' + r.xp + '">+' + r.xp + '</b><small>⭐ XP</small></span>' +
       (up ? '<span class="xr-stat up"><b>Lv ' + up + '</b><small>⬆ Level up!</small></span>' : '') + '</div>' +
       (r.lv && r.lv.learned.length ? '<p class="xr-note learn">✨ Learned ' + esc(r.lv.learned.join(', ')) + '!</p>' : '') +
+      (r.syn && r.syn.length ? '<p class="xr-note syn">🔗 ' + r.syn.map(a => a.g.icon + ' ' + esc(a.g.name)).join(', ') + ' synergy: +' + Math.round(SYN_EXP.data * r.syn.length * 100) + '% DigiData & XP</p>' : '') +
       (r.loot.length ? '<p class="xr-h">Found</p><div class="xr-loot">' + r.loot.map((it, i) => '<span class="xr-item ' + it.tier + '" style="--i:' + i + '"><i>' + it.icon + '</i><small>' + esc(it.name) + '</small></span>').join('') + '</div>' : '<p class="xr-none">No items this time.</p>') +
       (r.seen.length ? '<p class="xr-h">Spotted · added to your Digidex</p><div class="xr-seen">' + r.seen.map(s => '<span><img alt="" src="' + esc(s.image) + '">' + esc(s.name) + '</span>').join('') + '</div>' : '') +
       (r.ok ? '' : '<p class="xr-note">Ran into trouble, so rewards were halved. Higher levels make trips safer.</p>') +
@@ -1882,7 +1898,71 @@ function growthOf(p){
   if (!p.growth) p.growth = { hp: 0, sp: 0, atk: Math.max(0, Math.round(((p.str || 2) - 2) / 2)), int: 0, spd: 0 };
   return p.growth;
 }
-function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p), pm = persOf(p).mul || {}, hm = (HELD[heldOf(p)] || {}).mul || {}, bm = bondStatMul(p) * (p.ultra ? ULTRA_MUL : 1); const o = {}; STAT_KEYS.forEach(k => o[k] = Math.max(1, Math.round((b[k] + (g[k] || 0)) * (pm[k] || 1) * (hm[k] || 1) * bm))); return o; }
+function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p), pm = persOf(p).mul || {}, hm = (HELD[heldOf(p)] || {}).mul || {}, bm = bondStatMul(p) * (p.ultra ? ULTRA_MUL : 1), sm = synMul(p); const o = {}; STAT_KEYS.forEach(k => o[k] = Math.max(1, Math.round((b[k] + (g[k] || 0)) * (pm[k] || 1) * (hm[k] || 1) * bm * (sm[k] || 1)))); return o; }
+
+// ----- synergies: Digimon from the same group boost each other in your party, and earn more on expeditions sent together -----
+// named groups need 2 members and element groups need 3; having 2 more than that makes the bonus 1.5x
+const SYNERGIES = [
+  { key: 'rk', name: 'Royal Knights', icon: '🛡️', need: 2, re: /^(Omegamon|Dukemon|Alphamon|Ulforce|Magnamon|Duftmon|Sleipmon|Crani[au]m+on|Examon|Lord ?Knightmon|Gankoomon|Jesmon|Dynasmon)/i, st: { all: 0.06 } },
+  { key: 'demon', name: 'Seven Great Demon Lords', icon: '😈', need: 2, re: /^(Lucemon|Leviamon|Demon\b|Lilithmon|Beelzebumon|Belphemon|Barbamon|Ogudomon)/, st: { atk: 0.08, int: 0.08 } },
+  { key: 'bagra', name: 'Bagra Army', icon: '⚔️', need: 2, re: /Bagramon|Dark Knightmon|Tactimon|Blastmon|Neo Vamdemon Darkness|Dorbickmon|Gravimon|Splashmon|Apollomon Darkness|Skull Knightmon|Dark Volumon|Mad Leomon|Deckerdramon|Gattai Lilithmon|Majuu Lilithmon/, st: { atk: 0.1, spd: 0.05 } },
+  { key: 'xros', name: 'Team Xros Heart', icon: '❤️‍🔥', need: 2, re: /Shoutmon|Ballistamon|Dorulumon|Starmon|Pickmon|Cutemon|Sparrowmon|Monitamon|Chibick/, st: { hp: 0.08, atk: 0.06 } },
+  { key: 'chosen', name: 'Chosen Partners', icon: '🌟', need: 2, re: /^(Agumon|Greymon|Metal Greymon|War Greymon|Gabumon|Garurumon|Were Garurumon|Metal Garurumon|Piyomon|Birdramon|Garudamon|Hououmon|Tentomon|Kabuterimon|Atlur Kabuterimon \(Red\)|Herakle Kabuterimon|Palmon|Togemon|Lilimon|Rosemon|Gomamon|Ikkakumon|Zudomon|Vikemon|Patamon|Angemon|Holy Angemon|Seraphimon|Tailmon|Angewomon|Ofanimon|Omegamon)$/, st: { hp: 0.06, def: 0.06 } },
+  { key: 'tamers', name: 'Tamers\' Partners', icon: '🃏', need: 2, re: /^(Guilmon|Growmon|Megalo Growmon|Dukemon|Renamon|Kyubimon|Taomon|Sakuyamon|Terriermon|Galgomon|Rapidmon|Saint Galgomon|Lopmon|Turuiemon|Antylamon|Cherubimon|Impmon|Beelzebumon|Culumon|Guardromon|Andromon|Monodramon|Cyberdramon|Justimon)$/, st: { int: 0.08, spd: 0.05 } },
+  { key: 'sov', name: 'Four Holy Beasts', icon: '🐉', need: 2, re: /^(Zhuqiaomon|Qinglongmon|Baihumon|Xuanwumon|Huanglongmon|Fanglongmon)/, st: { all: 0.07 } },
+  { key: 'olympos', name: 'Olympos XII', icon: '🏛️', need: 2, re: /^(Apollomon|Dianamon|Jupitermon|Junomon|Neptunemon|Marsmon|Mercurimon|Minervamon|Vulcanusmon|Venusmon|Bacchusmon|Ceresmon|Plutomon|Mervamon|Jet Mervamon)/, st: { int: 0.08, def: 0.05 } },
+  { key: 'deva', name: 'Twelve Devas', icon: '🪷', need: 2, re: /^(Kumbhiramon|Vajramon|Mihiramon|Andiramon|Majiramon|Sandiramon|Indramon|Pajiramon|Makuramon|Sinduramon|Caturamon|Vikaralamon|Chatsuramon)/, st: { atk: 0.06, spd: 0.06 } },
+  { key: 'darkm', name: 'Dark Masters', icon: '🎭', need: 2, re: /^(Piemon|Metal Seadramon|Mugendramon|Pinochimon)$/, st: { atk: 0.07, int: 0.07 } },
+  { key: 'e_holy', name: 'Holy Light', icon: '✨', need: 3, elem: 'holy', st: { def: 0.06, hp: 0.06 } },
+  { key: 'e_dark', name: 'Shadow Pact', icon: '🌑', need: 3, elem: 'dark', st: { atk: 0.05, int: 0.05 } },
+  { key: 'e_fire', name: 'Blaze', icon: '🔥', need: 3, elem: 'fire', st: { atk: 0.08 } },
+  { key: 'e_water', name: 'Tide', icon: '💧', need: 3, elem: 'water', st: { hp: 0.08 } },
+  { key: 'e_plant', name: 'Verdant', icon: '🌿', need: 3, elem: 'plant', st: { def: 0.08 } },
+  { key: 'e_wind', name: 'Gale Wing', icon: '🌪️', need: 3, elem: 'wind', st: { spd: 0.08 } },
+  { key: 'e_machine', name: 'Metal Empire', icon: '⚙️', need: 3, elem: 'machine', st: { atk: 0.04, def: 0.05 } },
+  { key: 'e_beast', name: 'Wild Pack', icon: '🐾', need: 3, elem: 'beast', st: { atk: 0.04, spd: 0.05 } },
+];
+const SYN_EXP = { data: 0.15, xp: 0.15, odds: 0.05 };   // per active synergy on a team expedition
+function synElem(id){ try{ return ELEM_CACHE[id] || null; }catch{ return null; } }
+function synergiesOf(m){
+  const name = (state.byId.get(m.id) || {}).name || m.name || '', e = synElem(m.id);
+  return SYNERGIES.filter(g => g.re ? g.re.test(name) : e === g.elem);
+}
+// active synergies in a group of Digimon: [{ g, n, tier }]
+function activeSyn(list){
+  const n = new Map();
+  for (const m of list) for (const g of synergiesOf(m)) n.set(g, (n.get(g) || 0) + 1);
+  return [...n].filter(([g, c]) => c >= g.need).map(([g, c]) => ({ g, n: c, tier: c >= g.need + 2 ? 1.5 : 1 }));
+}
+const synText = (g, tier) => Object.entries(g.st).map(([k, v]) => '+' + Math.round(v * (tier || 1) * 100) + '% ' + (k === 'all' ? 'all stats' : STAT_LABEL[k] || k.toUpperCase())).join(', ');
+function synMul(p){
+  if (!p || !G.party.includes(p)) return {};
+  const mine = new Set(synergiesOf(p)), o = {};
+  for (const a of activeSyn(G.party)) if (mine.has(a.g)) for (const [k, v] of Object.entries(a.g.st)) for (const s of (k === 'all' ? ['hp', 'atk', 'int', 'def', 'spd'] : [k])) o[s] = (o[s] || 1) + v * a.tier;
+  return o;
+}
+function synergyBar(){
+  const act = activeSyn(G.party);
+  return '<div class="synbar">' + (act.length ? act.map(a => '<button class="synchip" data-act="syn">' + a.g.icon + ' ' + esc(a.g.name) + ' <small>×' + a.n + ' · ' + synText(a.g, a.tier) + '</small></button>').join('') :
+    '<button class="synchip off" data-act="syn">🔗 Synergies <small>none active · tap to see groups</small></button>') + '</div>';
+}
+function synergyScreen(){
+  busy = true;
+  const act = new Map(activeSyn(G.party).map(a => [a.g, a])), cnt = new Map();
+  for (const m of G.party) for (const g of synergiesOf(m)) cnt.set(g, (cnt.get(g) || 0) + 1);
+  const row = g => { const a = act.get(g), c = cnt.get(g) || 0;
+    return '<div class="synrow' + (a ? ' on' : '') + '"><span>' + g.icon + '</span><div><b>' + esc(g.name) + (a ? ' · active ×' + a.n : c ? ' · ' + c + ' / ' + g.need + ' in party' : '') + '</b><small>' + (g.elem ? 'Any ' + g.need + '+ ' + ELEMS[g.elem].name + '-element Digimon' : 'Needs ' + g.need + '+ members') + '. Party: ' + synText(g, 1) + ' (×1.5 with ' + (g.need + 2) + '+). Expeditions sent together: +15% DigiData and XP, smoother trips.</small></div></div>'; };
+  const sorted = SYNERGIES.slice().sort((a, b) => (act.has(b) - act.has(a)) || ((cnt.get(b) || 0) - (cnt.get(a) || 0)));
+  openOv('<h4>🔗 Synergies</h4><p class="ownline">Digimon from the same group power each other up. In your party, members of an active synergy get its stat bonus in battles and dungeons. Send them on an expedition together (🧭 Send a team) for bigger rewards.</p><div class="synlist">' + sorted.map(row).join('') + '</div><button class="ghost" id="synClose">Close</button>');
+  $('#synClose').onclick = () => { closeOv(); renderPartner(); };
+}
+// synergies among a team that left on the same expedition at the same moment
+function expSynergies(m){
+  if (!m.exp) return [];
+  const team = G.box.filter(x => x.exp && x.exp.key === m.exp.key && Math.abs(x.exp.start - m.exp.start) < 5000);
+  const mine = new Set(synergiesOf(m));
+  return activeSyn(team).filter(a => mine.has(a.g));
+}
 // Ultra: a Mega that fused with another Mega
 const ULTRA_MUL = 1.12, ULTRA_MIN_LV = 45;
 const lvName = m => m && m.ultra && m.stage === 5 ? 'Ultra' : LEVEL_EN[STAGES[m.stage]];
@@ -4077,6 +4157,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 17, title: 'Synergies', items: ['Digimon from the same group now power each other up: Royal Knights, Seven Great Demon Lords, Bagra Army, Team Xros Heart, Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, and element groups like Holy Light and Blaze.', 'In your party: members of an active synergy get stat bonuses in battle (shown under your party on the Partner page; tap to see all groups).', 'On expeditions: send group members together with 🧭 Send a team for +15% DigiData and XP each and smoother trips.'] },
   { v: 16, title: 'Team expeditions', items: ['Send several Box Digimon on the same expedition at once: tap 🧭 Send a team in the Box, pick a place, then tap the Digimon you want (or Pick the strongest).', 'It shows the team\'s total DigiData and XP estimate, and each Digimon\'s chance of a smooth trip. Each one still uses an expedition slot.'] },
   { v: 15, title: 'Living scenery', items: ['The background now shows where you are: palm-tree shores on File Island, a city skyline on Server Continent, volcanoes on Folder Continent, waves on Net Ocean, eerie rocks on Dark Ocean and a snowy peak on Spiral Mountain.', 'It follows your clock (dawn, day, dusk and a starry night with lit-up windows) and the region\'s weather: rain, thunderstorms with lightning, snow, fog, gales, blazing sun and the aurora.', 'Turn it off from your 👤 Tamer page if you prefer a plain background.'] },
   { v: 14, title: 'Move accuracy', items: ['Attacking moves now show their accuracy. In battle, each move button shows its hit chance against the current foe (🎯 87%), and holding a move shows it too.', 'Accuracy depends on speed: 95% against an equally fast foe, up to 97% against slower ones, down to 70% against much faster ones. Gale and Fog weather lower it a little more.'] },
@@ -4108,6 +4189,7 @@ const GUIDE = [
   ['🌍 World', '<ul><li><b>Expeditions</b>: send a Digimon from your Box away for a while, or tap 🧭 Send a team in the Box to send several at once. Longer trips are riskier but bring back more DigiData, items and eggs.</li><li><b>Regions</b>: unlock new areas as you discover more Digimon. Each has its own foes and bonus rewards.</li><li><b>Colosseum</b>: fight a run of battles in a row for a best streak.</li><li><b>DigiFarm</b>: plant crops that grow in real time into DigiData, stat chips, Clean Slates and eggs.</li><li><b>Events</b>: limited-time bonuses like double XP or an egg hunt.</li></ul>'],
   ['🥚 Eggs & the Shop', '<p>Spend DigiData on eggs and items. Rookie, Champion and themed eggs (Dragon, Dark, X, and the element eggs) skip the baby stages. In-Training, Ultimate and Mega eggs hatch straight into those levels. Digimon that can\'t be raised any other way turn up twice as often in them.</p><p>Eggs you\'re given wait on the Partner page until you hatch them.</p>'],
   ['📦 Box & party', '<p>Keep up to six Digimon in your party; the rest live in the Box. Tap one to swap it in, send it on an expedition, or release it for DigiData.</p>'],
+  ['🔗 Synergies', '<p>Digimon from the same group power each other up: Royal Knights, the Seven Great Demon Lords, Bagra Army, Team Xros Heart, the Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, plus element groups (3 or more Holy, Dark, Fire, Water, Plant, Wind, Machine or Beast Digimon).</p><ul><li><b>Party</b>: when 2 or more members of a group are in your party (3 for element groups), those members get the group\'s stat bonus in battles, dungeons and raids. Two extra members make it 1.5× stronger.</li><li><b>Expeditions</b>: send members of a group together with 🧭 Send a team for +15% DigiData and XP per synergy and smoother trips.</li><li>Active synergies show under your party on the Partner page. Tap one to see every group.</li></ul>'],
   ['🏆 Trainer, quests & achievements', '<ul><li><b>Tamer level</b> rises as you play. Spend skill points in the Tamer tree for lasting bonuses.</li><li><b>Daily</b> rewards grow with your login streak.</li><li><b>Quests</b> give DigiData for everyday goals.</li><li><b>Achievements</b> and <b>Collection</b> milestones give rewards and titles. Pick the title shown under the app name in Titles.</li></ul>'],
   ['🌐 Online', '<p>Go online in World → Online with a Tamer name.</p><ul><li><b>Ranks</b>: leaderboards for discoveries, Tamer level, Colosseum and PvP.</li><li><b>Raid</b>: a weekly boss everyone damages together.</li><li><b>Trades</b>: post a Digimon and swap with other Tamers.</li><li><b>Friends</b>: add friends with their 8-character friend code, fight their team, or challenge them to a live battle.</li></ul>'],
   ['☁️ Saving your game', '<p>Your game saves on this device automatically. To keep it safe, turn on <b>Cloud save</b> in Trainer → ☁️ Backup. You get a 16-character recovery code: enter it on any device to load your game. Keep it secret, since anyone with it can load your game.</p><p>You can also make an offline backup code there.</p>'],
