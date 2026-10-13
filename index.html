@@ -239,6 +239,24 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .synrow b{display:block;font-size:.9rem}
 .synrow small{display:block;color:var(--muted);font-size:.76rem;line-height:1.35}
 .xr-note.syn{color:var(--accent)}
+/* ----- shop: one card style for everything, grouped into tabs ----- */
+.shopsec{display:grid;gap:8px}
+.shopsec h3{margin:8px 0 0;font:700 1rem var(--display);display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.shopsec h3 small{font:600 .7rem var(--mono);color:var(--muted);font-weight:600}
+.shopsec>.ownline{margin:0}
+.shop{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.shopitem{background:var(--panel)}
+.shopitem .info b{font-size:.92rem}
+.shopitem .info .own{font:600 .68rem var(--mono);color:var(--accent)}
+.sicon{width:44px;height:52px;display:grid;place-items:center;font-size:1.6rem}
+.sicon .egg.mini{width:38px;height:50px}
+.act.price{min-width:84px;font-variant-numeric:tabular-nums}
+.count b{color:var(--fg)}
+.slot.ghostslot{background:transparent;border-style:dashed;opacity:.45;pointer-events:none}
+.plot .plantbtn{width:100%}
+.colomore{font-size:.82rem;color:var(--muted);padding:8px 10px;border:1px dashed var(--line);border-radius:12px;background:var(--panel)}
+.skytag.btn{pointer-events:auto;cursor:pointer}
+@media (max-width:420px){.brand{font-size:1.2rem;white-space:nowrap;min-width:0}.brand small{overflow:hidden;text-overflow:ellipsis;max-width:42vw}.top{gap:8px}}
 .bcell.away img{opacity:.4}
 .bcell.empty{border-style:dashed;color:var(--muted);font:.68rem var(--mono);min-height:108px;align-content:center}
 .bhead{display:flex;gap:12px;align-items:center}
@@ -623,7 +641,7 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 .upd ul{margin:0;padding-left:18px}.upd li{font-size:.88rem;line-height:1.4;margin-bottom:4px}
 .upd.new{border-color:var(--accent)}
 /* ----- scenery: sky, land and weather behind everything, following region, time of day and weather ----- */
-#scene{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;--scrim:.5}
+#scene{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;--scrim:.62}
 #scene[hidden]{display:none}
 #scene>div{position:absolute;inset:0}
 #scene::after{content:'';position:absolute;inset:0;background:var(--bg);opacity:var(--scrim)}
@@ -692,7 +710,7 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
       <h1 class="brand">Digimon Index<small id="tagline">raise · digivolve · collect</small></h1>
       <button id="profBtn" class="favbtn" title="Your Tamer profile, help and updates" aria-label="Tamer profile" style="margin-left:auto;padding:6px 10px">👤</button>
       <button id="trainerBtn" class="favbtn" title="Trainer: daily reward, achievements, collection, titles, backup" style="padding:6px 10px">🏆</button>
-      <button id="themeBtn" class="favbtn" title="Switch between light and dark mode" style="padding:6px 10px">🌙 Dark</button>
+      <button id="themeBtn" class="favbtn" title="Switch between light and dark mode" style="padding:6px 10px">🌙</button>
       <span class="count" id="count" style="margin-left:0"></span>
     </div>
     <div id="indexChrome" hidden>
@@ -1021,13 +1039,13 @@ function showError(html, retry){
 }
 function updateCount(){
   updateBoxBadge(); try{ updateTrainerBadge(); }catch{}
-  if (state.tab === 'world'){ $('#count').innerHTML = esc(curRegion().name) + '<br>' + G.data.toLocaleString() + ' DigiData'; return; }
-  if (state.tab === 'quests' && G.quests){ $('#count').innerHTML = G.quests.list.filter(questDone).length + ' to claim<br>' + foundCount() + ' found'; return; }
-  if (state.tab === 'box'){ $('#count').innerHTML = G.box.length + ' / ' + G.boxCap + ' stored<br>' + expRunning() + ' exploring'; return; }
-  const n = Object.values(G.col).filter(v => v === 'raised').length;
-  if (state.tab === 'shop') $('#count').innerHTML = G.data.toLocaleString() + ' DigiData<br>' + G.eggs.length + ' egg' + (G.eggs.length === 1 ? '' : 's');
-  else if (state.tab === 'partner') $('#count').innerHTML = `${Object.keys(G.col).length} / ${state.all.length ? state.all.length.toLocaleString() : '—'} found<br>${n} raised`;
-  else { const list = filtered(); $('#count').textContent = `${list.length.toLocaleString()} / ${state.all.length.toLocaleString()}`; }
+  // every tab but the Index shows your DigiData first, then one number that matters on that page
+  const dd = '<b>💾 ' + G.data.toLocaleString() + '</b><br>';
+  if (state.tab === 'world' || state.tab === 'partner'){ $('#count').innerHTML = dd + foundCount().toLocaleString() + ' found'; return; }
+  if (state.tab === 'quests'){ $('#count').innerHTML = dd + (G.quests ? G.quests.list.filter(questDone).length : 0) + ' to claim'; return; }
+  if (state.tab === 'box'){ $('#count').innerHTML = dd + G.box.length + '/' + G.boxCap + ' stored'; return; }
+  if (state.tab === 'shop'){ $('#count').innerHTML = dd + G.eggs.length + ' egg' + (G.eggs.length === 1 ? '' : 's'); return; }
+  { const list = filtered(); $('#count').textContent = `${list.length.toLocaleString()} / ${state.all.length.toLocaleString()}`; }
 }
 
 // ---------- tabs ----------
@@ -1325,15 +1343,15 @@ function renderPartner(){
     ${dailyReady() ? `<button class="dailybar" data-act="daily">🎁 Daily reward ready · day ${((dailyNextStreak() - 1) % 7) + 1} of your streak. Tap to claim!</button>` : ''}
     ${partyHtml}
     <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">Lv ${p.level}</span><span class="stage${p.ultra ? ' ultra' : ''}">${lvName(p)}</span>
-      <span class="stage">${ageText(p)}</span><span class="stage pers" title="${esc(persOf(p).desc)}">${persOf(p).name}</span>${heldOf(p) ? `<span class="stage" title="${esc(HELD[heldOf(p)].desc)}">${HELD[heldOf(p)].icon} ${esc(HELD[heldOf(p)].name)}</span>` : ''}</div>
+      <span class="stage">${ageText(p)}</span>${heldOf(p) ? `<span class="stage" title="${esc(HELD[heldOf(p)].desc)}">${HELD[heldOf(p)].icon} ${esc(HELD[heldOf(p)].name)}</span>` : ''}</div>
     <div class="habitat${habitatClass(p)}"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
       <img class="sprite${sl ? ' sleep' : ''}" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}">${habitatExtras(p)}</div>
     <div class="meters">${meter('Hunger', p.hunger)}${meter('Energy', p.energy)}${meter('Mood', p.mood)}</div>
     <div class="evobox">
       <div class="row statrow">${statChips(partnerStats(p))}</div>
-      <div class="row"><span>LEVEL <b>${p.level}</b></span><span>XP <b>${p.xp} / ${XP_NEED(p.level)}</b></span></div>
+      <div class="row"><span>XP TO LV ${p.level + 1}</span><b>${p.xp} / ${XP_NEED(p.level)}</b></div>
       <div class="xptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div>
-      <div class="row"><span>BOND <b>♥ ${p.bond || 0}</b> · ${BOND_TIERS[bondTier(p)].name}</span><span>${esc(persOf(p).name)}: ${esc(persOf(p).desc)}</span></div>
+      <div class="row"><span>BOND <b>♥ ${p.bond || 0}</b> · ${BOND_TIERS[bondTier(p)].name}</span><span title="Personality">🧬 ${esc(persOf(p).name)}: ${esc(persOf(p).desc)}</span></div>
       <div class="evotrack bondtrack"><i style="width:${p.bond || 0}%"></i></div>
       <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b>${(p.streak || 0) >= 2 ? ` · 🔥 STREAK <b>${p.streak}</b>` : ''}</span><span>THIS STAGE <b>${p.stageWins || 0}W · ${failures(p)} fail${failures(p) === 1 ? '' : 's'}</b></span></div>
       ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
@@ -1495,7 +1513,7 @@ const SHOP = [
   { key: 'lucky', name: 'Lucky Egg', price: 300, desc: 'Hatches a Fresh Digimon that already trusts you (bond 25) and comes holding a random item.' },
   { key: 'rookie', name: 'Rookie Egg', price: 450, stage: 2, desc: 'Skips the baby stages and hatches straight into a Rookie, usually one you haven\'t raised.' },
   { key: 'dragon', name: 'Dragon Egg', price: 550, stage: 2, desc: 'Hatches a dragon-line Rookie like Agumon, Guilmon, V-mon, Dracomon or Gammamon.' },
-  { key: 'dark', name: 'Dark Egg', price: 550, stage: 2, desc: 'Hatches a dark Rookie like Impmon, Keramon, Pico Devimon or Black Tailmon.' },
+  { key: 'dark', name: 'Shadow Egg', price: 550, stage: 2, desc: 'Hatches a shadowy Rookie like Impmon, Keramon, Pico Devimon or Black Tailmon.' },
   { key: 'xegg', name: 'X Egg', price: 700, stage: 2, desc: 'Hatches an X-Antibody Rookie.' },
   { key: 'champion', name: 'Champion Egg', price: 1200, stage: 3, desc: 'Hatches straight into a Champion, usually one you haven\'t raised.' },
   { key: 'golden', name: 'Golden Egg', price: 2500, stage: 3, desc: 'Hatches a Champion you\'ve never discovered, with big bonus stats, bond 40 and a held item.' },
@@ -1507,6 +1525,7 @@ const SHOP = [
 const EGG_RE = { dragon: /dramon|Dragon|Dracomon|DORUmon|Guilmon|V-mon|Agumon|Gammamon|Ryudamon|Coronamon|Gaomon/i, dark: /Devi|Dark|Black|Impmon|Gazimon|Keramon|Lopmon|Phascomon|Psychemon|Ghost/, xegg: /X-Antibody/ };
 const eggName = k => (SHOP.find(x => x.key === k) || SHOP[0]).name;
 function walletRow(){
+  return '';   // DigiData lives in the header; Shop and Trainer have their own buttons
   const eggs = G.eggs.length;
   const T = tamerInit();
   return `<div class="wallet"><span>DigiData <b>${G.data.toLocaleString()}</b></span><button class="tamerchip${T.pts ? ' alert' : ''}" data-act="tamer">⭐ Tamer Lv ${T.lv}${T.pts ? ' · ' + T.pts + ' pt' + (T.pts === 1 ? '' : 's') : ''}</button>${eggs ? `<span>Eggs <b>${eggs}</b></span>` : ''}<button class="favbtn" id="shopBtn">Shop</button></div>`;
@@ -1518,38 +1537,66 @@ function itemTile(k){
 }
 // the shop lives in its own tab; older buttons that opened it now switch tabs
 function openShop(){ setTab('shop'); }
+// one card for everything in the shop: icon, name, what it does, and the button
+function shopCard(icon, name, desc, btn, own){
+  return '<div class="shopitem"><span class="sicon" aria-hidden="true">' + icon + '</span><div class="info"><b>' + name + '</b><small>' + desc + '</small>' + (own ? '<small class="own">' + own + '</small>' : '') + '</div>' + btn + '</div>';
+}
+const priceBtn = (attr, price, ok) => '<button class="act price" ' + attr + (ok ? '' : ' disabled') + '>💾 ' + price.toLocaleString() + '</button>';
+function itemDesc(k){
+  const t = itemType(k), v = k.split(':')[1];
+  if (k === 'clean') return 'Clears this stage\'s care mistakes and lost battles.';
+  if (k === 'vit:all') return 'Raises every stat at once (more at higher stages).';
+  if (t === 'vit') return 'Raises ' + (STAT_LABEL[v] || v) + ' (more at higher stages).';
+  if (k === 'pers:?') return 'Gives a random new personality.';
+  if (t === 'pers') return 'Sets the ' + (PERS[v] ? PERS[v].name + ' personality: ' + PERS[v].desc : 'personality') + '.';
+  if (t === 'dm') return 'Lets a Rookie armor-digivolve. Used up.';
+  if (t === 'crest') return 'Unlocks special Ultimate and Mega forms. Kept forever.';
+  if (k === 'xab') return 'Unlocks X-Antibody forms. Used up.';
+  if (HELD[k]) return HELD[k].desc + '. Give it to a Digimon from 🎒 Bag.';
+  return '';
+}
+function itemCard(k){
+  const own = G.items[k] || 0, price = itemPrice(k), kept = itemKept(k);
+  return shopCard(itemIcon(k), esc(itemName(k)), esc(itemDesc(k)), kept && own ? '<button class="act price" disabled>✓ Owned</button>' : priceBtn('data-item="' + k + '"', price, G.data >= price), !kept && own ? own + ' owned' : '');
+}
+const SHOP_TABS = [['eggs', '🥚 Eggs'], ['items', '🎒 Items'], ['upgrades', '⬆️ Upgrades'], ['craft', '🛠️ Craft']];
+const EGG_GROUPS = [
+  ['Everyday eggs', 'Hatch a Fresh Digimon to raise from the start.', ['mystery', 'lucky', 'rare']],
+  ['Level eggs', 'Skip ahead and hatch straight into a later level.', ['intraining', 'rookie', 'champion', 'golden', 'ultimate', 'mega']],
+  ['Themed eggs', 'Rookies of one kind.', ['dragon', 'dark', 'xegg']],
+  ['Element eggs', 'Rookies of one element, for type matchups and synergies.', null],   // filled from ELEMS when drawn
+];
 function renderShop(){
   if (state.tab !== 'shop') return;
-  const v = $('#shopView'), room = G.party.length < PARTY_MAX;
-  v.innerHTML = '<div class="ptop"><h2>DigiData Shop</h2></div>' + eventBanner() +
-    '<div class="wallet"><span>DigiData <b>' + G.data.toLocaleString() + '</b></span><span>Eggs <b>' + G.eggs.length + '</b></span><span>Party <b>' + G.party.length + ' / ' + PARTY_MAX + '</b></span></div>' +
-    '<p style="margin:0;color:var(--muted)">Earn DigiData by releasing Digimon, winning battles and clearing dungeons. Harder difficulties pay more.</p>' +
-    '<div class="shop">' + SHOP.map(it => '<div class="shopitem"><span class="egg mini ' + it.key + '" aria-hidden="true"></span>' +
-      '<div class="info"><b>' + it.name + '</b><small>' + it.desc + '</small><small>Owned: ' + G.eggs.filter(e => e === it.key).length + '</small></div>' +
-      '<button class="act" data-buy="' + it.key + '"' + (G.data < salePrice(it.price, true) ? ' disabled' : '') + '>' + salePrice(it.price, true) + '<small>DigiData</small></button></div>').join('') + '</div>' +
-    '<h3 style="margin:4px 0 0">Upgrades</h3><div class="shop">' +
-      '<div class="shopitem"><span class="upic" aria-hidden="true">📦</span><div class="info"><b>Box +5 slots</b><small>Store more Digimon. You have ' + G.boxCap + ' slots.</small></div>' + (G.boxCap >= BOX_MAX ? '<button class="act" disabled>Maxed</button>' : '<button class="act" data-up="box"' + (G.data < upgradeCosts().box ? ' disabled' : '') + '>' + upgradeCosts().box + '<small>DigiData</small></button>') + '</div>' +
-      '<div class="shopitem"><span class="upic" aria-hidden="true">🧭</span><div class="info"><b>Expedition team +1</b><small>Run more expeditions at once. You have ' + G.expSlots + '.</small></div>' + (G.expSlots >= 6 ? '<button class="act" disabled>Maxed</button>' : '<button class="act" data-up="exp"' + (G.data < upgradeCosts().exp ? ' disabled' : '') + '>' + upgradeCosts().exp + '<small>DigiData</small></button>') + '</div>' +
-    '</div>' +
-    '<p id="shopMsg" style="margin:0;min-height:1.4em;font-size:.88rem"></p>' +
-    '<h3 style="margin:4px 0 0">Care &amp; training items</h3><p class="ownline">Use them from 🎒 Bag on the Partner tab. Chips add more at higher stages.</p>' +
-    '<div class="itemgrid">' + ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].map(itemTile).join('') + '</div>' +
-    '<h3 style="margin:4px 0 0">Personality Mints</h3><p class="ownline">Change a Digimon\'s personality from 🎒 Bag. 🎲 Mystery Mint picks a random new one (150); 🌿 each named Mint sets that exact personality (350).</p>' +
-    '<div class="itemgrid">' + MINT_KEYS().map(itemTile).join('') + '</div>' +
-    '<p class="ownline">🕊️ Clean Slate clears this stage\'s failures (care mistakes and lost battles). 💾 Chips raise one stat; 🌟 Ultimate Chip raises them all.</p>' +
-    '<h3 style="margin:4px 0 0">Digimentals <small class="pricetag">' + ITEM_PRICE.dm + ' DigiData each</small></h3><p class="ownline">Unlock Armor digivolutions from Rookies. Used up when your Digimon armor-digivolves.</p>' +
-    '<div class="itemgrid">' + VIRTUES.map(v => itemTile('dm:' + v)).join('') + '</div>' +
-    '<h3 style="margin:4px 0 0">Crests <small class="pricetag">' + ITEM_PRICE.crest + ' DigiData each</small></h3><p class="ownline">Unlock special Ultimate and Mega forms. Kept forever once you have one.</p>' +
-    '<div class="itemgrid">' + CREST_VIRTUES.map(v => itemTile('crest:' + v)).join('') + '</div>' +
-    '<h3 style="margin:4px 0 0">Other</h3><div class="itemgrid">' + itemTile('xab') + '</div>' +
-    '<h3 style="margin:4px 0 0">Held items</h3><p class="ownline">Give one to a Digimon from 🎒 Bag for a lasting bonus. Rarer held items come from crafting and dungeon bosses.</p>' +
-    '<div class="itemgrid">' + HELD_KEYS.filter(k => HELD[k].price).map(itemTile).join('') + '</div>' +
-    '<h3 style="margin:4px 0 0">Crafting</h3><p class="ownline">Turn spare items into rarer ones.</p>' +
-    '<div class="shop">' + RECIPES.map((r, i) => '<div class="shopitem"><span class="upic" aria-hidden="true">' + (r.out === 'crest:?' ? '🔰' : itemIcon(r.out)) + '</span><div class="info"><b>' + esc(r.out === 'crest:?' ? 'Random Crest' : itemName(r.out)) + '</b><small>' +
-      Object.entries(r.need).map(([k, n]) => '<span class="' + (haveFor(k) >= n ? 'hv' : 'nh') + '">' + esc(needText(k, n)) + ' (' + haveFor(k) + ')</span>').join(' + ') + '</small>' + (r.out.startsWith('h:') ? '<small>' + esc(HELD[r.out].desc) + '</small>' : '') + '</div>' +
-      '<button class="act" data-craft="' + i + '"' + (canCraft(r) ? '' : ' disabled') + '>Craft</button></div>').join('') + '</div>' +
-    '<p class="ownline">X-Antibody (' + ITEM_PRICE.xab + ') unlocks X-Antibody forms and is used up. Items also turn up in dungeons on Hard and Nightmare and on Ruins and Dark Area expeditions.</p>' +
-    (G.eggs.length ? (room ? '<button class="big" id="shopHatch">Hatch an egg · ' + G.eggs.length + ' waiting</button>' : G.box.length < G.boxCap ? '<button class="big" id="shopHatchBox">Hatch into the Box · ' + G.eggs.length + ' waiting</button>' : '<p style="margin:0;color:var(--muted)">Your party and Box are full. Release a Digimon or buy more Box slots.</p>') : '');
+  const v = $('#shopView'), room = G.party.length < PARTY_MAX, tab = store.get('dx_shoptab', 'eggs');
+  const sec = (title, note, cards, tag) => '<div class="shopsec"><h3>' + title + (tag ? ' <small>' + tag + '</small>' : '') + '</h3>' + (note ? '<p class="ownline">' + note + '</p>' : '') + '<div class="shop">' + cards + '</div></div>';
+  let body = '';
+  if (tab === 'eggs'){
+    const eggCard = it => { const n = G.eggs.filter(e => e === it.key).length, price = salePrice(it.price, true);
+      return shopCard('<span class="egg mini ' + it.key + '"></span>', esc(it.name), esc(it.desc), priceBtn('data-buy="' + it.key + '"', price, G.data >= price), n ? n + ' waiting to hatch' : ''); };
+    body = EGG_GROUPS.map(([t, note, keys]) => sec(t, note, (keys || Object.keys(ELEMS).map(k => 'e' + k)).map(k => SHOP.find(x => x.key === k)).filter(Boolean).map(eggCard).join(''))).join('');
+  } else if (tab === 'items'){
+    body = sec('Care & training', 'Use these from 🎒 Bag on the Partner tab.', ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].map(itemCard).join('')) +
+      sec('Personality Mints', 'Change a Digimon\'s personality from 🎒 Bag.', MINT_KEYS().map(itemCard).join('')) +
+      sec('Digimentals', 'Unlock Armor digivolutions from Rookies.', VIRTUES.map(x => itemCard('dm:' + x)).join(''), ITEM_PRICE.dm + ' each') +
+      sec('Crests', 'Unlock special Ultimate and Mega forms.', CREST_VIRTUES.map(x => itemCard('crest:' + x)).join(''), ITEM_PRICE.crest + ' each') +
+      sec('Special', '', itemCard('xab'), '') +
+      sec('Held items', 'A lasting bonus for the Digimon holding it. Rarer ones come from crafting and dungeon bosses.', HELD_KEYS.filter(k => HELD[k].price).map(itemCard).join(''));
+  } else if (tab === 'upgrades'){
+    const c = upgradeCosts();
+    body = sec('Upgrades', '', shopCard('📦', 'Box +5 slots', 'Store more Digimon. You have ' + G.boxCap + ' slots.', G.boxCap >= BOX_MAX ? '<button class="act price" disabled>Maxed</button>' : priceBtn('data-up="box"', c.box, G.data >= c.box)) +
+      shopCard('🧭', 'Expedition slot +1', 'Run more expeditions at once. You have ' + G.expSlots + '.', G.expSlots >= 6 ? '<button class="act price" disabled>Maxed</button>' : priceBtn('data-up="exp"', c.exp, G.data >= c.exp)));
+  } else {
+    body = sec('Crafting', 'Turn spare items into rarer ones. Items also turn up in Hard and Nightmare dungeons and on Ruins and Dark Area expeditions.', RECIPES.map((r, i) =>
+      shopCard(r.out === 'crest:?' ? '🔰' : itemIcon(r.out), esc(r.out === 'crest:?' ? 'Random Crest' : itemName(r.out)),
+        Object.entries(r.need).map(([k, n]) => '<span class="' + (haveFor(k) >= n ? 'hv' : 'nh') + '">' + esc(needText(k, n)) + ' (' + haveFor(k) + ')</span>').join(' + ') + (r.out.startsWith('h:') ? '<br>' + esc(HELD[r.out].desc) : ''),
+        '<button class="act price" data-craft="' + i + '"' + (canCraft(r) ? '' : ' disabled') + '>Craft</button>')).join(''));
+  }
+  v.innerHTML = '<div class="ptop"><h2>Shop</h2></div>' + eventBanner() +
+    (G.eggs.length ? (room ? '<button class="dailybar" id="shopHatch">🥚 ' + G.eggs.length + ' egg' + (G.eggs.length === 1 ? '' : 's') + ' waiting · tap to hatch</button>' : G.box.length < G.boxCap ? '<button class="dailybar" id="shopHatchBox">🥚 ' + G.eggs.length + ' egg' + (G.eggs.length === 1 ? '' : 's') + ' waiting · party full, tap to hatch into the Box</button>' : '<p class="ownline">🥚 ' + G.eggs.length + ' eggs waiting, but your party and Box are full.</p>') : '') +
+    '<div class="segs">' + SHOP_TABS.map(([k, l]) => '<button class="seg' + (k === tab ? ' on' : '') + '" data-stab="' + k + '">' + l + '</button>').join('') + '</div>' +
+    '<p id="shopMsg" style="margin:0;min-height:1.3em;font-size:.88rem"></p>' + body;
+  v.querySelectorAll('[data-stab]').forEach(b => b.onclick = () => { store.set('dx_shoptab', b.dataset.stab); renderShop(); });
   v.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
     const it = SHOP.find(x => x.key === b.dataset.buy);
     if (G.data < salePrice(it.price, true)) return;
@@ -1605,7 +1652,7 @@ function renderBox(){
     cells.push('<button class="bcell' + (m.exp && !expDone(m) ? ' away' : '') + '" data-box="' + bi + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + '</small>' + status + '</button>');
   }
   v.innerHTML = '<div class="ptop"><h2>Storage Box</h2></div>' +
-    '<div class="wallet"><span>Stored <b>' + G.box.length + ' / ' + G.boxCap + '</b></span><span>Expeditions <b>' + expRunning() + ' / ' + G.expSlots + '</b></span><button class="favbtn" id="boxShop">More slots</button></div>' +
+    '<div class="wallet"><span>Expeditions out <b>' + expRunning() + ' / ' + G.expSlots + '</b></span><button class="favbtn" id="boxShop">More slots</button></div>' +
     '<p style="margin:0;color:var(--muted)">Digimon in the Box rest without getting hungry. Tap one to move it to your party, release it, or send it on a timed expedition. Use “Send to the Box” on the Partner tab to store one.</p>' +
     '<div class="segs">' + BOX_SORTS.map(([k, l]) => '<button class="seg' + (k === sortKey ? ' on' : '') + '" data-bsort="' + k + '">' + l + '</button>').join('') + '</div>' +
     (ready.length ? '<button class="big" id="collectAll">Collect ' + ready.length + ' finished expedition' + (ready.length === 1 ? '' : 's') + '</button>' : '') +
@@ -1811,9 +1858,10 @@ function partyBar(){
     if (m){
       const flag = m.hunger < 25 || m.mood < 25 ? '!' : canEvolve(m) ? '▲' : '';
       slots.push(`<button class="slot${i === G.active ? ' on' : ''}" data-slot="${i}" aria-label="${esc(m.name)}${i === G.active ? ' (active)' : ''}"><img alt="" src="${esc(m.image)}"><small>${esc(m.name)}</small>${flag ? `<i title="${flag === '!' ? 'Needs care' : 'Ready to digivolve'}">${flag}</i>` : ''}</button>`);
-    } else slots.push(G.eggs.length
+    } else if (G.party.length < i) slots.push('<span class="slot empty ghostslot" aria-hidden="true"></span>');
+    else slots.push(G.eggs.length
       ? `<button class="slot empty" data-hatch="1" aria-label="Hatch a stored egg into this slot"><span>+</span><small>Hatch</small></button>`
-      : `<button class="slot empty" data-shop="1" aria-label="Buy an egg in the shop"><span>+</span><small>Shop</small></button>`);
+      : `<button class="slot empty" data-shop="1" aria-label="Get an egg in the shop"><span>+</span><small>Get egg</small></button>`);
   }
   return `<div class="party" aria-label="Your party">${slots.join('')}</div>`;
 }
@@ -3417,7 +3465,7 @@ function renderQuests(msg){
   };
   const locked = QUEST_UNLOCKS.filter(n => found < n).map(n => '<div class="quest locked"><b>🔒 Locked slot</b><small>Unlocks at ' + n + ' Digimon found (' + found + ' / ' + n + ')</small><div class="evotrack"><i style="width:' + Math.min(100, found / n * 100) + '%"></i></div></div>');
   $('#questsView').innerHTML = '<div class="ptop"><h2>Quests</h2></div>' +
-    '<div class="wallet"><span>Slots <b>' + slots + ' / 6</b></span><span>Found <b>' + found + '</b></span><span>DigiData <b>' + G.data.toLocaleString() + '</b></span></div>' +
+    '<div class="wallet"><span>Quest slots <b>' + slots + ' / 6</b></span></div>' +
     '<div class="quests">' + Q.list.map(card).join('') + locked.join('') + '</div>' +
     '<div class="qrefresh">' + (Q.freeUsed
       ? '<button class="act" id="qPaid"' + (G.data < cost ? ' disabled' : '') + '>🔄 Refresh now · ' + cost + ' DigiData<small>free again in ' + fmtLeft(nextHour) + ' · price goes up with each refresh</small></button>'
@@ -4157,6 +4205,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 18, title: 'Cleaner screens', items: ['The Shop is split into Eggs, Items, Upgrades and Crafting tabs, with eggs grouped (Everyday, Level, Themed, Element) and every item shown the same way with what it does.', 'Your DigiData now sits in the top corner on every page instead of being repeated on each screen.', 'Partner page: no more duplicate level, personality or weather; only the next empty party slot shows a button.', 'DigiFarm shows one crop menu at a time, and the Colosseum folds away ranks you can\'t reach yet.', 'The themed Dark Egg is now the Shadow Egg, so it isn\'t confused with the Dark element egg.'] },
   { v: 17, title: 'Synergies', items: ['Digimon from the same group now power each other up: Royal Knights, Seven Great Demon Lords, Bagra Army, Team Xros Heart, Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, and element groups like Holy Light and Blaze.', 'In your party: members of an active synergy get stat bonuses in battle (shown under your party on the Partner page; tap to see all groups).', 'On expeditions: send group members together with 🧭 Send a team for +15% DigiData and XP each and smoother trips.'] },
   { v: 16, title: 'Team expeditions', items: ['Send several Box Digimon on the same expedition at once: tap 🧭 Send a team in the Box, pick a place, then tap the Digimon you want (or Pick the strongest).', 'It shows the team\'s total DigiData and XP estimate, and each Digimon\'s chance of a smooth trip. Each one still uses an expedition slot.'] },
   { v: 15, title: 'Living scenery', items: ['The background now shows where you are: palm-tree shores on File Island, a city skyline on Server Continent, volcanoes on Folder Continent, waves on Net Ocean, eerie rocks on Dark Ocean and a snowy peak on Spiral Mountain.', 'It follows your clock (dawn, day, dusk and a starry night with lit-up windows) and the region\'s weather: rain, thunderstorms with lightning, snow, fog, gales, blazing sun and the aurora.', 'Turn it off from your 👤 Tamer page if you prefer a plain background.'] },
@@ -4467,6 +4516,7 @@ function renderWorld(sub, msg){
     body = '<p class="ownline">Your active partner fights three opponents in a row. HP carries over between rounds (with a 20% breather), and you can\'t run. Opponents match your partner\'s stage and change every week. Each match costs 30 energy.</p>' +
       (p ? '<div class="wallet"><span>Fighter <b>' + esc(p.name) + '</b></span><span>Energy <b>' + Math.round(p.energy) + '</b></span><span>Best rank <b>' + (best ? COLO[best - 1].name : 'none') + '</b></span></div>' : '') +
       '<div class="regions">' + COLO.map((r, i) => { const done = i < best, open = i <= best, foes = p ? coloFoes(i, p.stage) : [];
+        if (i > best + 1) return i === best + 2 ? '<div class="colomore">🔒 ' + (COLO.length - i) + ' more rank' + (COLO.length - i === 1 ? '' : 's') + ' after that: ' + COLO.slice(i).map(x => esc(x.name)).join(' · ') + '</div>' : '';
         return '<div class="region' + (done ? ' done' : '') + (open ? '' : ' locked') + '"><div class="qtop"><b>' + (done ? '✓ ' : open ? '🏟️ ' : '🔒 ') + esc(r.name) + '</b><span>foes ×' + r.mult + '</span></div>' +
           '<small>Opponents: ' + foes.map(id => esc(shown(id, state.byId.get(id).name))).join(', ') + '</small>' +
           '<small>' + (done ? 'Replay: +' + Math.round(coloData(i) * 0.3) + ' DigiData' : 'First clear: +' + coloData(i) + ' DigiData' + (r.item ? ' · ' + esc(itemIcon(r.item) + ' ' + itemName(r.item)) : '')) + '</small>' +
@@ -4476,7 +4526,8 @@ function renderWorld(sub, msg){
   } else {
     const F = farmInit(), pend = gymPending(), boxers = G.box.filter(m => !m.exp).length;
     body = '<p class="ownline">Plant crops and they grow in real time, even while the app is closed.' + (evOn('harvest') ? ' 🌾 Bumper Crop: everything grows twice as fast right now!' : '') + (weatherAt('file').farm ? ' 🌧️ It\'s raining on the farm, so crops grow 20% faster.' : '') + '</p>' +
-      '<div class="plots">' + F.plots.map((pl, i) => { if (!pl) return '<div class="plot empty"><b>Empty plot</b><div class="seeds">' + CROPS.map(c => '<button class="seed" data-plant="' + i + ':' + c.key + '"' + (G.data < c.cost ? ' disabled' : '') + '>' + c.icon + '<span>' + esc(c.name) + '</span><small>' + c.cost + ' DD · ' + fmtLeft(cropMs(c)) + '</small></button>').join('') + '</div></div>';
+      '<div class="plots">' + F.plots.map((pl, i) => { if (!pl) return state.farmPick !== i ? '<div class="plot empty"><b>Empty plot</b><small>Pick a crop to grow here.</small><button class="act plantbtn" data-pp="' + i + '">🌱 Plant…</button></div>' :
+        '<div class="plot empty"><b>Plant in plot ' + (i + 1) + '</b><div class="seeds">' + CROPS.map(c => '<button class="seed" data-plant="' + i + ':' + c.key + '"' + (G.data < c.cost ? ' disabled' : '') + '>' + c.icon + '<span>' + esc(c.name) + '</span><small>' + c.cost + ' DD · ' + fmtLeft(cropMs(c)) + '</small></button>').join('') + '</div><button class="ghost" data-pp="-1">Cancel</button></div>';
         const c = CROPS.find(x => x.key === pl.crop), left = cropMs(c) - (Date.now() - pl.start), pct = Math.min(100, (1 - left / cropMs(c)) * 100);
         return '<div class="plot' + (left <= 0 ? ' ripe' : '') + '"><b>' + c.icon + ' ' + esc(c.name) + '</b><small>Gives ' + esc(c.out) + '</small><div class="evotrack"><i style="width:' + pct + '%"></i></div>' +
           (left <= 0 ? '<button class="act" data-harvest="' + i + '">Harvest</button>' : '<small>Ready in ' + fmtLeft(left) + '</small>') + '</div>'; }).join('') + '</div>' +
@@ -4486,8 +4537,7 @@ function renderWorld(sub, msg){
       (F.gym < GYM.length - 1 ? '<button class="act" id="gymUp"' + (G.data < GYM[F.gym].cost ? ' disabled' : '') + '>' + (F.gym ? 'Upgrade' : 'Build') + ' · ' + GYM[F.gym].cost + ' DD</button>' : '<span class="rq ok">Max level</span>') + '</div>';
   }
   v.innerHTML = '<div class="ptop"><h2>Digital World</h2><span class="stage">' + curRegion().icon + ' ' + esc(curRegion().name) + '</span><span class="stage">' + skyTag() + '</span></div>' + eventBanner() +
-    '<div class="wallet"><span>DigiData <b>' + G.data.toLocaleString() + '</b></span></div>' +
-    '<div class="segs">' + [['map', '🗺️ Map'], ['colo', '🏟️ Colosseum'], ['farm', '🌾 DigiFarm'], ['online', '🌐 Online']].map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-ws="' + k + '">' + l + '</button>').join('') + '</div>' +
+    '<div class="segs">' + [['map', '🗺️ Map'], ['colo', '🏟️ Colosseum'], ['farm', '🌾 Farm'], ['online', '🌐 Online']].map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-ws="' + k + '">' + l + '</button>').join('') + '</div>' +
     body + '<p id="wMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>';
   v.querySelectorAll('[data-ws]').forEach(b => b.onclick = () => renderWorld(b.dataset.ws));
   v.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => {
@@ -4497,10 +4547,11 @@ function renderWorld(sub, msg){
     saveGame(); updateCount(); renderWorld('map', m);
   });
   v.querySelectorAll('[data-colo]').forEach(b => b.onclick = () => coloMatch(+b.dataset.colo));
+  v.querySelectorAll('[data-pp]').forEach(b => b.onclick = () => { state.farmPick = +b.dataset.pp; renderWorld('farm'); });
   v.querySelectorAll('[data-plant]').forEach(b => b.onclick = () => {
     const [i, k] = b.dataset.plant.split(':'), c = CROPS.find(x => x.key === k), F = farmInit();
     if (F.plots[+i] || G.data < c.cost) return;
-    G.data -= c.cost; F.plots[+i] = { crop: k, start: Date.now() }; saveGame(); nfCrop(+i); updateCount(); renderWorld('farm', 'Planted ' + c.name + '.');
+    G.data -= c.cost; F.plots[+i] = { crop: k, start: Date.now() }; state.farmPick = -1; saveGame(); nfCrop(+i); updateCount(); renderWorld('farm', 'Planted ' + c.name + '.');
   });
   v.querySelectorAll('[data-harvest]').forEach(b => b.onclick = () => { const t = harvest(+b.dataset.harvest); if (t){ updateCount(); renderWorld('farm', 'Harvested ' + t + '!'); } });
   const fp = $('#farmPlot'); if (fp) fp.onclick = () => { const F = farmInit(), c = plotCost(); if (G.data < c || F.plots.length >= 6) return; G.data -= c; F.plots.push(null); saveGame(); updateCount(); renderWorld('farm', 'A new plot is ready to plant.'); };
@@ -4648,7 +4699,7 @@ function careLine(p){
 function habitatExtras(p){
   careInit(p);
   const w = curWeather(), sl = asleep(p);
-  return '<div class="sky" aria-hidden="true"><span class="skytag">' + skyTag() + '</span></div>' +
+  return '<div class="sky"><button class="skytag btn" data-act="sky" title="Weather and time of day">' + skyTag() + '</button></div>' +
     (w.key === 'rain' || w.key === 'storm' ? '<i class="wx rain" aria-hidden="true"></i>' : w.key === 'snow' ? '<i class="wx snow" aria-hidden="true"></i>' : w.key === 'fog' ? '<i class="wx fog" aria-hidden="true"></i>' : w.key === 'aurora' ? '<i class="wx aurora" aria-hidden="true"></i>' : '') +
     (p.poop ? '<div class="poops" aria-label="' + p.poop + ' mess' + (p.poop === 1 ? '' : 'es') + '">' + '💩'.repeat(p.poop) + '</div>' : '') +
     (p.sick ? '<span class="sickic" aria-label="sick">🤒</span>' : '') + (sl ? '<span class="zzz" aria-hidden="true">Z<small>z</small><small>z</small></span>' : '');
@@ -4658,7 +4709,7 @@ function careButtons(p){
   careInit(p);
   const third = sleepHour()
     ? '<button class="act" data-act="lights">' + (lightsOff() ? '💡 Lights on<small>room is dark</small>' : '🌙 Lights off<small>bedtime</small>') + '</button>'
-    : '<button class="act" data-act="sky">' + curWeather().icon + ' Weather<small>' + esc(curWeather().name) + ' · ' + PHASES[dayPhase()].name.toLowerCase() + '</small></button>';
+    : '<button class="act" data-act="lights" disabled>🌙 Lights off<small>from 10pm</small></button>';
   return '<div class="actions">' +
     '<button class="act" data-act="clean"' + (p.poop ? '' : ' disabled') + '>🧹 Clean<small>' + (p.poop ? p.poop + ' mess' + (p.poop === 1 ? '' : 'es') : 'all tidy') + '</small></button>' +
     '<button class="act" data-act="med"' + (p.sick && G.data >= MED_COST ? '' : ' disabled') + '>💊 Medicine<small>' + (p.sick ? MED_COST + ' DigiData' : 'healthy') + '</small></button>' + third + '</div>';
@@ -5620,7 +5671,7 @@ setTimeout(() => { if (onl().name) duelListen().catch(() => {}); }, 3000);
 setRetro(false);
 // light / dark mode: follows the phone until you pick one, then remembers it
 function isDark(){ return document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); }
-function paintThemeBtn(){ $('#themeBtn').textContent = isDark() ? '☀️ Light' : '🌙 Dark'; $('#themeBtn').setAttribute('aria-label', isDark() ? 'Switch to light mode' : 'Switch to dark mode'); }
+function paintThemeBtn(){ $('#themeBtn').textContent = isDark() ? '☀️' : '🌙'; $('#themeBtn').setAttribute('aria-label', isDark() ? 'Switch to light mode' : 'Switch to dark mode'); }
 $('#themeBtn').onclick = () => {
   const next = isDark() ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
