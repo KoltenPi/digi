@@ -561,6 +561,35 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 .fbtns .act,.fbtns .ghost{padding:5px 8px;font-size:.78rem}
 .tpick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px}
 .tpick .on{outline:2px solid var(--accent)}
+#profBtn{position:relative}
+#profBtn.alert::after{content:'';position:absolute;top:3px;right:3px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.profhead{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+.profhead img{width:72px;height:72px;object-fit:contain;border-radius:12px;background:var(--sunk)}
+.profhead h5{margin:0;font:700 1.2rem var(--display);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.profhead small{display:block;color:var(--muted);font:600 .75rem var(--mono)}
+.profhead .xptrack{margin-top:6px}
+.profcodes{display:grid;gap:8px}
+.profcode{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.profcode div{flex:1;min-width:0}
+.profcode small{display:block;color:var(--muted);font:600 .7rem var(--mono);text-transform:uppercase;letter-spacing:.04em}
+.profcode b{font:700 1rem var(--mono);letter-spacing:.06em;word-break:break-all}
+.profcode span{color:var(--muted);font-size:.85rem}
+.pstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pstats div{padding:8px 6px;border:1px solid var(--line);border-radius:10px;background:var(--panel);text-align:center}
+.pstats b{display:block;font:700 1.05rem var(--mono)}
+.pstats small{display:block;color:var(--muted);font-size:.7rem;line-height:1.2}
+.profbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.guide{display:grid;gap:6px}
+.guide details{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 12px}
+.guide summary{cursor:pointer;padding:10px 0;font-weight:700;list-style-position:inside}
+.guide details[open] summary{border-bottom:1px solid var(--line);margin-bottom:6px}
+.guide p,.guide li{font-size:.9rem;line-height:1.45;margin:0 0 8px}
+.guide ul{margin:0 0 8px;padding-left:18px}
+.upd{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:10px 12px}
+.upd h6{margin:0 0 6px;font:700 .95rem var(--display);display:flex;justify-content:space-between;gap:8px}
+.upd h6 small{color:var(--muted);font:600 .72rem var(--mono)}
+.upd ul{margin:0;padding-left:18px}.upd li{font-size:.88rem;line-height:1.4;margin-bottom:4px}
+.upd.new{border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -569,7 +598,8 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
   <div class="wrap">
     <div class="top">
       <h1 class="brand">Digimon Index<small id="tagline">raise · digivolve · collect</small></h1>
-      <button id="trainerBtn" class="favbtn" title="Trainer: daily reward, achievements, collection, titles, backup" style="margin-left:auto;padding:6px 10px">🏆</button>
+      <button id="profBtn" class="favbtn" title="Your Tamer profile, help and updates" aria-label="Tamer profile" style="margin-left:auto;padding:6px 10px">👤</button>
+      <button id="trainerBtn" class="favbtn" title="Trainer: daily reward, achievements, collection, titles, backup" style="padding:6px 10px">🏆</button>
       <button id="themeBtn" class="favbtn" title="Switch between light and dark mode" style="padding:6px 10px">🌙 Dark</button>
       <span class="count" id="count" style="margin-left:0"></span>
     </div>
@@ -3773,6 +3803,105 @@ function trainerScreen(tab, msg){
   };
 }
 
+// ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
+// newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
+const UPDATES = [
+  { v: 9, title: 'Tamer profile, Help & Updates', items: ['New 👤 button at the top of every page opens your Tamer profile: name, title, Tamer level, stats, friend code and cloud recovery code.', 'A Help guide explaining every part of the game.', 'This Updates page, so you can see what\'s new.'] },
+  { v: 8, title: 'Ultra fusions & every Digimon obtainable', items: ['Two Megas can now Jogress into an Ultra form (+12% to every stat, at least Lv 45). Over 40 Megas like Omegamon, Susanoomon and Ordinemon unlocked this way.', 'New Shop eggs: In-Training Egg, Ultimate Egg and Mega Egg. Digimon with no pre-evolution hatch twice as often from them.', 'Every Digimon now has a level, so every one can be obtained.', 'More official evolutions: Ultimates into 18 more Megas, Enbarrmon, GreatGrizzlymon, SkullSeadramon, Sharkmon, Monimon, Suzumon, the Shoutmon fusions and more.', 'Wormmon can armor-digivolve to Quetzalmon with the Digimental of Light.'] },
+  { v: 7, title: 'Artwork', items: ['Undiscovered Digimon show as a dark, blurred silhouette of their real artwork instead of a “?”.', 'Grey and coloured art backgrounds are removed; painted scenes are shown as a soft rounded portrait.'] },
+  { v: 6, title: 'New Digimon & official evolutions', items: ['26 Digimon added from Wikimon.', 'Evolution lines cleaned up to match the official (canon) ones listed on Wikimon.'] },
+  { v: 5, title: 'Dungeons', items: ['Auto-explore: tap Auto in the dungeon header and your partner walks the floor on its own, avoiding lava.', 'A Guard button sits next to your moves.'] },
+  { v: 4, title: 'Wild battles by difficulty', items: ['Easy: Baby and In-Training foes, sometimes a Rookie. Normal: Rookies and Champions, sometimes an Ultimate. Hard: Ultimates, sometimes a Mega. Nightmare: Megas.'] },
+  { v: 3, title: 'Faster levelling', items: ['More XP everywhere, extra catch-up XP while below your stage\'s usual level, and digivolving lifts your partner to its new stage\'s starting level.'] },
+  { v: 2, title: 'Cloud save, live battles & attack animations', items: ['Cloud save backs your game up online with a secret recovery code.', 'Battle a friend live, turn by turn, from the Friends tab. Wins count on the PvP leaderboard.', 'Attacks now fly, slash and burst across the screen with damage numbers.'] },
+  { v: 1, title: 'Expedition results', items: ['Expedition results are shown as reward cards instead of a wall of text.'] },
+];
+const UPD_LATEST = UPDATES[0].v;
+const updSeenV = () => G.updSeen ?? UPD_LATEST - 1;   // older saves: only the newest entry counts as new
+const updUnseen = () => updSeenV() < UPD_LATEST;
+function updateProfBadge(){ const b = $('#profBtn'); if (b) b.classList.toggle('alert', updUnseen()); }
+
+const GUIDE = [
+  ['🥚 Getting started', '<p>Tap the egg three times to hatch your first partner. Everything it becomes is added to your collection in the Index.</p><ul><li><b>Feed</b> when it\'s hungry, <b>Play</b> to keep its mood up, and let it <b>Rest</b> when energy is low.</li><li><b>Train</b> raises its stats. Each training session costs energy.</li><li>Clean up messes and use medicine from the care bar, or it gets unhappy and sick. Mistakes in care can change which forms it can reach.</li></ul>'],
+  ['🧬 Digivolving', '<p>Partners digivolve along their real evolution lines: Fresh → In-Training → Rookie → Champion → Ultimate → Mega.</p><ul><li><b>🧭 Evolution paths</b> shows every form your partner can reach next and what each one needs: a level, a stat, battle wins, a clean or messy care record, bond, or an item.</li><li>Fresh and In-Training digivolve freely once they\'re old enough.</li><li>Items: <b>Digimentals</b> unlock Armor forms from Rookies, <b>Crests</b> unlock famous forms (like War Greymon), and the <b>X-Antibody</b> unlocks X forms.</li><li><b>🌳 Evolution tree</b> shows the branches you\'ve found along your partner\'s line.</li></ul>'],
+  ['🤝 Jogress & Ultra', '<p>Jogress (DNA digivolution) fuses your partner with a partner Digimon in your party or Box to jump to a stronger form. The other Digimon is merged in: your partner keeps half of its trained stats and all its moves.</p><p>Two <b>Megas</b> can Jogress into an <b>Ultra</b> form, like War Greymon + Metal Garurumon → Omegamon. Ultras get +12% to every stat.</p>'],
+  ['⚔️ Battles', '<p>Pick a difficulty to fight a wild Digimon. Harder fights give more DigiData and XP and a chance at eggs.</p><ul><li>Easy: Baby and In-Training. Normal: Rookie and Champion. Hard: Ultimate. Nightmare: Mega.</li><li>Moves scale with ATK or INT. Elements matter: hitting a weakness does extra damage.</li><li><b>Moves</b> lets you choose which moves your partner brings. New moves unlock as it levels up.</li></ul>'],
+  ['🏰 Dungeons', '<p>Explore floors one step at a time, fight what you meet and find treasure. A boss waits at the bottom.</p><ul><li><b>Auto</b> in the dungeon header explores for you. Tap it again to stop.</li><li><b>Guard</b> next to your moves braces your partner against the next attack.</li><li>Watch out for lava tiles.</li></ul>'],
+  ['🌍 World', '<ul><li><b>Expeditions</b>: send a Digimon from your Box away for a while. Longer trips are riskier but bring back more DigiData, items and eggs.</li><li><b>Regions</b>: unlock new areas as you discover more Digimon. Each has its own foes and bonus rewards.</li><li><b>Colosseum</b>: fight a run of battles in a row for a best streak.</li><li><b>DigiFarm</b>: plant crops that grow in real time into DigiData, stat chips, Clean Slates and eggs.</li><li><b>Events</b>: limited-time bonuses like double XP or an egg hunt.</li></ul>'],
+  ['🥚 Eggs & the Shop', '<p>Spend DigiData on eggs and items. Rookie, Champion and themed eggs (Dragon, Dark, X, and the element eggs) skip the baby stages. In-Training, Ultimate and Mega eggs hatch straight into those levels. Digimon that can\'t be raised any other way turn up twice as often in them.</p><p>Eggs you\'re given wait on the Partner page until you hatch them.</p>'],
+  ['📦 Box & party', '<p>Keep up to six Digimon in your party; the rest live in the Box. Tap one to swap it in, send it on an expedition, or release it for DigiData.</p>'],
+  ['🏆 Trainer, quests & achievements', '<ul><li><b>Tamer level</b> rises as you play. Spend skill points in the Tamer tree for lasting bonuses.</li><li><b>Daily</b> rewards grow with your login streak.</li><li><b>Quests</b> give DigiData for everyday goals.</li><li><b>Achievements</b> and <b>Collection</b> milestones give rewards and titles. Pick the title shown under the app name in Titles.</li></ul>'],
+  ['🌐 Online', '<p>Go online in World → Online with a Tamer name.</p><ul><li><b>Ranks</b>: leaderboards for discoveries, Tamer level, Colosseum and PvP.</li><li><b>Raid</b>: a weekly boss everyone damages together.</li><li><b>Trades</b>: post a Digimon and swap with other Tamers.</li><li><b>Friends</b>: add friends with their 8-character friend code, fight their team, or challenge them to a live battle.</li></ul>'],
+  ['☁️ Saving your game', '<p>Your game saves on this device automatically. To keep it safe, turn on <b>Cloud save</b> in Trainer → ☁️ Backup. You get a 16-character recovery code: enter it on any device to load your game. Keep it secret, since anyone with it can load your game.</p><p>You can also make an offline backup code there.</p>'],
+];
+
+function profStats(){
+  const S = G.stats || {}, raisedN = Object.values(G.col).filter(x => x === 'raised').length;
+  const ultra = [...G.party, ...G.box].filter(m => m.ultra).length;
+  return [
+    ['Discovered', foundCount().toLocaleString() + '<small style="display:inline;font-size:.7rem"> / ' + (state.all || []).length.toLocaleString() + '</small>'], ['Raised', raisedN.toLocaleString()], ['DigiData', G.data.toLocaleString()],
+    ['Battles won', (S.wins || 0).toLocaleString()], ['Best win streak', S.bestStreak || 0], ['Live wins', S.pvpWins || 0],
+    ['Hatched', S.hatches || 0], ['Digivolutions', S.evolves || 0], ['Jogress', S.jogress || 0],
+    ['Dungeons cleared', S.dungeons || 0], ['Bosses beaten', S.bosses || 0], ['Nightmare wins', S.nightmare || 0],
+    ['Expeditions', S.exps || 0], ['Quests done', S.quests || 0], ['Colosseum best', (G.colo && G.colo.best) || 0],
+    ['Best daily streak', (G.daily && G.daily.best) || 0], ['Achievements', Object.keys(G.achClaimed || {}).length + ' / ' + ACH.length], ['Past partners', G.history.length],
+    ['Party + Box', G.party.length + G.box.length], ['Ultras', ultra], ['Trained', S.trains || 0],
+  ];
+}
+
+function profileScreen(view, msg){
+  if (busy && $('#overlay').hidden) return;
+  view = view || 'me';
+  busy = true;
+  const tabs = [['me', '👤 Tamer'], ['help', '❓ Help'], ['upd', '📰 Updates' + (updUnseen() ? ' •' : '')]];
+  let body = '';
+  if (view === 'me'){
+    const T = tamerInit(), O = onl(), C = cloudInit(), p = P();
+    body = '<div class="profhead"><img alt="" src="' + esc(p ? p.image : '') + '"' + (p ? '' : ' style="visibility:hidden"') + '><div>' +
+      '<h5>' + (O.name ? esc(O.name) : '<span style="color:var(--muted)">No name yet</span>') + (titleOf() ? '<span class="stage">★ ' + esc(titleOf()) + '</span>' : '') + '</h5>' +
+      '<small>Tamer Lv ' + T.lv + ' · ' + T.xp + ' / ' + tamerNeed(T.lv) + ' XP' + (T.pts ? ' · ' + T.pts + ' skill point' + (T.pts === 1 ? '' : 's') : '') + '</small>' +
+      '<small>' + (p ? 'Partner: ' + esc(p.name) + ' · Lv ' + (p.level || 1) + ' ' + esc(lvName(p)) : 'No partner right now') + '</small>' +
+      '<div class="xptrack"><i style="width:' + Math.min(100, T.xp / tamerNeed(T.lv) * 100) + '%"></i></div></div></div>' +
+      '<div class="bkrow"><input id="pfName" class="onlin" maxlength="16" autocomplete="off" placeholder="Tamer name" value="' + esc(O.name || O.prev || '') + '"><button class="act" id="pfSave">' + (O.name ? 'Rename' : 'Set name') + '</button></div>' +
+      (O.name ? '' : '<p class="ownline">Setting a name takes you online, so other Tamers can see it on leaderboards and add you as a friend.</p>') +
+      '<h5 class="lockh">Your codes</h5><div class="profcodes">' +
+      '<div class="profcode"><div><small>Friend code</small>' + (O.name ? '<b id="pfFriend">…</b>' : '<span>Set a Tamer name to get one</span>') + '</div>' + (O.name ? '<button class="favbtn" id="pfFriendCopy">Copy</button>' : '') + '</div>' +
+      '<div class="profcode"><div><small>Cloud backup code</small>' + (C.on && C.key ? '<b>' + esc(cloudPretty(C.key)) + '</b><span style="display:block;font-size:.75rem">Last backup ' + esc(C.last ? new Date(C.last).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never') + ' · keep this secret</span>' : '<span>Cloud save is off</span>') + '</div>' +
+        (C.on && C.key ? '<button class="favbtn" id="pfCloudCopy">Copy</button>' : '<button class="favbtn" id="pfCloudOn">Turn on</button>') + '</div></div>' +
+      '<h5 class="lockh">Stats</h5><div class="pstats">' + profStats().map(([l, v]) => '<div><b>' + v + '</b><small>' + l + '</small></div>').join('') + '</div>' +
+      '<div class="profbtns" style="margin-top:10px"><button class="act" data-pv="help">❓ Help</button><button class="act" data-pv="upd">📰 Updates' + (updUnseen() ? ' •' : '') + '</button></div>' +
+      '<button class="act" id="pfTrainer" style="width:100%;margin-top:8px">🏆 Trainer: skills, daily, achievements, titles, backup</button>';
+  } else if (view === 'help'){
+    body = '<p class="ownline">Tap a topic to open it.</p><div class="guide">' + GUIDE.map(([t, h], i) => '<details' + (i === 0 ? ' open' : '') + '><summary>' + t + '</summary>' + h + '</details>').join('') + '</div>';
+  } else {
+    const seen = updSeenV();
+    body = '<div class="guide">' + UPDATES.map(u => '<div class="upd' + (u.v > seen ? ' new' : '') + '"><h6>' + esc(u.title) + (u.v > seen ? '<small style="color:var(--accent)">NEW</small>' : '<small>#' + u.v + '</small>') + '</h6><ul>' + u.items.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>').join('') + '</div>';
+    G.updSeen = UPD_LATEST; saveGame(); updateProfBadge();
+  }
+  const html = '<h4>👤 Tamer</h4><div class="segs">' + tabs.map(([k, l]) => '<button class="seg' + (k === view ? ' on' : '') + '" data-pv="' + k + '">' + l + '</button>').join('') + '</div>' +
+    body + '<p id="pfMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p><button class="ghost" id="pfClose">Close</button>';
+  if ($('#overlay').hidden) openOv(html); else { $('#overlay .sheet').innerHTML = html; $('#overlay .sheet').scrollTop = 0; }
+  const say2 = t => { const m = $('#pfMsg'); if (m) m.textContent = t; };
+  $('#pfClose').onclick = () => { closeOv(); updateProfBadge(); if (state.tab === 'partner') renderPartner(); };
+  $('#overlay').querySelectorAll('[data-pv]').forEach(b => b.onclick = () => profileScreen(b.dataset.pv));
+  if (view !== 'me') return;
+  const O = onl(), C = cloudInit();
+  $('#pfTrainer').onclick = () => trainerScreen();
+  const sv = $('#pfSave'); sv.onclick = async () => {
+    const n = cleanName($('#pfName').value); if (n.length < 3){ say2('Use 3 to 16 letters or numbers.'); return; }
+    if (n === O.name){ say2('That\'s already your name.'); return; }
+    const old = O.name; sv.disabled = true; say2('Saving…'); O.name = n;
+    try{ await netSync(); profileScreen('me', 'Your Tamer name is now ' + n + '.'); }
+    catch(e){ O.name = old; saveGame(); sv.disabled = false; say2(netErr(e)); }
+  };
+  if (O.name){
+    net().then(N => { const f = $('#pfFriend'); if (f) f.textContent = myCode(N.uid); }).catch(e => { const f = $('#pfFriend'); if (f) f.textContent = 'offline'; });
+    $('#pfFriendCopy').onclick = async () => { const t = $('#pfFriend').textContent; if (!/^[A-Z0-9]{8}$/.test(t)) return; try{ await navigator.clipboard.writeText(t); say2('Friend code copied.'); }catch{ say2('Your friend code: ' + t); } };
+  }
+  const cc = $('#pfCloudCopy'); if (cc) cc.onclick = async () => { try{ await navigator.clipboard.writeText(cloudPretty(C.key)); say2('Recovery code copied. Keep it somewhere safe.'); }catch{ say2('Your recovery code: ' + cloudPretty(C.key)); } };
+  const co = $('#pfCloudOn'); if (co) co.onclick = () => trainerScreen('backup');
+}
+
 // ================= WORLD: elements, regions, colosseum, farm, events =================
 
 // ----- elements (type weaknesses), read from each Digimon's field and type in the database -----
@@ -5124,6 +5253,8 @@ $('#themeBtn').onclick = () => {
 try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { paintThemeBtn(); setRetro(false); }); }catch{}
 paintThemeBtn();
 $('#trainerBtn').onclick = () => { if (!busy) trainerScreen(); };
+$('#profBtn').onclick = () => { if (!busy) profileScreen(); };
+updateProfBadge();
 paintTitle();
 setInterval(updateTrainerBadge, 60000);
 evCheck(); updateWorldBadge();
