@@ -302,6 +302,10 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .egg.dark{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.35),transparent 26%),radial-gradient(circle at 62% 60%,#a066ff 0 11%,transparent 12%),radial-gradient(circle at 36% 72%,#d24dff 0 7%,transparent 8%),radial-gradient(circle at 56% 30%,#a066ff 0 6%,transparent 7%),#241634;box-shadow:inset -10px -14px 0 rgba(0,0,0,.3),0 0 0 2px #7b3fe4}
 .egg.xegg{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.75),transparent 26%),linear-gradient(45deg,transparent 44%,#2b6fe0 44% 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,#2b6fe0 44% 56%,transparent 56%),linear-gradient(180deg,#eef1f6,#b8c2d4);box-shadow:inset -10px -14px 0 rgba(0,0,0,.12),0 0 0 2px #2b6fe0}
 .egg.champion{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.6),transparent 26%),linear-gradient(transparent 44%,#ffd04d 44% 56%,transparent 56%),linear-gradient(160deg,#3b5bdb,#1c2f8a);box-shadow:inset -10px -14px 0 rgba(0,0,0,.2),0 0 0 2px #ffd04d}
+.egg.intraining{background:radial-gradient(circle at 30% 28%,rgba(255,255,255,.75),transparent 28%),radial-gradient(circle at 62% 60%,#ff7eb6 0 10%,transparent 11%),radial-gradient(circle at 36% 70%,#7cc4ff 0 8%,transparent 9%),#fff0f6;box-shadow:inset -10px -14px 0 rgba(0,0,0,.1)}
+.egg.ultimate{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.55),transparent 26%),linear-gradient(transparent 40%,#e8e8f0 40% 46%,transparent 46% 54%,#e8e8f0 54% 60%,transparent 60%),linear-gradient(160deg,#9b2c2c,#4a0f1a);box-shadow:inset -10px -14px 0 rgba(0,0,0,.25),0 0 0 2px #e8e8f0}
+.egg.mega{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.7),transparent 24%),conic-gradient(from 0deg at 50% 60%,#ff5f6d,#ffc371,#47e5bc,#4facfe,#a66cff,#ff5f6d);box-shadow:inset -10px -14px 0 rgba(0,0,0,.25),0 0 0 2px #fff,0 0 18px rgba(166,108,255,.6)}
+.stage.ultra{background:linear-gradient(90deg,#ff5f6d,#a66cff);color:#fff;border-color:transparent}
 .egg.golden{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.95),transparent 24%),radial-gradient(circle at 66% 62%,rgba(255,255,255,.5) 0 6%,transparent 7%),linear-gradient(140deg,#fff4b8,#ffcf3f 45%,#c98a00);box-shadow:inset -10px -14px 0 rgba(120,70,0,.25),0 0 0 2px #ffd04d,0 0 18px rgba(255,200,40,.55)}
 .egg.rare{background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.75),transparent 30%),radial-gradient(circle at 62% 60%,var(--star) 0 12%,transparent 13%),radial-gradient(circle at 34% 68%,var(--accent) 0 9%,transparent 10%),radial-gradient(circle at 55% 28%,var(--star) 0 7%,transparent 8%),var(--fg);box-shadow:inset -10px -14px 0 rgba(0,0,0,.2),0 0 0 2px var(--star)}
 .party{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
@@ -659,6 +663,17 @@ function addExtraItems(items){
   const have = new Set(items.map(d => d.id));
   return items.concat(EXTRA.map((e, i) => ({ id: EXTRA_BASE + i, name: e[1], href: '', image: extraImg(e), extra: true })).filter(d => !have.has(d.id)));
 }
+// levels the database leaves blank, cross-checked on Wikimon, the Digimon Fandom wiki and the official encyclopedia
+// (database id -> stage: 2 Rookie, 4 Ultimate, 5 Mega)
+const LEVEL_FIX = { 868: 2, 970: 4, 994: 4, 1010: 5, 1018: 5, 1019: 5, 1030: 5, 1058: 5, 1059: 5, 1063: 5, 1104: 4, 1105: 4, 1106: 5, 1334: 4 };
+function addLevelFixes(){
+  for (const [k, s] of Object.entries(LEVEL_FIX)){
+    const id = +k; if (!state.byId.has(id) || state.levelOf.get(id) != null) continue;
+    state.levelOf.set(id, s); state.stagesOf.set(id, [s]);
+    if (!state.stageIds[s].includes(id)) state.stageIds[s].push(id);
+    state.levelSets[STAGES[s]].add(id);
+  }
+}
 function addExtraLevels(){
   EXTRA.forEach((e, i) => {
     const id = EXTRA_BASE + i, s = STAGES.indexOf(e[2]);
@@ -715,17 +730,30 @@ function linkExtras(d){
 // ----- official evolutions from Wikimon (wikimon.net) -----
 // Every Digimon keeps only the evolutions Wikimon lists for it. Digimon left with none get Wikimon's list.
 // Digimon Wikimon has no list for keep what the database says, so nobody gets stuck.
-let WIKI_NEXT = null, WIKI_PREV = null;
+// official links the database is missing, for Digimon that otherwise couldn't be raised (from -> to, database ids)
+const EVO_ADD = [[41, 90045], [250, 90045], [490, 90045], [654, 90047], [616, 90047], [45, 90066], [124, 90066], [31, 90066], [49, 90067], [31, 90067], [182, 957], [90002, 90004],
+  [1101, 994], [987, 994], [990, 994], [991, 994], [176, 1010], [474, 1018], [1064, 1019], [937, 1030], [128, 1059], [1101, 1104], [987, 1104], [990, 1104], [1101, 1105], [987, 1105], [990, 1105], [995, 1106],
+  // Megas whose recorded pre-evolutions were all other Megas, linked to their official Ultimate-level ones
+  [47, 459], [406, 459], [1177, 818], [929, 818], [453, 971], [592, 971], [94, 1015], [1054, 1127], [1054, 1147], [152, 1162], [177, 1162], [26, 1162],
+  [38, 1447], [169, 1447], [20, 1447], [205, 1447], [414, 1468], [1029, 1468], [1029, 1470], [1115, 1470], [332, 1470], [1094, 1470], [168, 1477],
+  [160, 1487], [160, 90056], [1460, 90017], [409, 90019], [1411, 90019], [786, 90019], [718, 90048], [1452, 90063], [107, 90064], [90010, 90009],
+  [356, 90075]];   // Wormmon armor-digivolves to Quetzalmon with the Digimental of Light
+// Digimon with no way to raise them from an egg; their level's egg hatches them twice as often
+const EGG_ORPHANS = new Set([878, 1131, 1193, 1333,
+  392, 874, 912, 970, 974, 1025, 1046, 1069, 1117, 1120, 1165, 1334, 1403, 90010, 90099, 90101,
+  283, 284, 286, 340, 402, 514, 543, 558, 570, 617, 871, 916, 1300, 1336, 1357, 1410, 1428, 90008, 90009, 90013, 90016, 90021, 90022, 90023, 90028, 90043, 90077, 90078, 90090, 90091]);
+let WIKI_NEXT = null, WIKI_PREV = null, ADD_NEXT = null, ADD_PREV = null;
 function wikiEvo(){
   if (WIKI_NEXT) return true;
   if (!window.WIKI_EVO) return false;
-  WIKI_NEXT = new Map(); WIKI_PREV = new Map();
+  WIKI_NEXT = new Map(); WIKI_PREV = new Map(); ADD_NEXT = new Map(); ADD_PREV = new Map();
+  const link = (from, t) => { if (!WIKI_NEXT.has(from)) WIKI_NEXT.set(from, new Set()); WIKI_NEXT.get(from).add(t); if (!WIKI_PREV.has(t)) WIKI_PREV.set(t, new Set()); WIKI_PREV.get(t).add(from); };
   for (const part of String(window.WIKI_EVO).split(',')){
     const [a, b] = part.split(':'); if (!b) continue;
-    const from = parseInt(a, 36), tos = b.split('.').map(x => parseInt(x, 36)).filter(Number.isFinite);
-    WIKI_NEXT.set(from, new Set(tos));
-    for (const t of tos){ if (!WIKI_PREV.has(t)) WIKI_PREV.set(t, new Set()); WIKI_PREV.get(t).add(from); }
+    const from = parseInt(a, 36);
+    b.split('.').map(x => parseInt(x, 36)).filter(Number.isFinite).forEach(t => link(from, t));
   }
+  for (const [a, b] of EVO_ADD){ link(a, b); (ADD_NEXT.get(a) || ADD_NEXT.set(a, []).get(a)).push(b); (ADD_PREV.get(b) || ADD_PREV.set(b, []).get(b)).push(a); }
   return true;
 }
 function wikiCanon(list, canon, entry){
@@ -736,13 +764,13 @@ function wikiFill(d){
   const s = state.levelOf.get(d.id); if (s == null) return d;
   const entry = x => { const b = state.byId.get(x); return { id: x, digimon: b ? b.name : '?', condition: '', image: b ? b.image : '', url: '' }; };
   const out = Object.assign({}, d);
-  const cn = WIKI_NEXT.get(d.id);
+  const cn = WIKI_NEXT.get(d.id), force = (list, ids) => (list || []).concat((ids || []).filter(x => state.byId.has(x) && !(list || []).some(e => evoId(e) === x)).map(entry));
   if (cn && cn.size){
-    const c = wikiCanon(d.nextEvolutions, cn, entry);
+    const c = wikiCanon(force(d.nextEvolutions, ADD_NEXT.get(d.id)), cn, entry);
     out.nextEvolutions = nextCands({ nextEvolutions: c.kept }, s).length ? c.kept : c.all;
   }
   const cp = WIKI_PREV.get(d.id);
-  if (cp && cp.size){ const c = wikiCanon(d.priorEvolutions, cp, entry); out.priorEvolutions = c.kept.some(e => state.byId.has(evoId(e))) ? c.kept : c.all; }
+  if (cp && cp.size){ const c = wikiCanon(force(d.priorEvolutions, ADD_PREV.get(d.id)), cp, entry); out.priorEvolutions = c.kept.some(e => state.byId.has(evoId(e))) ? c.kept : c.all; }
   return out;
 }
 
@@ -821,7 +849,7 @@ async function loadStages(){
       state.stagesOf.set(id, [...(state.stagesOf.get(id) || []), i]);
     }
   });
-  addExtraLevels();
+  addExtraLevels(); addLevelFixes();
   state.ready = true;
   tick();
   renderPartner();
@@ -1162,7 +1190,7 @@ function renderPartner(){
     ${G.tamerNote ? `<button class="dailybar" data-act="tamer">⭐ ${esc(G.tamerNote)} Tap to open the skill tree.</button>` : ''}
     ${dailyReady() ? `<button class="dailybar" data-act="daily">🎁 Daily reward ready · day ${((dailyNextStreak() - 1) % 7) + 1} of your streak. Tap to claim!</button>` : ''}
     ${partyHtml}
-    <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">Lv ${p.level}</span><span class="stage">${LEVEL_EN[STAGES[p.stage]]}</span>
+    <div class="ptop"><h2>${esc(p.name)}</h2><span class="stage">Lv ${p.level}</span><span class="stage${p.ultra ? ' ultra' : ''}">${lvName(p)}</span>
       <span class="stage">${ageText(p)}</span><span class="stage pers" title="${esc(persOf(p).desc)}">${persOf(p).name}</span>${heldOf(p) ? `<span class="stage" title="${esc(HELD[heldOf(p)].desc)}">${HELD[heldOf(p)].icon} ${esc(HELD[heldOf(p)].name)}</span>` : ''}</div>
     <div class="habitat${habitatClass(p)}"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
       <img class="sprite${sl ? ' sleep' : ''}" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}">${habitatExtras(p)}</div>
@@ -1307,7 +1335,7 @@ function hatchNew(type = 'mystery', toBox, forcedId){
   const undiscovered = pool.filter(id => !known(id) && !inParty.has(id));
   const fresh = pool.filter(id => !raised(id) && !inParty.has(id));
   const from = (type === 'rare' || type === 'golden') && undiscovered.length ? undiscovered : fresh.length ? fresh : pool;
-  const id = forcedId && state.byId.has(forcedId) ? forcedId : pick(from);
+  const id = forcedId && state.byId.has(forcedId) ? forcedId : pick(from.concat(from.filter(x => EGG_ORPHANS.has(x))));
   let m;
   if (toBox){ m = makePartner(id); G.box.push(m); } else { newPartner(id); m = P(); }
   questProgress('hatch'); bump('hatches');
@@ -1336,6 +1364,9 @@ const SHOP = [
   { key: 'xegg', name: 'X Egg', price: 700, stage: 2, desc: 'Hatches an X-Antibody Rookie.' },
   { key: 'champion', name: 'Champion Egg', price: 1200, stage: 3, desc: 'Hatches straight into a Champion, usually one you haven\'t raised.' },
   { key: 'golden', name: 'Golden Egg', price: 2500, stage: 3, desc: 'Hatches a Champion you\'ve never discovered, with big bonus stats, bond 40 and a held item.' },
+  { key: 'intraining', name: 'In-Training Egg', price: 150, stage: 1, desc: 'Hatches straight into an In-Training Digimon. Ones that can\'t be raised any other way turn up twice as often.' },
+  { key: 'ultimate', name: 'Ultimate Egg', price: 5000, stage: 4, desc: 'Hatches straight into an Ultimate. Ones that can\'t be raised any other way turn up twice as often.' },
+  { key: 'mega', name: 'Mega Egg', price: 10000, stage: 5, desc: 'Hatches straight into a Mega. Ones that can\'t be raised any other way turn up twice as often.' },
 ];
 // themed eggs draw from matching Digimon of their stage
 const EGG_RE = { dragon: /dramon|Dragon|Dracomon|DORUmon|Guilmon|V-mon|Agumon|Gammamon|Ryudamon|Coronamon|Gaomon/i, dark: /Devi|Dark|Black|Impmon|Gazimon|Keramon|Lopmon|Phascomon|Psychemon|Ghost/, xegg: /X-Antibody/ };
@@ -1436,7 +1467,7 @@ function renderBox(){
     const bi = order[i], m = bi === undefined ? null : G.box[bi];
     if (!m){ cells.push('<div class="bcell empty"><span>Empty</span></div>'); continue; }
     const status = m.exp ? (expDone(m) ? '<i class="ok">Back!</i>' : '<i>' + fmtLeft(m.exp.end - Date.now()) + '</i>') : '';
-    cells.push('<button class="bcell' + (m.exp && !expDone(m) ? ' away' : '') + '" data-box="' + bi + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + LEVEL_EN[STAGES[m.stage]] + '</small>' + status + '</button>');
+    cells.push('<button class="bcell' + (m.exp && !expDone(m) ? ' away' : '') + '" data-box="' + bi + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + '</small>' + status + '</button>');
   }
   v.innerHTML = '<div class="ptop"><h2>Storage Box</h2></div>' +
     '<div class="wallet"><span>Stored <b>' + G.box.length + ' / ' + G.boxCap + '</b></span><span>Expeditions <b>' + expRunning() + ' / ' + G.expSlots + '</b></span><button class="favbtn" id="boxShop">More slots</button></div>' +
@@ -1455,7 +1486,7 @@ function boxMenu(i){
   busy = true; initMoves(m);
   const st = partnerStats(m), away = !!m.exp, done = expDone(m), partyRoom = G.party.length < PARTY_MAX;
   const exName = away ? (EXPEDITIONS.find(e => e.key === m.exp.key) || EXPEDITIONS[0]).name : '';
-  openOv('<div class="bhead"><img alt="" src="' + esc(m.image) + '"><div><h4>' + esc(m.name) + '</h4><div class="statrow"><span class="stage">Lv ' + m.level + '</span><span class="stage">' + LEVEL_EN[STAGES[m.stage]] + '</span></div></div></div>' +
+  openOv('<div class="bhead"><img alt="" src="' + esc(m.image) + '"><div><h4>' + esc(m.name) + '</h4><div class="statrow"><span class="stage">Lv ' + m.level + '</span><span class="stage">' + lvName(m) + '</span></div></div></div>' +
     '<div class="row statrow">' + statChips(st) + '</div>' +
     (away ? '<p style="margin:0">' + (done ? esc(m.name) + ' is back from ' + esc(exName) + '!' : 'Exploring ' + esc(exName) + '. Back in ' + fmtLeft(m.exp.end - Date.now()) + '.') + '</p>' : '') +
     '<div class="bactions">' +
@@ -1685,7 +1716,10 @@ function growthOf(p){
   if (!p.growth) p.growth = { hp: 0, sp: 0, atk: Math.max(0, Math.round(((p.str || 2) - 2) / 2)), int: 0, spd: 0 };
   return p.growth;
 }
-function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p), pm = persOf(p).mul || {}, hm = (HELD[heldOf(p)] || {}).mul || {}, bm = bondStatMul(p); const o = {}; STAT_KEYS.forEach(k => o[k] = Math.max(1, Math.round((b[k] + (g[k] || 0)) * (pm[k] || 1) * (hm[k] || 1) * bm))); return o; }
+function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p), pm = persOf(p).mul || {}, hm = (HELD[heldOf(p)] || {}).mul || {}, bm = bondStatMul(p) * (p.ultra ? ULTRA_MUL : 1); const o = {}; STAT_KEYS.forEach(k => o[k] = Math.max(1, Math.round((b[k] + (g[k] || 0)) * (pm[k] || 1) * (hm[k] || 1) * bm))); return o; }
+// Ultra: a Mega that fused with another Mega
+const ULTRA_MUL = 1.12, ULTRA_MIN_LV = 45;
+const lvName = m => m && m.ultra && m.stage === 5 ? 'Ultra' : LEVEL_EN[STAGES[m.stage]];
 function statChips(st){ return STAT_KEYS.map(k => `<span>${STAT_LABEL[k]} <b>${st[k]}</b></span>`).join(''); }
 
 // ----- training: pick a stat, then tap when the marker is in the green zone -----
@@ -2827,7 +2861,7 @@ const CREST_OF = { 'Metal Greymon': ['Courage'], 'War Greymon': ['Courage'], 'We
   'Lilimon': ['Sincerity'], 'Rosemon': ['Sincerity'], 'Zudomon': ['Reliability'], 'Vikemon': ['Reliability'], 'Holy Angemon': ['Hope'],
   'Seraphimon': ['Hope'], 'Angewomon': ['Light'], 'Ofanimon': ['Light'], 'Omegamon': ['Courage', 'Friendship'] };
 const DIGIMENTAL_OF = { Fladramon: 'Courage', Lighdramon: 'Friendship', Nefertimon: 'Light', Pegasmon: 'Hope', Digmon: 'Knowledge', Submarimon: 'Sincerity',
-  Shurimon: 'Sincerity', Holsmon: 'Love', Magnamon: 'Miracles', 'Gold V-dramon': 'Fate', 'Rapidmon Armor': 'Miracles' };
+  Shurimon: 'Sincerity', Holsmon: 'Love', Magnamon: 'Miracles', 'Gold V-dramon': 'Fate', 'Rapidmon Armor': 'Miracles', Quetzalmon: 'Light' };
 const JUNK_RE = /^(Numemon|Sukamon|Raremon|Geremon|Nanimon|Platinum Sukamon|Gold Numemon|Platinum Numemon|Etemon)$/;
 const DARK_RE = /Skull|Black|Chaos|Death|Dark|Devi|Venom|Evil|Vamdemon|Piemon|Lilithmon|Belial|Falldown|Daemon|Demon|Zombie|Undead|Bakemon|Phantomon|Mummymon|Ogudomon/;
 const HOLY_RE = /Ange|Holy|Seraph|Ofani|Saint|Magnamon|Cherubi|Kerubi|Dominimon|Clavis|Darcmon|Pidmon|Sleipmon|Hououmon|Unimon|Pegasmon|Nefertimon/;
@@ -3448,8 +3482,9 @@ async function jogressOptions(p){
   for (const e of d.nextEvolutions || []){
     const id = evoId(e), c = String(e.condition || '');
     if (!id || !state.byId.has(id) || seen.has(id) || !/\bwith\b/i.test(c) || /Warp|Card Game|Vital Bracelet|Pendulum|Every Digimon|Spirit/i.test(c)) continue;
-    const higher = inStage(id, p.stage + 1) || higherStage(id, p.stage) !== undefined || (p.stage === 2 && state.armor.has(id));
-    if (!higher) continue;
+    // Megas can fuse with another Mega into an Ultra form
+    const higher = inStage(id, p.stage + 1) || higherStage(id, p.stage) !== undefined || (p.stage === 2 && state.armor.has(id)) || (p.stage === 5 && inStage(id, 5));
+    if (!higher || id === p.id) continue;
     const ids = [...new Set(c.replace(/with or without/ig, 'with').replace(/^.*?\bwith\b\s*/i, '').split(/,\s*(?:or |and )?|\s+or\s+|\s+and\s+/).map(nameId).filter(x => x && x !== id))];
     if (!ids.length) continue;
     seen.add(id);
@@ -3468,7 +3503,7 @@ async function jogressScreen(){
     '<span class="reqs">' + o.need.map(id => '<span class="rq' + (o.mates.some(m => m.id === id) ? ' ok' : ' no') + '">🤝 ' + esc(shown(id, state.byId.get(id)?.name || '?')) + '</span>').join('') + '</span>' +
     (o.mates.length ? '<span class="jbtns">' + o.mates.map(m => '<button class="act" data-jog="' + o.id + '" data-with="' + (G.party.includes(m) ? 'p' : 'b') + (G.party.includes(m) ? G.party.indexOf(m) : G.box.indexOf(m)) + '">Fuse with ' + esc(m.name) + (G.box.includes(m) ? ' (Box)' : '') + '</button>').join('') + '</span>' : '') + '</div></div>';
   $('#overlay .sheet').innerHTML = '<h4>🧬 Jogress · ' + esc(p.name) + '</h4>' +
-    '<p class="ownline">Fuse ' + esc(p.name) + ' with a DNA partner to jump straight to a stronger form. The partner is merged in: it leaves your party or Box, and ' + esc(p.name) + ' keeps half of its trained stats and all of its moves.</p>' +
+    '<p class="ownline">Fuse ' + esc(p.name) + ' with a DNA partner to jump straight to a stronger form. The partner is merged in: it leaves your party or Box, and ' + esc(p.name) + ' keeps half of its trained stats and all of its moves.' + (p.stage === 5 ? ' Two Megas fuse into an <b>Ultra</b>: +12% to every stat.' : '') + '</p>' +
     (opts.length ? '<div class="lrows tall">' + ready.concat(later).map(card).join('') + '</div>' : '<p style="margin:0">' + esc(p.name) + ' has no recorded DNA digivolutions. Try another Digimon.</p>') +
     '<p id="jogMsg" style="margin:0;min-height:1.3em;font-size:.88rem"></p><button class="ghost" id="ovClose">Close</button>';
   $('#ovClose').onclick = () => { closeOv(); renderPartner(); };
@@ -3490,16 +3525,17 @@ async function doJogress(p, mate, id){
   const pi = G.party.indexOf(mate); if (pi >= 0){ G.party.splice(pi, 1); if (G.active > pi) G.active--; }
   const bi = G.box.indexOf(mate); if (bi >= 0) G.box.splice(bi, 1);
   G.active = Math.max(0, G.party.indexOf(p));
-  const firstTime = !raised(id);
+  const firstTime = !raised(id), ultra = p.stage === 5;
   p.id = id; p.name = b.name; p.image = b.image;
   p.stage = inStage(id, p.stage + 1) ? p.stage + 1 : Math.min(5, higherStage(id, p.stage) ?? p.stage + 1);
+  if (ultra){ p.ultra = 1; p.level = Math.max(p.level || 1, ULTRA_MIN_LV); }
   p.evo = 0; p.stageMistakes = 0; p.stageWins = 0; p.stageLosses = 0; p.final = false; p.line.push(id);
   p.stageLine = [...(p.stageLine || p.line.slice(0, -1).map((_, i) => i)), p.stage];
   G.col[id] = 'raised'; bump('jogress'); bump('evolves'); questProgress('evolve');
   saveGame();
   const learned = await syncMoves(p);
   $('#overlay .sheet').innerHTML = '<div class="reveal"><img class="sprite happy" alt="" src="' + esc(b.image) + '"><h4>' + esc(b.name) + '!</h4><p style="margin:0;color:var(--muted)">' +
-    LEVEL_EN[STAGES[p.stage]] + ' level · DNA digivolution' + (firstTime ? ' · new to your collection!' : '') + (learned.length ? ' · learned ' + esc(learned.join(', ')) : '') + '</p></div><button class="big" id="ovClose">Awesome</button>';
+    lvName(p) + ' level · DNA digivolution' + (firstTime ? ' · new to your collection!' : '') + (learned.length ? ' · learned ' + esc(learned.join(', ')) : '') + '</p></div><button class="big" id="ovClose">Awesome</button>';
   $('#ovClose').onclick = () => { closeOv(); say(oldName + ' and ' + mate.name + ' fused into ' + b.name + '!', 'happy'); };
 }
 
