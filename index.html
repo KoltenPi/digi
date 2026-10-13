@@ -2360,7 +2360,7 @@ function stageFloor(p){ const f = STAGE_MIN_LV[p.stage] || 1; if (!p.level || p.
 const BASIC = { name: 'Tackle', kind: 'phys', power: 1, desc: 'A basic body attack. Costs no SP.' };
 const GUARD = { name: 'Guard', kind: 'guard', power: 0, cost: 0 };
 const KIND_LABEL = { phys: 'PHY', mag: 'MAG', heal: 'HEAL', buff: 'BUFF', drain: 'DRAIN', guard: 'GRD' };
-const kindLabel = m => m.kind === 'buff' && moveTrait(m) === 'shield' ? 'GUARD' : m.kind === 'buff' && moveTrait(m) === 'haste' ? 'SPD' : KIND_LABEL[m.kind];
+const kindLabel = m => m.kind === 'buff' && moveTrait(m) === 'shield' ? 'GUARD' : m.kind === 'buff' && moveTrait(m) === 'haste' ? 'SPD' : m.kind === 'buff' && moveTrait(m) === 'focus' ? 'FOCUS' : KIND_LABEL[m.kind];
 const GENERIC = [
   { name: 'Data Shot', kind: 'mag', power: 1.3, desc: 'Fires a compact burst of data.' },
   { name: 'Quick Strike', kind: 'phys', power: 1.3, desc: 'A fast physical hit.' },
@@ -2410,14 +2410,16 @@ function moveLabel(m){
   if (m.kind === 'phys') return c + 'ATK ×' + m.power + ti;
   if (m.kind === 'mag') return c + 'INT ×' + m.power + ti;
   if (m.kind === 'drain') return c + 'INT ×' + m.power + ', heals' + ti;
+  if (m.kind === 'heal' && tr === 'regen') return c + 'heals ' + Math.round(m.power * 60) + '% + regen';
   if (m.kind === 'heal') return c + 'heals ' + Math.round(m.power * 100) + '% HP, cures';
   if (m.kind === 'buff' && tr === 'shield') return c + '−40% damage taken, 3 turns';
   if (m.kind === 'buff' && tr === 'haste') return c + '+30% SPD';
+  if (m.kind === 'buff' && tr === 'focus') return c + 'next hit crits';
   if (m.kind === 'buff') return c + '+' + Math.round((m.power - 1) * 100) + '% damage';
   return 'halve damage, +SP';
 }
 // what a move actually does, in plain words (matches doMove)
-const STATUS_FX = { psn: 'poison the foe (it loses 1/12 of its max HP each turn for 4 turns)', par: 'paralyze the foe (30% chance each turn that it can\'t move, for 3 turns)', slp: 'put the foe to sleep (it skips 1–3 turns, or wakes up when hit)', brn: 'burn the foe (it loses 1/16 of its max HP each turn and deals 25% less damage, for 4 turns)', frz: 'freeze the foe (it loses its next turn)' };
+const STATUS_FX = { psn: 'poison the foe (it loses 1/12 of its max HP each turn for 4 turns)', par: 'paralyze the foe (30% chance each turn that it can\'t move, for 3 turns)', slp: 'put the foe to sleep (it skips 1–3 turns, or wakes up when hit)', cnf: 'confuse the foe (35% chance each turn to hurt itself instead of acting, for 3 turns)', brn: 'burn the foe (it loses 1/16 of its max HP each turn and deals 25% less damage, for 4 turns)', frz: 'freeze the foe (it loses its next turn)' };
 const dealsDamage = m => !!m && (m.kind === 'phys' || m.kind === 'atk' || m.kind === 'mag' || m.kind === 'drain');
 function moveEffect(m, withCost){
   const x = v => (Math.round(v * 100) / 100) + '×';
@@ -2427,7 +2429,9 @@ function moveEffect(m, withCost){
   if (m.kind === 'phys' || m.kind === 'atk') return cost + 'Physical attack: deals damage equal to ' + x(m.power || 1) + ' your ATK, softened by the foe\'s DEF.' + sx;
   if (m.kind === 'mag') return cost + 'Special attack: deals damage equal to ' + x(m.power) + ' your INT, softened by the foe\'s DEF.' + sx;
   if (m.kind === 'drain') return cost + 'Draining attack: deals damage equal to ' + x(m.power) + ' your INT and heals you for half the damage dealt.' + sx;
+  if (m.kind === 'heal' && tr === 'regen') return cost + 'Restores ' + Math.round(m.power * 60) + '% of your max HP now, then 8% at the start of each of your next 4 turns. Also cures status problems.';
   if (m.kind === 'heal') return cost + 'Restores ' + Math.round(m.power * 100) + '% of your max HP and cures poison, burns and other status problems.';
+  if (m.kind === 'buff' && tr === 'focus') return cost + TRAITS.focus.icon + ' Focus: ' + TRAITS.focus.tip;
   if (m.kind === 'buff' && tr === 'shield') return cost + TRAITS.shield.icon + ' Barrier: ' + TRAITS.shield.tip;
   if (m.kind === 'buff' && tr === 'haste') return cost + TRAITS.haste.icon + ' Haste: ' + TRAITS.haste.tip + ' After two uses it gives +15% damage instead.';
   if (m.kind === 'buff') return cost + 'Powers up: your attacks deal +' + Math.round((m.power - 1) * 100) + '% damage for the rest of the battle (stacks, up to +90%).';
@@ -2567,9 +2571,29 @@ const TRAITS = {
   purify:   { name: 'Purify',      icon: '✨', tip: 'Wipes out the foe\'s power-ups and Barrier, and cures your own status problem.' },
   shield:   { name: 'Barrier',     icon: '🛡️', tip: 'You take 40% less damage from the foe\'s next 3 turns.' },
   haste:    { name: 'Haste',       icon: '⚡', tip: '+30% SPD for the rest of the battle (dodge more, crit more, act first). Stacks twice.' },
+  twin:     { name: 'Double hit',  icon: '✌️', tip: 'Always hits exactly twice; each hit has 62% of the listed power (124% in total).' },
+  flurry:   { name: 'Flurry',      icon: '🌀', tip: 'Hits 3–5 times; each hit has 30% of the listed power (about 120% in total). Great against Barrier.' },
+  confuse:  { name: 'Confuse',     icon: '💫', tip: '30% chance to confuse the foe for 3 turns: each turn it has a 35% chance to hurt itself instead of acting.' },
+  blind:    { name: 'Blind',       icon: '🌫️', tip: '35% chance to blind the foe: its attacks miss 25% more often for its next 3 turns.' },
+  slow:     { name: 'Slow',        icon: '🐌', tip: 'Every hit lowers the foe\'s SPD by 25% for the rest of the battle (stacks twice).' },
+  sap:      { name: 'SP drain',    icon: '🔋', tip: 'Drains 25% of the foe\'s max SP; you get half of it.' },
+  rally:    { name: 'Rally',       icon: '📣', tip: 'Also powers you up: +10% damage for the rest of the battle (stacks up to +90% with other boosts).' },
+  guardup:  { name: 'Guard hit',   icon: '🧱', tip: 'You take 40% less damage from the foe\'s next attack.' },
+  charge:   { name: 'Recharge',    icon: '⚙️', tip: 'Gets back 15% of your max SP after hitting.' },
+  focus:    { name: 'Focus',       icon: '🔍', tip: 'Your next attack is a guaranteed critical hit.' },
+  regen:    { name: 'Regenerate',  icon: '🌱', tip: 'Heals less right away, but then restores 8% of your max HP at the start of each of your next 4 turns.' },
 };
 const TRAIT_RE = [
-  ['multi', /rapid|barrage|combo|flurry|rush|volley|gatling|machine ?gun|missiles|double|twin|dual|triple|hundred|thousand|rain|shower|swarm|storm|frenzy/],
+  ['twin', /double|twin|dual|\bx\b|cross|pair|both/],
+  ['flurry', /flurry|barrage|gatling|machine ?gun|hundred|thousand|volley|rapid|needles|feathers/],
+  ['confuse', /confus|dizz|chaos|illusion|mirage|trick|madness|psych|bewilder|joke|prank|dance/],
+  ['blind', /smoke|mist|fog|dazzl|glare|blind|\bink|sand|dust|haze|smog/],
+  ['slow', /slow|sticky|\bweb|\bnet\b|bind|entangl|vine|\bivy|chain|tangle|glue|\bmud|gravity|ooze|slime/],
+  ['sap', /\bsap\b|siphon|\bjam|virus|hack|glitch|\bbug|static|disrupt/],
+  ['rally', /cheer|rally|war cry|battle cry|valor|brave|courage|spirit|soul|hero|glory/],
+  ['guardup', /shield|armor|guard|counter|parry|bulwark|bash|tackle/],
+  ['charge', /charge|battery|energy|overload|dynamo|generator|plasma/],
+  ['multi', /combo|rush|rain|shower|swarm|storm|frenzy|missiles|triple/],
   ['pierce', /(?<!solar )(?:beam|\bray\b)|laser|pierc|needle|arrow|spear|lance|drill|snip|bullet|cannon|\bshot\b|blaster/],
   ['quick', /quick|flash|sonic|speed|swift|instant|dash|blitz|zap|\bjet\b/],
   ['reckless', /final|giga|ultimate|crash|explo|burst|meteor|nova|apocalyp|armageddon|destruct|big bang|kamikaze|dynamite|bomb/],
@@ -2582,50 +2606,55 @@ const TRAIT_RE = [
 ];
 const traitCache = new Map();
 function moveTrait(m){
-  if (!m || !m.name || m.name === BASIC.name || m.kind === 'guard' || m.kind === 'heal') return null;
+  if (!m || !m.name || m.name === BASIC.name || m.kind === 'guard') return null;
+  if (m.kind === 'heal') return /regen|rejuv|bloom|growth|\blife|spring|blossom|renew|seed|sprout/.test((m.name + ' ' + (m.desc || '')).toLowerCase()) ? 'regen' : null;
   const key = m.kind + '|' + m.name; if (traitCache.has(key)) return traitCache.get(key);
   const nm = m.name.toLowerCase(), t = nm + ' ' + String(m.desc || '').toLowerCase();
   let tr = null;
-  if (m.kind === 'buff') tr = /barrier|shield|wall|protect|armor|fortress|defen|guard/.test(t) ? 'shield' : /speed|accel|haste|wing|evasi|agil|swift/.test(t) ? 'haste' : null;
+  if (m.kind === 'buff') tr = /barrier|shield|wall|protect|armor|fortress|defen|guard/.test(t) ? 'shield' : /speed|accel|haste|wing|evasi|agil|swift/.test(t) ? 'haste' : /focus|aim|concentrat|sharpen|meditat|lock.?on|scope|mind|eye/.test(t) ? 'focus' : null;
   else if (dealsDamage(m)){
     tr = (TRAIT_RE.find(([, re]) => re.test(nm)) || TRAIT_RE.find(([, re]) => re.test(t)) || [null])[0];
     // moves that already poison, paralyze or put to sleep keep just that; the rest get a trait picked from their name
-    if (!tr && !moveStatus(m)) tr = ['pierce', 'multi', 'quick', 'breaker', 'finisher', 'scare', null, null][strSeed(m.name) % 8];
+    if (!tr && !moveStatus(m)) tr = ['pierce', 'multi', 'quick', 'breaker', 'finisher', 'scare', 'twin', 'flurry', 'slow', 'sap', 'rally', 'guardup', 'charge', 'blind', 'confuse', null][strSeed(m.name) % 16];
   }
   traitCache.set(key, tr); return tr;
 }
 const traitTag = m => { const t = moveTrait(m); return t ? ' · ' + TRAITS[t].icon + ' ' + TRAITS[t].name : ''; };
 // how much a trait changes a hit's power, before multi-hit
-function traitPow(tr, def){ return tr === 'pierce' || tr === 'quick' ? 0.9 : tr === 'reckless' ? 1.3 : tr === 'finisher' && def && def.hp < def.st.hp * 0.35 ? 1.6 : tr === 'multi' ? 1.26 : 1; }
+function traitPow(tr, def){ return tr === 'pierce' || tr === 'quick' ? 0.9 : tr === 'reckless' ? 1.3 : tr === 'finisher' && def && def.hp < def.st.hp * 0.35 ? 1.6 : tr === 'multi' ? 1.26 : tr === 'twin' ? 1.24 : tr === 'flurry' ? 1.2 : 1; }
 // the one move engine every battle uses: R is the random source, local adds this phone's weather and time of day
 function moveCore(att, def, mv, R, local){
   if (att.shield > 0) att.shield--;
   if (mv.kind === 'heal'){
-    att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h);
-    let text = att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.';
+    const rg = moveTrait(mv) === 'regen';
+    att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power * (rg ? 0.6 : 1))); att.hp = Math.min(att.st.hp, att.hp + h);
+    let text = att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.' + (rg ? ' It will keep regenerating for 4 turns.' : '');
+    if (rg) att.regen = 4;
     if (att.status){ text += ' It is no longer ' + STATUS[att.status.k].name + '.'; att.status = null; }
     return { text, heal: h };
   }
   if (mv.kind === 'buff'){
     att.sp -= mv.cost || 0; const tr = moveTrait(mv);
     if (tr === 'shield'){ att.shield = 3; return { text: att.name + ' used ' + mv.name + '! A barrier cuts the damage it takes.' }; }
+    if (tr === 'focus'){ att.focus = true; return { text: att.name + ' used ' + mv.name + '! Its next attack will be a critical hit.' }; }
     if (tr === 'haste' && (att.hasted || 0) < 2){ att.hasted = (att.hasted || 0) + 1; att.st = Object.assign({}, att.st, { spd: Math.round(att.st.spd * 1.3) }); return { text: att.name + ' used ' + mv.name + '! It got faster.' }; }
     att.buff = Math.min(1.9, (att.buff || 1) * (tr === 'haste' ? 1.15 : mv.power)); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' };
   }
   if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: att.name + ' guards and recovers ' + g + ' SP.' }; }
   att.sp -= mv.cost || 0;
-  const tr = moveTrait(mv);
-  const evade = tr === 'quick' ? 0 : Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (local ? curWeather().evade || 0 : 0);
-  if (R() < evade) return { text: att.name + ' used ' + mv.name + '… but ' + def.name + ' dodged!', miss: true };
-  const crit = R() < Math.max(0.04, Math.min(0.48, 0.06 + (att.critBonus || 0) + (tr === 'quick' ? 0.15 : 0) + (att.st.spd - def.st.spd) * 0.01));
+  const tr = moveTrait(mv), blind = att.blind > 0 ? 0.25 : 0; if (att.blind > 0) att.blind--;
+  const evade = tr === 'quick' ? 0 : Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (local ? curWeather().evade || 0 : 0) + blind;
+  if (R() < evade) return { text: att.name + ' used ' + mv.name + '… but ' + def.name + ' dodged!' + (blind ? ' (blinded)' : ''), miss: true };
+  const focused = !!att.focus; att.focus = false;
+  const crit = focused || R() < Math.max(0.04, Math.min(0.48, 0.06 + (att.critBonus || 0) + (tr === 'quick' ? 0.15 : 0) + (att.st.spd - def.st.spd) * 0.01));
   const em = elemMult(att.elem, def.elem), am = attrMult(att.attr, def.attr) * em;
   const phys = mv.kind === 'phys' || mv.kind === 'atk', aStat = phys ? att.st.atk : att.st.int;
   // DEF softens both physical (ATK) and SP-powered attacks; equal attack and defense keeps damage about where it was
   const dStat = (def.st.def || 0) * (1 - (def.defDown || 0)) * (tr === 'pierce' ? 0.4 : 1);
   const defFactor = 1.35 * (2 * aStat) / (2 * aStat + dStat);
-  const hits = tr === 'multi' ? 2 + Math.floor(R() * 3) : 1, low = def.hp < def.st.hp * 0.35;
-  const pw = (tr === 'multi' ? 0.42 * hits : traitPow(tr, def)) * (mv.power || 1);
-  const mods = (att.buff || 1) * (1 - (att.weak || 0)) * (att.status && att.status.k === 'brn' ? 0.75 : 1) * (def.shield > 0 ? 0.6 : 1) * (def.guard && tr !== 'pierce' ? 0.5 : 1) * (local ? skyMult(att) : 1) * (att.tdm || 1) * (def.ttk || 1);
+  const hits = tr === 'multi' ? 2 + Math.floor(R() * 3) : tr === 'twin' ? 2 : tr === 'flurry' ? 3 + Math.floor(R() * 3) : 1, low = def.hp < def.st.hp * 0.35;
+  const pw = (tr === 'multi' ? 0.42 * hits : tr === 'twin' ? 0.62 * hits : tr === 'flurry' ? 0.3 * hits : traitPow(tr, def)) * (mv.power || 1);
+  const mods = (att.buff || 1) * (1 - (att.weak || 0)) * (att.status && att.status.k === 'brn' ? 0.75 : 1) * (def.shield > 0 ? (tr === 'flurry' ? 0.8 : 0.6) : 1) * (def.guard && tr !== 'pierce' ? 0.5 : 1) * (local ? skyMult(att) : 1) * (att.tdm || 1) * (def.ttk || 1);
   const dmg = Math.max(1, Math.round(aStat * pw * defFactor * (0.85 + R() * 0.3) * am * (crit ? 1.6 : 1) * mods));
   def.hp = Math.max(0, def.hp - dmg);
   let text = att.name + ' used ' + mv.name + '! ' + (hits > 1 ? 'Hit ' + hits + ' times for ' : '') + dmg + ' damage.', heal = 0;
@@ -2641,12 +2670,19 @@ function moveCore(att, def, mv, R, local){
   if (def.hp > 0){
     if (tr === 'breaker' && (def.defDown || 0) < 0.6){ def.defDown = Math.min(0.6, (def.defDown || 0) + 0.2); text += ' ' + def.name + '\'s DEF fell!'; }
     if (tr === 'scare' && (def.weak || 0) < 0.45){ def.weak = Math.min(0.45, (def.weak || 0) + 0.15); text += ' ' + def.name + ' is shaken (deals less damage)!'; }
+    if (tr === 'slow' && (def.slowed || 0) < 2){ def.slowed = (def.slowed || 0) + 1; def.st = Object.assign({}, def.st, { spd: Math.max(1, Math.round(def.st.spd * 0.75)) }); text += ' ' + def.name + ' slowed down!'; }
+    if (tr === 'sap' && def.sp > 0){ const t = Math.min(def.sp, Math.max(1, Math.round(def.st.sp * 0.25))); def.sp -= t; att.sp = Math.min(att.st.sp, att.sp + Math.round(t / 2)); text += ' Drained ' + t + ' SP!'; }
+    if (tr === 'blind' && !(def.blind > 0) && R() < 0.35){ def.blind = 3; text += ' ' + def.name + ' is blinded!'; }
     if (tr === 'purify'){ if ((def.buff || 1) > 1 || def.shield > 0){ def.buff = 1; def.shield = 0; text += ' ' + def.name + '\'s power-ups were wiped away!'; } if (att.status){ text += ' ' + att.name + ' is no longer ' + STATUS[att.status.k].name + '.'; att.status = null; } }
   }
+  if (tr === 'rally' && (att.buff || 1) < 1.9){ att.buff = Math.min(1.9, (att.buff || 1) * 1.1); text += ' ' + att.name + ' is fired up!'; }
+  if (tr === 'guardup'){ att.shield = Math.max(att.shield || 0, 1); text += ' ' + att.name + ' braces itself.'; }
+  if (tr === 'charge'){ const g = Math.max(1, Math.round(att.st.sp * 0.15)); att.sp = Math.min(att.st.sp, att.sp + g); text += ' +' + g + ' SP.'; }
+  if (focused) text += ' (focused)';
   if (def.status && def.status.k === 'slp' && def.hp > 0){ def.status = null; text += ' ' + def.name + ' woke up!'; }
-  const sk = moveStatus(mv) || (tr === 'burn' ? 'brn' : tr === 'chill' ? 'frz' : null);
+  const sk = moveStatus(mv) || (tr === 'burn' ? 'brn' : tr === 'chill' ? 'frz' : tr === 'confuse' ? 'cnf' : null);
   const chance = sk === 'frz' ? 0.25 : sk === 'par' && local && curWeather().par ? 0.45 : 0.3;
-  if (sk && def.hp > 0 && !def.status && !def.noStatus && R() < chance){ def.status = { k: sk, t: sk === 'slp' ? 1 + Math.floor(R() * 3) : sk === 'par' ? 3 : sk === 'frz' ? 1 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
+  if (sk && def.hp > 0 && !def.status && !def.noStatus && R() < chance){ def.status = { k: sk, t: sk === 'slp' ? 1 + Math.floor(R() * 3) : sk === 'par' || sk === 'cnf' ? 3 : sk === 'frz' ? 1 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
   return { text, dmg, crit, am, heal, hits };
 }
 function doMove(att, def, mv){ return moveCore(att, def, mv, Math.random, true); }
@@ -2655,7 +2691,7 @@ function foeChoice(f, me){
   const guard = f.moves.find(m => m.kind === 'guard') || GUARD;
   const heal = usable.find(m => m.kind === 'heal');
   if (heal && f.hp < f.st.hp * 0.35 && Math.random() < 0.6) return heal;
-  const buff = usable.find(m => m.kind === 'buff' && !(moveTrait(m) === 'shield' && f.shield > 0) && !(moveTrait(m) === 'haste' && (f.hasted || 0) >= 2));
+  const buff = usable.find(m => m.kind === 'buff' && !(moveTrait(m) === 'shield' && f.shield > 0) && !(moveTrait(m) === 'haste' && (f.hasted || 0) >= 2) && !(moveTrait(m) === 'focus' && f.focus));
   if (buff && (f.buff || 1) < 1.3 && f.hp > f.st.hp * (moveTrait(buff) === 'shield' ? 0.3 : 0.6) && Math.random() < 0.3) return buff;
   if (heal && f.status && f.status.k !== 'slp' && f.hp < f.st.hp * 0.7 && Math.random() < 0.4) return heal;
   const dmg = usable.filter(m => m.kind === 'phys' || m.kind === 'mag' || m.kind === 'drain');
@@ -2679,7 +2715,7 @@ async function moveFx(aSel, dSel, mv, r, elem, onHit){
   [A, D, box].forEach(e => e.style.setProperty('--fxc', col));
   const dir = fxCenter(D, box)[0] >= fxCenter(A, box)[0] ? 1 : -1;
   if (mv.kind === 'heal'){ fxClass(A, 'fx-heal'); hit(); fxFloat(A, '+' + (r.heal || 0), 'heal'); await sleep(calm ? 200 : 600); return; }
-  if (mv.kind === 'buff'){ fxClass(A, 'fx-buff'); hit(); fxFloat(A, { shield: '🛡️ Barrier', haste: '⚡ Haste' }[moveTrait(mv)] || '⬆ Power up', 'info'); await sleep(calm ? 200 : 600); return; }
+  if (mv.kind === 'buff'){ fxClass(A, 'fx-buff'); hit(); fxFloat(A, { shield: '🛡️ Barrier', haste: '⚡ Haste', focus: '🔍 Focus' }[moveTrait(mv)] || '⬆ Power up', 'info'); await sleep(calm ? 200 : 600); return; }
   if (mv.kind === 'guard'){ fxClass(A, 'fx-guard', 800); hit(); fxFloat(A, '🛡️ Guard', 'info'); await sleep(calm ? 200 : 450); return; }
   const ranged = mv.kind === 'mag' || mv.kind === 'drain';
   if (!calm){
@@ -4150,7 +4186,7 @@ function applyPerks(u, p){
 }
 
 // ----- status effects: poison, paralysis, sleep -----
-const STATUS = { psn: { name: 'poisoned', icon: '☠️' }, par: { name: 'paralyzed', icon: '⚡' }, slp: { name: 'asleep', icon: '💤' }, brn: { name: 'burned', icon: '🔥' }, frz: { name: 'frozen', icon: '🧊' } };
+const STATUS = { psn: { name: 'poisoned', icon: '☠️' }, par: { name: 'paralyzed', icon: '⚡' }, slp: { name: 'asleep', icon: '💤' }, brn: { name: 'burned', icon: '🔥' }, frz: { name: 'frozen', icon: '🧊' }, cnf: { name: 'confused', icon: '💫' } };
 function moveStatus(mv){
   const t = ((mv.name || '') + ' ' + (mv.desc || '')).toLowerCase();
   if (/poison|toxic|venom|acid|sting/.test(t)) return 'psn';
@@ -4161,7 +4197,13 @@ function moveStatus(mv){
 function statusLabel(u){ return u.status ? STATUS[u.status.k].icon + ' ' + STATUS[u.status.k].name : ''; }
 // runs at the start of a unit's turn; returns { skip, text }
 function statusTurn(u, R = Math.random){
+  const r = statusCore(u, R);
+  if (u.regen > 0 && u.hp > 0){ const h = Math.max(1, Math.round(((u.st && u.st.hp) || u.max || 10) * 0.08)); u.hp = Math.min((u.st && u.st.hp) || u.max || u.hp + h, u.hp + h); u.regen--; r.text = (r.text ? r.text + ' ' : '') + u.name + ' regenerates ' + h + ' HP.'; }
+  return r;
+}
+function statusCore(u, R){
   const s = u.status; if (!s) return { skip: false, text: '' };
+  if (s.k === 'cnf'){ s.t--; if (s.t <= 0) u.status = null; if (R() < 0.35){ const d = Math.max(1, Math.round(((u.st && u.st.hp) || u.max || 10) / 10)); u.hp = Math.max(0, u.hp - d); return { skip: true, text: u.name + ' is confused and hurt itself (' + d + ')!' }; } return { skip: false, text: s.t <= 0 ? u.name + ' snapped out of its confusion.' : '' }; }
   if (s.k === 'slp'){ s.t--; if (s.t <= 0){ u.status = null; return { skip: false, text: u.name + ' woke up!' }; } return { skip: true, text: u.name + ' is fast asleep…' }; }
   if (s.k === 'frz'){ u.status = null; return { skip: true, text: u.name + ' is frozen solid and can\'t move! (It thaws out.)' }; }
   if (s.k === 'par'){ s.t--; const stuck = R() < 0.3; if (s.t <= 0) u.status = null; return { skip: stuck, text: stuck ? u.name + ' is paralyzed and can\'t move!' : '' }; }
@@ -4537,6 +4579,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 27, title: 'More move effects', items: ['New attack traits: ✌️ Double hit (always 2 hits), 🌀 Flurry (3–5 hits that chip through Barrier), 💫 Confuse, 🌫️ Blind, 🐌 Slow, 🔋 SP drain, 📣 Rally (powers you up as you hit), 🧱 Guard hit (take less damage next turn) and ⚙️ Recharge (get SP back).', 'New support moves: 🔍 Focus (next attack is a guaranteed critical hit) and 🌱 Regenerate heals (healing over 4 turns).', 'New status: 💫 confused (may hurt itself instead of acting).', 'Almost every attack now has an extra effect. Press and hold a move to see what it does.'] },
   { v: 26, title: 'Hard expeditions', items: ['Four new HARD expeditions that check your Digimon\'s stats instead of its level: 🌋 Magma Core (ATK, DEF, HP), 🌊 Net Ocean Abyss (INT, HP, SP), 🌪️ Storm Spire (SPD, INT, DEF) and 💠 Kernel Core (every stat, Mega-level).', 'Meet every need for a 75% smooth trip; beat them for up to 97%. Fall short, especially badly in one stat, and it gets risky fast. A rough HARD trip only brings back 30% of the rewards.', 'In a team, each member borrows 30% of the team\'s best in each needed stat, so a strong leader carries the rest.', 'They pay much more and can bring element and level eggs, held items, Crests, X-Antibodies and even Golden or Mega Eggs.'] },
   { v: 25, title: 'Faster raids', items: ['Raid fights now refill every 3 hours: 3 fights every 3 hours instead of 3 a day. The Raid screen shows when your next fights are ready.'] },
   { v: 24, title: 'AI Tamers start fresh', items: ['The AI Tamers have been reset to nothing. They join over the next few days and level up like real players: one session most days, with days off. They only raid, trade and climb the boards as fast as their progress allows.'] },
@@ -5097,7 +5140,7 @@ function autoHeur(me, foe, modes, modeCost){
     const statusBonus = st && !foe.status && !foe.noStatus ? e.avg * (st === 'slp' ? 0.35 : st === 'par' ? 0.25 : 0.2) * 0.3 : 0;
     return Object.assign(x, { e, val: e.avg + statusBonus + (x.m.kind === 'drain' && me.hp < me.st.hp * 0.7 ? e.avg * 0.3 : 0) });
   });
-  const heal = can.find(x => x.m.kind === 'heal'), buff = can.find(x => x.m.kind === 'buff' && !(moveTrait(x.m) === 'shield' && me.shield > 0) && !(moveTrait(x.m) === 'haste' && (me.hasted || 0) >= 2)), guard = moves.find(x => x.m.kind === 'guard');
+  const heal = can.find(x => x.m.kind === 'heal'), buff = can.find(x => x.m.kind === 'buff' && !(moveTrait(x.m) === 'shield' && me.shield > 0) && !(moveTrait(x.m) === 'haste' && (me.hasted || 0) >= 2) && !(moveTrait(x.m) === 'focus' && me.focus)), guard = moves.find(x => x.m.kind === 'guard');
   // how hard can the foe hit back next turn?
   const foeMoves = (foe.moves || []).filter(m => (m.cost || 0) <= foe.sp + 1);
   const threat = Math.max(1, ...foeMoves.map(m => estHit(foe, Object.assign({}, me, { guard: false }), m).avg)) * 1.15;
