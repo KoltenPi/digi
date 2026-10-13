@@ -281,7 +281,7 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .mvrow.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .mvrow.locked{opacity:.6}
 .mvt{display:grid;min-width:0}
-.mvt small{color:var(--muted);font-size:.75rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mvt small{color:var(--muted);font-size:.75rem;line-height:1.3;display:block;white-space:normal;overflow-wrap:break-word}
 .mvk{font:700 .58rem var(--mono);letter-spacing:.05em;padding:3px 6px;border-radius:6px;background:var(--sunk);color:var(--muted);min-width:42px;text-align:center}
 .mvk.phys{color:var(--bad)}
 .mvk.mag{color:var(--link)}
@@ -417,7 +417,8 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .statrow{display:flex;gap:4px 10px;flex-wrap:wrap;font:600 .72rem var(--mono);color:var(--muted)}
 .statrow b{color:var(--fg)}
 .bact{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
-.bact .act small{white-space:nowrap}
+.bact .act{min-width:0;height:auto;white-space:normal;overflow-wrap:break-word;line-height:1.2}
+.bact .act small{display:block;white-space:normal;overflow-wrap:break-word;line-height:1.25;margin-top:2px}
 .bact .act,#dgSkill{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .bact .act.dis{opacity:.45;cursor:default}
 .bact .act.dis:active{transform:none}
@@ -813,7 +814,7 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 [data-skin="retro"] body{font-size:18px;letter-spacing:.02em}
 [data-skin="retro"] .brand{font-size:1rem}
 [data-skin="retro"] .bact .act{font-size:1.05rem}
-[data-skin="retro"] .bact .act small{white-space:normal}
+[data-skin="retro"] .bact .act small{white-space:normal;font-size:.85rem;line-height:1.15}
 [data-skin="retro"] #scene{display:none}
 [data-skin="retro"] :is(h1,h2,h3,h4,h5,.brand,.ptop h2){font-family:var(--display);font-weight:400;letter-spacing:.02em}
 [data-skin="retro"] .brand small{font-family:var(--body);font-size:.95rem}
