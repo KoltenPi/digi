@@ -554,6 +554,9 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 .lbrow small{display:block;color:var(--muted);font-size:.72rem}
 .raidboss{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:center}
 .raidboss img{width:96px;height:96px;object-fit:contain}
+.raidboss.ev{padding:10px;border-radius:14px;border:2px solid #ff7a1a;background:linear-gradient(135deg,rgba(255,122,26,.18),rgba(110,45,160,.18))}
+.raidboss.ev h3{color:#ff7a1a}
+.raidev{margin:0 0 8px;padding:8px 10px;border-radius:12px;background:linear-gradient(90deg,#ff7a1a,#7b2fb5);color:#fff;font-weight:700;font-size:.9rem}
 .tcard{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 .tcard img{width:56px;height:56px;object-fit:contain}
 .tcard small{display:block;color:var(--muted);font-size:.74rem}
@@ -3806,6 +3809,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 10, title: '🎃 Halloween raid: Pumpkinmon', items: ['Pumpkinmon takes over the weekly raid through October (World → Online → Raid). It hits harder than a normal raid boss.', 'Help defeat it and you get a Pumpkinmon of your own (Ultimate) when you claim your reward, plus 300 extra DigiData.'] },
   { v: 9, title: 'Tamer profile, Help & Updates', items: ['New 👤 button at the top of every page opens your Tamer profile: name, title, Tamer level, stats, friend code and cloud recovery code.', 'A Help guide explaining every part of the game.', 'This Updates page, so you can see what\'s new.'] },
   { v: 8, title: 'Ultra fusions & every Digimon obtainable', items: ['Two Megas can now Jogress into an Ultra form (+12% to every stat, at least Lv 45). Over 40 Megas like Omegamon, Susanoomon and Ordinemon unlocked this way.', 'New Shop eggs: In-Training Egg, Ultimate Egg and Mega Egg. Digimon with no pre-evolution hatch twice as often from them.', 'Every Digimon now has a level, so every one can be obtained.', 'More official evolutions: Ultimates into 18 more Megas, Enbarrmon, GreatGrizzlymon, SkullSeadramon, Sharkmon, Monimon, Suzumon, the Shoutmon fusions and more.', 'Wormmon can armor-digivolve to Quetzalmon with the Digimental of Light.'] },
   { v: 7, title: 'Artwork', items: ['Undiscovered Digimon show as a dark, blurred silhouette of their real artwork instead of a “?”.', 'Grey and coloured art backgrounds are removed; painted scenes are shown as a soft rounded portrait.'] },
@@ -4633,7 +4637,7 @@ async function onlineView(msg){
   }
   const sub = state.onlSub || 'ranks';
   el.innerHTML = '<div class="onlhead"><span>🌐 <b>' + esc(O.name) + '</b></span><span id="onlCode" class="stage"></span><button class="ghost" id="onlRename">Rename</button></div>' +
-    '<div class="segs">' + ONL_TABS.map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-onl="' + k + '">' + l + '</button>').join('') + '</div>' +
+    '<div class="segs">' + ONL_TABS.map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-onl="' + k + '">' + (k === 'raid' && raidEvent() ? raidEvent().icon + ' Raid' : l) + '</button>').join('') + '</div>' +
     '<div id="onlBody"><div class="status">Connecting…</div></div><p id="onlMsg" class="ownline" style="color:var(--fg)">' + esc(msg || '') + '</p>';
   el.querySelectorAll('[data-onl]').forEach(b => b.onclick = () => { state.onlSub = b.dataset.onl; onlineView(); });
   $('#onlRename').onclick = () => { O.prev = O.name; O.name = ''; onlineView(); };
@@ -4674,8 +4678,17 @@ async function viewRanks(el){
 // ----- weekly raid: one huge boss shared by every player -----
 var RAID_PER = 1200;           // raid HP each new attacker adds, so the boss stays a challenge however many join
 var RAID_TRIES = 3;            // raid fights per day
-const raidWeek = () => 'w' + weekNo();
-function raidBossId(){ const pool = (state.stageIds[5] || []).filter(id => !isExtra(id) && !state.armor.has(id) && state.byId.has(id)); return pool[Math.floor(Math.abs(seeded(weekNo(), 4242)) * pool.length) % pool.length]; }
+// seasonal raid bosses take over the weekly raid for every week that overlaps their dates (month is 0-based, `to` is exclusive)
+const RAID_EVENTS = [
+  { key: 'hw', id: 224, name: 'Pumpkinmon', icon: '🎃', title: 'Halloween raid', from: [9, 1], to: [10, 2], mult: 1.7,
+    blurb: 'Pumpkinmon is haunting the Digital World! Everyone who helps take it down gets a Pumpkinmon of their own, plus extra treats.' },
+];
+function raidEvent(w = weekNo()){
+  const ws = (7 * w - 3) * 864e5, we = ws + 7 * 864e5, y = new Date(ws + 3 * 864e5).getUTCFullYear();
+  return RAID_EVENTS.find(e => state.byId.has(e.id) && ws < Date.UTC(y, e.to[0], e.to[1]) && we > Date.UTC(y, e.from[0], e.from[1])) || null;
+}
+const raidWeek = () => 'w' + weekNo() + (raidEvent() ? '-' + raidEvent().key : '');
+function raidBossId(){ const ev = raidEvent(); if (ev) return ev.id; const pool = (state.stageIds[5] || []).filter(id => !isExtra(id) && !state.armor.has(id) && state.byId.has(id)); return pool[Math.floor(Math.abs(seeded(weekNo(), 4242)) * pool.length) % pool.length]; }
 function raidLocal(){
   const w = raidWeek(), day = dayKey();
   if (!G.raid || G.raid.week !== w) G.raid = { week: w, day, used: 0, dmg: 0, joined: false, claimed: false };
@@ -4686,8 +4699,8 @@ async function raidDoc(){
   const N = await net(), F = N.F, ref = F.doc(N.db, 'raids', raidWeek());
   let s = await F.getDoc(ref);
   if (!s.exists()){
-    const id = raidBossId(), b = state.byId.get(id);
-    try{ await F.setDoc(ref, { boss: { id, name: b.name, image: b.image }, hp: 0, hitters: 0, week: raidWeek() }); }catch{}
+    const id = raidBossId(), b = state.byId.get(id), ev = raidEvent();
+    try{ await F.setDoc(ref, { boss: { id, name: ev ? ev.name : b.name, image: b.image }, hp: 0, hitters: 0, week: raidWeek() }); }catch{}
     s = await F.getDoc(ref);
   }
   return s.data();
@@ -4697,9 +4710,10 @@ async function viewRaid(el){
   const max = RAID_PER * (d.hitters || 0), down = d.hitters > 0 && d.hp <= 0, left = RAID_TRIES - R.used;
   const top = await F.getDocs(F.query(F.collection(N.db, 'raids', raidWeek(), 'hits'), F.orderBy('dmg', 'desc'), F.limit(10)));
   const ends = (weekNo() + 1) * 7 * 864e5 - 3 * 864e5 - Date.now();
-  const block = !p ? 'no partner' : asleep(p) ? 'asleep' : careInit(p).sick ? 'sick' : p.energy < 25 ? 'too tired' : '';
-  el.innerHTML = '<div class="raidboss"><img alt="" src="' + esc(d.boss.image) + '"><div><h3 style="margin:0">👑 ' + esc(d.boss.name) + '</h3>' +
-      '<small class="ownline">This week\'s raid boss · ends in ' + fmtLeft(ends) + '</small>' +
+  const block = !p ? 'no partner' : asleep(p) ? 'asleep' : careInit(p).sick ? 'sick' : p.energy < 25 ? 'too tired' : '', ev = raidEvent();
+  el.innerHTML = (ev ? '<p class="raidev">' + ev.icon + ' ' + esc(ev.title) + ': ' + esc(ev.blurb) + '</p>' : '') +
+    '<div class="raidboss' + (ev ? ' ev' : '') + '"><img alt="" src="' + esc(d.boss.image) + '"><div><h3 style="margin:0">' + (ev ? ev.icon : '👑') + ' ' + esc(d.boss.name) + '</h3>' +
+      '<small class="ownline">' + (ev ? esc(ev.title) : 'This week\'s raid boss') + ' · ends in ' + fmtLeft(ends) + '</small>' +
       '<div class="evotrack" style="margin-top:6px"><i style="width:' + (max ? Math.max(0, d.hp / max * 100) : 100) + '%;background:var(--bad)"></i></div>' +
       '<small>' + (down ? 'Defeated! 🎉' : max ? 'HP ' + d.hp.toLocaleString() + ' / ' + max.toLocaleString() : 'Nobody has attacked yet') + ' · ' + (d.hitters || 0) + ' Tamer' + (d.hitters === 1 ? '' : 's') + '</small></div></div>' +
     '<div class="wallet"><span>Your damage <b>' + R.dmg + '</b></span><span>Fights left today <b>' + Math.max(0, left) + ' / ' + RAID_TRIES + '</b></span></div>' +
@@ -4709,15 +4723,20 @@ async function viewRaid(el){
     '<h5 class="lockh">Top attackers</h5><div class="lbs">' + (top.docs.length ? top.docs.map((h, i) => '<div class="lbrow' + (h.id === N.uid ? ' me' : '') + '"><b>#' + (i + 1) + '</b><span></span><span>' + esc(h.data().name || '?') + '</span><b>' + (h.data().dmg || 0) + '</b></div>').join('') : '<p class="ownline">No attacks yet.</p>') + '</div>';
   const go = $('#raidGo'); if (go) go.onclick = () => raidFight(d.boss);
   const cl = $('#raidClaim'); if (cl) cl.onclick = () => {
-    const item = pick(['egg:golden', 'egg:rare', 'egg:champion', randomCrest() || 'h:band', randomHeld()]), data = 300 + R.dmg * 2;
-    R.claimed = true; G.data += data; grantItem(item); saveGame(); updateCount();
-    onlineView('Raid reward: +' + data + ' DigiData and ' + itemIcon(item) + ' ' + itemName(item) + '!');
+    const item = pick(['egg:golden', 'egg:rare', 'egg:champion', randomCrest() || 'h:band', randomHeld()]), data = 300 + R.dmg * 2 + (ev ? 300 : 0);
+    R.claimed = true; G.data += data; grantItem(item);
+    // seasonal bosses also join your Box (or leave a Golden Egg if it's full)
+    let extra = '';
+    if (ev){ if (G.box.length < G.boxCap){ const m = hatchNew('ultimate', true, ev.id); m.name = state.byId.get(ev.id).name; G.col[ev.id] = 'raised'; extra = ' ' + ev.icon + ' ' + ev.name + ' joined your Box!'; } else { grantItem('egg:golden'); extra = ' Your Box was full, so ' + ev.name + ' left you a Golden Egg instead.'; } }
+    saveGame(); updateCount();
+    onlineView('Raid reward: +' + data + ' DigiData and ' + itemIcon(item) + ' ' + itemName(item) + '!' + extra);
   };
 }
 function raidFight(boss){
   const p = P(), R = raidLocal(); if (!p || R.used >= RAID_TRIES || p.energy < 25 || busy) return;
   p.energy = clamp(p.energy - 25); R.used++; saveGame();
-  battle(DIFFS[2], { foeId: boss.id, mult: 1.25, hpMul: 5, title: '👑 Raid · ' + boss.name, noRun: true, onDone: async (outcome, info) => {
+  const ev = raidEvent();
+  battle(DIFFS[2], { foeId: boss.id, mult: ev ? ev.mult : 1.25, hpMul: 5, title: (ev ? ev.icon + ' ' + ev.title : '👑 Raid') + ' · ' + boss.name, noRun: true, onDone: async (outcome, info) => {
     const pct = info && info.max ? Math.round(100 * Math.min(1, info.dealt / info.max)) : 0, dmg = pct + (outcome === 'win' ? 50 : 0), join = !R.joined;
     R.dmg += dmg; R.joined = true; const reward = 20 + Math.round(dmg / 2); G.data += reward; addBond(p, 1); saveGame();
     let line = 'You knocked out ' + pct + '% of its HP' + (outcome === 'win' ? ' and won (+50 bonus)' : '') + ': <b>' + dmg + ' raid damage</b>. +' + reward + ' DigiData.';
