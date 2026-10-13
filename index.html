@@ -631,6 +631,8 @@ if (!G.boxCap) G.boxCap = 10;
 if (!G.expSlots) G.expSlots = 3;
 if (!G.items || typeof G.items !== 'object') G.items = {};
 const saveGame = () => store.set('dx_game_v1', G);
+// v2 levels: lift every Digimon to its stage's starting level once (after the level curve was made gentler)
+setTimeout(() => { if (G.xpv2) return; G.xpv2 = 1; try{ (G.party || []).concat(G.box || []).forEach(m => { if (m && m.stage != null && typeof stageFloor === 'function') stageFloor(m); }); }catch{} saveGame(); }, 0);
 const raised = id => G.col[id] === 'raised';
 const known = id => !!G.col[id];
 const shown = (id, name) => known(id) ? name : '???';
@@ -1719,8 +1721,14 @@ function movesFor(d, stage){
   ];
 }
 // ----- moves: each species gets its own moves from its real skills; partners learn them as they level -----
-const STAGE_MIN_LV = [1, 6, 12, 20, 30, 42];
-const XP_NEED = lv => 12 + lv * 6;
+// the lowest level for each stage: digivolving lifts a Digimon to at least this, so its new moves aren't far out of reach
+const STAGE_MIN_LV = [1, 5, 10, 18, 26, 35];
+const XP_NEED = lv => 10 + lv * 4;
+const XP_MUL = 1.5;   // every XP source gives 50% more
+// Digimon whose level lags behind their stage (old saves, or lots of quick digivolving) catch up at double speed
+const xpCatchUp = p => (p.level || 1) < (STAGE_MIN_LV[p.stage] || 1) + 6 ? 2 : 1;
+// raise a Digimon to its stage's starting level; returns the new level if it went up
+function stageFloor(p){ const f = STAGE_MIN_LV[p.stage] || 1; if (!p.level || p.level < f){ p.level = f; p.xp = 0; return f; } return 0; }
 const BASIC = { name: 'Tackle', kind: 'phys', power: 1, desc: 'A basic body attack. Costs no SP.' };
 const GUARD = { name: 'Guard', kind: 'guard', power: 0, cost: 0 };
 const KIND_LABEL = { phys: 'PHY', mag: 'MAG', heal: 'HEAL', buff: 'BUFF', drain: 'DRAIN', guard: 'GRD' };
@@ -1745,7 +1753,7 @@ const learnCache = new Map();
 function learnset(id, d, stage){
   const key = id + '|' + stage + '|' + (d ? 1 : 0);
   if (learnCache.has(key)) return learnCache.get(key);
-  const base = STAGE_MIN_LV[stage] || 1, offs = [0, 2, 4, 7, 10, 14];
+  const base = STAGE_MIN_LV[stage] || 1, offs = [0, 1, 3, 5, 7, 10];
   const list = (d?.skills || []).filter(s => s.skill).slice(0, 6).map((s, i) => {
     const name = (s.translation && s.translation.trim()) || s.skill;
     const kind = moveKind(name, s.description);
@@ -1755,7 +1763,7 @@ function learnset(id, d, stage){
   // species with few listed skills get a couple of generic moves picked for them
   for (let i = 0; list.length < 3 && i < 4; i++){
     const g = GENERIC[Math.floor(Math.abs(seeded(id, 20 + i + stage)) * GENERIC.length) % GENERIC.length];
-    if (!list.some(m => m.name === g.name)) list.push(Object.assign({}, g, { learn: base + 3 + i * 4 }));
+    if (!list.some(m => m.name === g.name)) list.push(Object.assign({}, g, { learn: base + 2 + i * 3 }));
   }
   list.sort((a, b) => a.learn - b.learn);
   if (d) learnCache.set(key, list);
@@ -1804,7 +1812,7 @@ async function syncMoves(p){
 }
 async function gainXP(p, amount){
   initMoves(p);
-  p.xp += Math.max(0, Math.round(amount * (heldOf(p) === 'h:amulet' ? 1.3 : 1) * (evOn('xp') ? 2 : 1) * (1 + 0.1 * perk('study')))); const ups = [];
+  p.xp += Math.max(0, Math.round(amount * XP_MUL * xpCatchUp(p) * (heldOf(p) === 'h:amulet' ? 1.3 : 1) * (evOn('xp') ? 2 : 1) * (1 + 0.1 * perk('study')))); const ups = [];
   while (p.xp >= XP_NEED(p.level) && p.level < 99){
     p.xp -= XP_NEED(p.level); p.level++;
     const g = growthOf(p), gk = pick(['atk', 'int', 'def', 'spd']); g[gk] = (g[gk] || 0) + 1; g.hp += 2;
@@ -2999,10 +3007,11 @@ async function evolveTo(id, reqs){
   p.evo = 0; p.stageMistakes = 0; p.stageWins = 0; p.stageLosses = 0; p.line.push(id); questProgress('evolve'); bump('evolves');
   p.stageLine = [...(p.stageLine || p.line.slice(0, -1).map((_, i) => i)), p.stage];
   p.mood = clamp(p.mood + 20); p.energy = clamp(p.energy + 20); p.str += 3;
+  const grew = stageFloor(p);
   G.col[id] = 'raised';
   saveGame();
   $('#overlay .sheet').innerHTML = `<div class="reveal"><img class="sprite happy" alt="" src="${esc(b.image)}">
-    <h4>${esc(b.name)}!</h4><p style="margin:0;color:var(--muted)">${LEVEL_EN[STAGES[p.stage]]} level${firstTime ? ' · new to your collection!' : ''}${used.length ? ' · used ' + esc(used.join(', ')) : ''}</p></div>
+    <h4>${esc(b.name)}!</h4><p style="margin:0;color:var(--muted)">${LEVEL_EN[STAGES[p.stage]]} level${grew ? ' · grew to Lv ' + grew + '!' : ''}${firstTime ? ' · new to your collection!' : ''}${used.length ? ' · used ' + esc(used.join(', ')) : ''}</p></div>
     <button class="big" id="ovClose">Awesome</button>`;
   const newMoves = await syncMoves(p);
   $('#ovClose').onclick = () => { closeOv(); say(`${oldName} digivolved into ${b.name}!` + (newMoves.length ? ' Learned ' + newMoves.join(', ') + '!' : ''), 'happy'); };
