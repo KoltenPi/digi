@@ -1821,7 +1821,9 @@ const EXPEDITIONS = [
   { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, relic: 0.35, crest: 0.1, xab: 0.12, chip: 0.7, clean: 0.25, desc: 'Dangerous depths with the richest rewards.' },
 ];
 function expDone(m){ return !!(m.exp && Date.now() >= m.exp.end); }
-function expRunning(){ return G.box.filter(m => m.exp).length; }
+// a team on the same trip shares one slot (m.exp.team), a solo expedition uses its own
+const TEAM_MAX = 6;
+function expRunning(){ const teams = new Set(); let n = 0; for (const m of G.box) if (m.exp){ if (m.exp.team) teams.add(m.exp.team); else n++; } return n + teams.size; }
 function fmtLeft(ms){ const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), mn = Math.floor(s % 3600 / 60); return h ? h + 'h ' + mn + 'm' : mn ? mn + 'm' : s + 's'; }
 function expOdds(m, ex){ return Math.max(0.5, 1 - ex.risk * Math.max(0.25, 1 - (m.level || 1) / 45)); }
 function expEstimate(m, ex){ return { data: Math.round((8 + m.stage * 6) * ex.data), xp: Math.round((6 + m.stage * 4) * ex.xp) }; }
@@ -1847,7 +1849,7 @@ function renderBox(){
     '<p style="margin:0;color:var(--muted)">Digimon in the Box rest without getting hungry. Tap one to move it to your party, release it, or send it on a timed expedition. Use “Send to the Box” on the Partner tab to store one.</p>' +
     '<div class="segs">' + BOX_SORTS.map(([k, l]) => '<button class="seg' + (k === sortKey ? ' on' : '') + '" data-bsort="' + k + '">' + l + '</button>').join('') + '</div>' +
     (ready.length ? '<button class="big" id="collectAll">Collect ' + ready.length + ' finished expedition' + (ready.length === 1 ? '' : 's') + '</button>' : '') +
-    (G.box.some(m => !m.exp) ? '<button class="act" id="teamExp"' + (expRunning() < G.expSlots ? '' : ' disabled') + ' style="width:100%">🧭 Send a team on an expedition<small>' + (expRunning() < G.expSlots ? (G.expSlots - expRunning()) + ' expedition slot' + (G.expSlots - expRunning() === 1 ? '' : 's') + ' free' : 'all expedition slots are busy') + '</small></button>' : '') +
+    (G.box.some(m => !m.exp) ? '<button class="act" id="teamExp"' + (expRunning() < G.expSlots ? '' : ' disabled') + ' style="width:100%">🧭 Send a team on an expedition<small>' + (expRunning() < G.expSlots ? (G.expSlots - expRunning()) + ' expedition slot' + (G.expSlots - expRunning() === 1 ? '' : 's') + ' free · up to ' + TEAM_MAX + ' Digimon per team' : 'all expedition slots are busy') + '</small></button>' : '') +
     '<div class="boxgrid">' + cells.join('') + '</div>';
   v.querySelectorAll('[data-box]').forEach(b => b.onclick = () => boxMenu(+b.dataset.box));
   v.querySelectorAll('[data-bsort]').forEach(b => b.onclick = () => { store.set('dx_boxsort', b.dataset.bsort); renderBox(); });
@@ -1856,14 +1858,14 @@ function renderBox(){
   const te = $('#teamExp'); if (te) te.onclick = () => { if (!busy) teamExpedition(); };
 }
 
-// ----- send several Box Digimon on the same expedition in one go (each one uses an expedition slot) -----
+// ----- send several Box Digimon on the same expedition in one go (the whole team uses one expedition slot) -----
 function teamExpedition(exKey, sel){
   busy = true; sel = sel || new Set();
-  const ex = EXPEDITIONS.find(e => e.key === exKey), free = Math.max(0, G.expSlots - expRunning());
+  const ex = EXPEDITIONS.find(e => e.key === exKey), free = G.expSlots > expRunning() ? TEAM_MAX : 0;
   const idle = G.box.filter(m => !m.exp).sort((a, b) => (b.stage - a.stage) || ((b.level || 1) - (a.level || 1)));
   const show = html => { if ($('#overlay').hidden) openOv(html); else $('#overlay .sheet').innerHTML = html; };
   if (!ex){
-    show('<h4>🧭 Send a team</h4><p class="ownline">Pick where the team goes, then choose up to ' + free + ' Digimon from your Box. Each one uses an expedition slot.</p><div class="diffs">' +
+    show('<h4>🧭 Send a team</h4><p class="ownline">Pick where the team goes, then choose up to ' + free + ' Digimon from your Box. The whole team only uses one expedition slot.</p><div class="diffs">' +
       EXPEDITIONS.map(e => '<button class="diff" data-tex="' + e.key + '"><span class="dn">' + e.name + '<small>' + fmtLeft(expMs(e)) + '</small></span><span class="dd">' + e.desc + '</span>' +
         '<span class="dr">' + (e.risk ? Math.round(e.risk * 100) + '% risk of a rough trip (less for high levels)' : 'Always a smooth trip') + (e.egg ? ' · ' + Math.round(e.egg * 100) + '% egg each' : '') + '</span></button>').join('') +
       '</div><button class="ghost" id="teCancel">Cancel</button>');
@@ -1884,17 +1886,18 @@ function teamExpedition(exKey, sel){
     '<button class="ghost" id="teBack">← Choose another place</button>');
   $('#overlay').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => {
     const m = idle[+b.dataset.tm]; if (!m) return;
-    if (sel.has(m)) sel.delete(m); else if (sel.size >= free){ $('#teMsg').textContent = 'Only ' + free + ' expedition slot' + (free === 1 ? '' : 's') + ' free. Get more in the Shop.'; return; } else sel.add(m);
+    if (sel.has(m)) sel.delete(m); else if (sel.size >= free){ $('#teMsg').textContent = free ? 'A team can have up to ' + TEAM_MAX + ' Digimon.' : 'All expedition slots are busy. Get more in the Shop.'; return; } else sel.add(m);
     teamExpedition(ex.key, sel);
   });
   $('#teBest').onclick = () => { sel.clear(); idle.slice(0, free).forEach(m => sel.add(m)); teamExpedition(ex.key, sel); };
   $('#teClear').onclick = () => { sel.clear(); teamExpedition(ex.key, sel); };
   $('#teBack').onclick = () => teamExpedition(null, sel);
   $('#teGo').onclick = () => {
-    const now = Date.now(); let n = 0;
-    for (const m of sel){ if (m.exp || expRunning() >= G.expSlots) continue; m.exp = { key: ex.key, start: now, end: now + expMs(ex) }; nfExp(m); n++; }
+    const now = Date.now(), team = 't' + now; let n = 0;
+    if (expRunning() >= G.expSlots) return;
+    for (const m of sel){ if (m.exp) continue; m.exp = { key: ex.key, start: now, end: now + expMs(ex), team }; if (!n) nfExp(m); n++; }
     saveGame(); renderBox();
-    $('#overlay .sheet').innerHTML = '<div class="reveal"><h4>🧭 Team sent!</h4><p style="margin:0">' + n + ' Digimon set off for ' + esc(ex.name) + '. They\'ll be back in ' + fmtLeft(expMs(ex)) + '.</p></div><button class="big" id="teOk">OK</button>';
+    $('#overlay .sheet').innerHTML = '<div class="reveal"><h4>🧭 Team sent!</h4><p style="margin:0">' + n + ' Digimon set off for ' + esc(ex.name) + '. They\'ll be back in ' + fmtLeft(expMs(ex)) + ', and the team only takes up 1 expedition slot.</p></div><button class="big" id="teOk">OK</button>';
     $('#teOk').onclick = () => { closeOv(); renderBox(); };
   };
 }
@@ -4396,6 +4399,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 21, title: 'Team expeditions use 1 slot', items: ['A team expedition now takes up just one expedition slot, however many Digimon go. Send up to 6 Digimon per team.'] },
   { v: 20, title: 'AI Tamers', items: ['14 computer-run AI Tamers 🤖 now play alongside you. They level up over time and show up on every leaderboard, marked with an AI tag.', 'They join the weekly raid and chip away at the boss each day, and they appear in Top attackers.', 'They post Digimon on the trade board every 6 hours (Rookies, Champions and the odd Ultimate) and may buy your listings that have been up a few hours if the price is fair.', 'Ranks has a new Recent activity feed showing what the AI Tamers have been doing.'] },
   { v: 19, title: 'New look: Trainer Card (and Retro)', items: ['The game has a brand-new look: bright paper cards with bold outlines, chunky buttons and your partner standing in a sky-and-grass scene.', 'Prefer the old days? Tap the look button at the top (🃏) and pick Retro: a Digivice with green LCD screens and pixel sprites. The Original look (dark or light) is still there too.', 'New 📟 Digivices tab in the Shop: buy and equip different shells for the Retro look, like the D-3, D-Ark, Xros Loader, Pendulum, Original V-Pet and a rare Gold Edition.', 'The Partner page is tidier: Feed, Play, Train and Battle up front, jobs that need doing now (cleaning, medicine, rest) appear only when needed, and the rest is under More.'] },
   { v: 18, title: 'Cleaner screens', items: ['The Shop is split into Eggs, Items, Upgrades and Crafting tabs, with eggs grouped (Everyday, Level, Themed, Element) and every item shown the same way with what it does.', 'Your DigiData now sits in the top corner on every page instead of being repeated on each screen.', 'Partner page: no more duplicate level, personality or weather; only the next empty party slot shows a button.', 'DigiFarm shows one crop menu at a time, and the Colosseum folds away ranks you can\'t reach yet.', 'The themed Dark Egg is now the Shadow Egg, so it isn\'t confused with the Dark element egg.'] },
