@@ -4512,6 +4512,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 24, title: 'AI Tamers start fresh', items: ['The AI Tamers have been reset to nothing. They join over the next few days and level up like real players: one session most days, with days off. They only raid, trade and climb the boards as fast as their progress allows.'] },
   { v: 23, title: 'More Digivices', items: ['17 new Digivice shells for the Retro look in the Shop: the Adventure Digivices (Courage, Friendship, Light), Dark D-3, D-Power (Red), D-Tector, Digivice Burst, Dark Digivice, Fusion Loader (Blue), Darkness Loader, Pendulum X, D-Cyber, Digivice: (2020), App Drive, D-Zero, and Digivice -V- and -VV-.', 'The Digivices tab in the Shop is now grouped by series.'] },
   { v: 22, title: 'Move traits', items: ['Most attacks now have a trait on top of their damage, picked from the move\'s name: 🎯 Piercing (ignores DEF and Guard), 🔁 Multi-hit, 💨 Sure-hit (never misses), 💥 Reckless (stronger, with recoil), 🔥 Burn, 🧊 Freeze, 🔨 Armor break, 😱 Intimidate, 🗡️ Finisher (big damage on weak foes) and ✨ Purify.', 'Buff moves with barrier or shield names now raise a 🛡️ Barrier (−40% damage taken for 3 turns), and speed-themed ones give ⚡ Haste (+30% SPD).', 'Healing moves also cure poison, burns, paralysis and other status problems.', 'Two new status problems: 🔥 burned and 🧊 frozen.', 'Press and hold a move in battle (or open Moves) to see its trait.'] },
   { v: 21, title: 'Team expeditions use 1 slot', items: ['A team expedition now takes up just one expedition slot, however many Digimon go. Send up to 6 Digimon per team.'] },
@@ -5393,7 +5394,8 @@ async function onlineView(msg){
 
 // ----- AI Tamers: computer players who level up, climb the boards, hit the raid boss and use the trade board.
 // Everything about them comes from the clock and a seed, so every player sees the same AI Tamers doing the same things.
-const BOT_EPOCH = Date.UTC(2026, 9, 1);
+// every AI Tamer started from nothing on this date and plays like a person: a short session most days, some days off
+const BOT_EPOCH = Date.UTC(2026, 9, 13, 23, 0);
 const BOT_TAMERS = [
   ['ByteRunner', 1.25], ['NeonKoi', 1.1], ['PixelRook', 1.3], ['MossTamer', .85], ['Kitsu_7', 1.05], ['LunaGlitch', 1.15], ['ZeroDrift', 1.2],
   ['SolarPup', .8], ['HexaQuill', .95], ['Tidecaller', 1], ['Juno.exe', 1.1], ['Brambleby', .75], ['CircuitFox', 1.2], ['RetroRio', .9]
@@ -5404,66 +5406,86 @@ const botR = (i, salt) => sd(i * 977 + 31, salt);
 function strSeed(str){ let h = 7; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h % 100000; }
 function botPool(st){ return (state.stageIds[st] || []).filter(id => state.byId.has(id) && !isExtra(id) && !state.armor.has(id)); }
 function botMon(st, a, b){ const pool = botPool(st); return pool.length ? state.byId.get(pool[Math.floor(sd(a, b) * pool.length) % pool.length]) : null; }
+const botStart = i => BOT_EPOCH + botR(i, 1) * 3 * 864e5;     // each one joins within the first 3 days
+// Tamer XP earned up to time t: one play session a day (1–4 hours, at the bot's usual time), skipping some days
+function botXP(i, t){
+  const start = botStart(i), D = 864e5; if (t <= start) return 0;
+  const s = BOT_TAMERS[i][1], hour = 13 + Math.floor(botR(i, 9) * 11), len = 1 + botR(i, 10) * 3, plays = 0.6 + botR(i, 11) * 0.35;
+  let xp = 0;
+  for (let d = Math.floor(start / D) - 1, end = Math.floor(t / D); d <= end; d++){
+    if (sd(i * 31 + d, 41) > plays) continue;
+    const ws = d * D + hour * 36e5, from = Math.max(ws, start), to = Math.min(ws + len * 36e5, t);
+    if (to > from) xp += (to - from) / 36e5 * 130 * s * (0.6 + sd(i * 31 + d, 42) * 0.8);
+  }
+  return xp;
+}
+function botLv(xp){ let lv = 1; while (lv < 60 && xp >= 60 + lv * 40){ xp -= 60 + lv * 40; lv++; } return lv; }
 function botStats(i, t = Date.now()){
-  const [name, s] = BOT_TAMERS[i], d = Math.max(0, (t - BOT_EPOCH) / 864e5) + 18 + botR(i, 1) * 45;
-  const lv = Math.min(60, Math.floor(2 + Math.sqrt(d) * s * 4.2));
-  const st = lv >= 34 ? 5 : lv >= 25 ? 4 : lv >= 16 ? 3 : 2, era = Math.floor(d / 9);
-  const pm = botMon(st, i * 13 + era, 77), total = (state.all || []).length || 1200;
-  return { uid: 'bot' + i, bot: true, name, tamerLv: lv,
-    found: Math.min(total, Math.floor(lv * (8 + botR(i, 2) * 6) + d * 1.5)),
-    bestStreak: Math.floor(3 + botR(i, 3) * lv * .9),
-    colo: Math.max(1, Math.min(COLO.length, Math.floor(lv / 6.5 + botR(i, 4) * 2))),
-    pvp: Math.floor(d * s * botR(i, 5) * 1.1),
-    title: botR(i, 6) < .6 ? ACH[Math.floor(botR(i, 7) * ACH.length) % ACH.length].name : '',
-    partner: pm ? { name: pm.name, image: pm.image, level: Math.min(99, lv + Math.floor(botR(i, 8) * 8)) } : null };
+  const [name, s] = BOT_TAMERS[i], xp = botXP(i, t), started = t > botStart(i), lv = botLv(xp);
+  const st = lv >= 26 ? 5 : lv >= 17 ? 4 : lv >= 9 ? 3 : lv >= 3 ? 2 : 1;
+  const pm = started ? botMon(st, i * 13 + st, 77) : null, total = (state.all || []).length || 1200;
+  return { uid: 'bot' + i, bot: true, name, started, xp, tamerLv: started ? lv : 0, stage: st,
+    found: started ? Math.min(total, Math.floor(1 + xp * (0.015 + botR(i, 2) * 0.015))) : 0,
+    bestStreak: Math.floor(Math.sqrt(xp) / 4 * (0.5 + botR(i, 3))),
+    colo: lv >= 5 ? Math.min(COLO.length, Math.floor((lv - 3) / (4 + botR(i, 4) * 3))) : 0,
+    pvp: Math.floor(xp / (700 + botR(i, 5) * 900)),
+    title: lv >= 10 && botR(i, 6) < .7 ? ACH[Math.floor(botR(i, 7) * ACH.length) % ACH.length].name : '',
+    partner: pm ? { name: pm.name, image: pm.image, level: Math.min(99, Math.max(1, Math.round(lv * 1.4 + botR(i, 8) * 4))) } : null };
 }
 function fmtAgo(t){ const m = Math.max(1, Math.round((Date.now() - t) / 6e4)); return m < 60 ? m + 'm ago' : Math.round(m / 60) + 'h ago'; }
-const botAll = () => BOT_TAMERS.map((_, i) => botStats(i));
-// a feed of what the AI Tamers have been up to, one or two things an hour
+const botAll = () => BOT_TAMERS.map((_, i) => botStats(i)).filter(b => b.started);
+// a feed of what the AI Tamers have been up to: only things they could really have done by then
 function botFeed(n = 8){
   const out = [], H = 36e5, now = Date.now();
-  for (let h = Math.floor(now / H); out.length < n && h > Math.floor(now / H) - 48; h--){
-    for (let k = 0; k < 2 && out.length < n; k++){
-      if (k && sd(h, 501) < .5) continue;
+  for (let h = Math.floor(now / H); out.length < n && h > Math.floor(now / H) - 72; h--){
+    for (let k = 0; k < 3 && out.length < n; k++){
       const at = h * H + Math.floor(sd(h, 502 + k) * H); if (at > now) continue;
-      const i = Math.floor(sd(h, 503 + k) * BOT_TAMERS.length) % BOT_TAMERS.length, b = botStats(i, at), nm = esc(b.name), kind = Math.floor(sd(h, 504 + k) * 7);
-      const st = 1 + Math.floor(sd(h, 505 + k) * 4), a = botMon(st, h, 506 + k), z = botMon(st + 1, h, 507 + k);
-      const txt = kind === 0 && a && z ? nm + '\'s ' + esc(a.name) + ' digivolved into <b>' + esc(z.name) + '</b>'
+      const i = Math.floor(sd(h, 503 + k) * BOT_TAMERS.length) % BOT_TAMERS.length, b = botStats(i, at);
+      if (!b.started || botXP(i, at) - botXP(i, at - H) <= 0) continue;   // only while that Tamer is playing
+      const nm = esc(b.name), kind = Math.floor(sd(h, 504 + k) * 7), st = Math.max(0, Math.min(b.stage, 4) - Math.floor(sd(h, 505 + k) * 2));
+      const a = botMon(st, h, 506 + k), z = botMon(st + 1, h, 507 + k);
+      const txt = kind === 0 && a && z && b.stage > st ? nm + '\'s ' + esc(a.name) + ' digivolved into <b>' + esc(z.name) + '</b>'
         : kind === 1 && a ? nm + ' hatched a <b>' + esc(a.name) + '</b>'
-        : kind === 2 ? nm + ' dealt <b>' + (40 + Math.floor(sd(h, 508) * 110)) + '</b> damage to the raid boss'
-        : kind === 3 ? nm + ' won a Colosseum match (' + esc(COLO[b.colo - 1].name) + ')'
+        : kind === 2 ? nm + ' dealt <b>' + Math.round((20 + sd(h, 508) * 50) * (0.4 + Math.min(1, b.tamerLv / 25))) + '</b> damage to the raid boss'
+        : kind === 3 && b.colo ? nm + ' won a Colosseum match (' + esc(COLO[b.colo - 1].name) + ')'
         : kind === 4 && z ? nm + ' found <b>' + esc(z.name) + '</b> on an expedition'
-        : kind === 5 ? nm + ' reached Tamer level <b>' + b.tamerLv + '</b>'
-        : nm + ' won a live battle 🔥';
+        : kind === 5 && b.tamerLv > 1 ? nm + ' reached Tamer level <b>' + b.tamerLv + '</b>'
+        : kind === 6 && b.pvp ? nm + ' won a live battle 🔥'
+        : nm + ' won a battle';
       out.push({ at, txt });
     }
   }
   return out.sort((a, b) => b.at - a.at);
 }
-// raid: each AI Tamer joins early in the week and fights 2 or 3 times a day
+// raid: AI Tamers that have started join in, fighting during their play sessions; damage grows with their level
 function botRaid(w = weekNo()){
-  const ws = (7 * w - 3) * 864e5, e = (Date.now() - ws) / 864e5, out = [];
+  const ws = (7 * w - 3) * 864e5, now = Date.now(), out = [];
   BOT_TAMERS.forEach(([name], i) => {
-    if (sd(i + 1, w * 3 + 1) < .12) return;               // sits this week out
-    const join = sd(i + 1, w * 3 + 2) * 1.4, fpd = 2 + (sd(i + 1, w * 3 + 3) < .5 ? 1 : 0);
-    if (e < join) return;
-    const fights = Math.min(RAID_TRIES * 7, Math.floor((e - join) * fpd) + 1);
-    let dmg = 0; for (let f = 0; f < fights; f++) dmg += 55 + Math.floor(sd(i * 50 + f, w) * 75);
-    out.push({ name, dmg, bot: true });
+    if (sd(i + 1, w * 3 + 1) < .15) return;
+    const from = Math.max(ws, botStart(i)); if (now <= from) return;
+    const lv = botLv(botXP(i, now)), days = Math.floor((now - from) / 864e5);
+    let dmg = 0, fights = 0;
+    for (let d = 0; d <= days; d++){
+      const t = Math.min(now, from + (d + 1) * 864e5); if (botXP(i, t) - botXP(i, from + d * 864e5) <= 0) continue;   // didn't play that day
+      const f = 1 + Math.floor(sd(i * 50 + d, w + 7) * 3);
+      for (let k = 0; k < f; k++){ dmg += Math.round((20 + sd(i * 50 + d * 3 + k, w) * 60) * (0.4 + Math.min(1.2, lv / 25))); fights++; }
+    }
+    if (fights) out.push({ name, dmg, bot: true });
   });
   return out;
 }
-// trades: a fresh batch of AI listings every 6 hours
+// trades: a few listings every 6 hours from AI Tamers who have started, nothing above what they could have raised
 function botTrades(){
-  const slot = Math.floor(Date.now() / 216e5), n = 4 + Math.floor(sd(slot, 11) * 3), out = [];
+  const slot = Math.floor(Date.now() / 216e5), n = 2 + Math.floor(sd(slot, 11) * 4), out = [];
   G.botTaken = G.botTaken || {};
   for (const k in G.botTaken) if (+k.split(':')[1] < slot - 1) delete G.botTaken[k];
   for (let j = 0; j < n; j++){
     const id = 'bot:' + slot + ':' + j; if (G.botTaken[id]) continue;
-    const r = sd(slot * 7 + j, 13), st = r < .45 ? 2 : r < .85 ? 3 : 4, b = botMon(st, slot * 7 + j, 14); if (!b) continue;
-    const i = Math.floor(sd(slot * 7 + j, 15) * BOT_TAMERS.length) % BOT_TAMERS.length;
-    const lvl = STAGE_MIN_LV[st] + Math.floor(sd(slot * 7 + j, 16) * 7);
-    const price = Math.round(([0, 0, 120, 350, 900][st] * (.7 + sd(slot * 7 + j, 17) * .8)) / 10) * 10;
+    const i = Math.floor(sd(slot * 7 + j, 15) * BOT_TAMERS.length) % BOT_TAMERS.length, bs = botStats(i, slot * 216e5);
+    if (!bs.started) continue;
+    const r = sd(slot * 7 + j, 13), st = Math.min(Math.max(1, bs.stage - 1), r < .5 ? 2 : r < .9 ? 3 : 4), b = botMon(st, slot * 7 + j, 14); if (!b) continue;
+    const lvl = STAGE_MIN_LV[st] + Math.floor(sd(slot * 7 + j, 16) * 5);
+    const price = Math.round(([0, 60, 120, 350, 900][st] * (.7 + sd(slot * 7 + j, 17) * .8)) / 10) * 10;
     out.push({ id, bot: true, from: 'bot' + i, fromName: BOT_TAMERS[i][0], monId: b.id, monName: b.name, monImage: b.image, monStage: st, monLevel: lvl, price,
       note: BOT_NOTES[Math.floor(sd(slot * 7 + j, 18) * BOT_NOTES.length) % BOT_NOTES.length] });
   }
