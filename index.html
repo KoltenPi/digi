@@ -2317,6 +2317,7 @@ async function battle(diff, opts){
     const ev = evoWin(p, diff), dd = Math.round((1 + 0.05 * Math.min(p.streak || 0, 10)) * (4 + 3 * fStage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1) * (ultraFoe ? ULTRA_REWARD : 1) * (1 + 0.1 * perk('scav')));
     bump('wins'); addBond(p, 2);
     questProgress('win'); if (diff.key === 'hard' || diff.key === 'nightmare') questProgress('winHard');
+    if (wild && diff.key === 'nightmare') bump('nmWins'); if (ultraFoe) bump('ultraWins');
     p.wins++; p.stageWins = (p.stageWins || 0) + 1; p.evo += ev + perk('evo'); p.mood = clamp(p.mood + 8); G.data += dd;
     p.streak = (p.streak || 0) + 1; G.stats = G.stats || {}; G.stats.bestStreak = Math.max(G.stats.bestStreak || 0, p.streak);
     summary = p.name + ' won! +' + ev + ' digivolution points, +' + v + ' ' + STAT_LABEL[k] + ', +' + dd + ' DigiData.';
@@ -3658,7 +3659,7 @@ async function doJogress(p, mate, id){
   if (ultra){ p.ultra = 1; p.level = Math.max(p.level || 1, ULTRA_MIN_LV); }
   p.evo = 0; p.stageMistakes = 0; p.stageWins = 0; p.stageLosses = 0; p.final = false; p.line.push(id);
   p.stageLine = [...(p.stageLine || p.line.slice(0, -1).map((_, i) => i)), p.stage];
-  G.col[id] = 'raised'; bump('jogress'); bump('evolves'); questProgress('evolve');
+  G.col[id] = 'raised'; bump('jogress'); bump('evolves'); questProgress('evolve'); if (ultra) G.ultraIds = [...new Set([...(G.ultraIds || []), id])];
   saveGame();
   const learned = await syncMoves(p);
   $('#overlay .sheet').innerHTML = '<div class="reveal"><img class="sprite happy" alt="" src="' + esc(b.image) + '"><h4>' + esc(b.name) + '!</h4><p style="margin:0;color:var(--muted)">' +
@@ -3731,6 +3732,52 @@ const ACH = [
   { id: 'tamer25', name: 'Legendary Tamer', desc: 'Reach Tamer level 25', stat: 'tamer', n: 25, data: 2000, item: 'egg:golden' },
   { id: 'clean50', name: 'Clean Freak', desc: 'Clean up 50 messes', stat: 'cleans', n: 50, data: 300 },
   { id: 'bond100', name: 'Soulmates', desc: 'Max out a Digimon\'s bond', stat: 'bond', n: 100, data: 500, item: 'h:heart' },
+  // ----- more achievements -----
+  { id: 'win500', name: 'Unbeatable', desc: 'Win 500 battles', stat: 'wins', n: 500, data: 2500, item: 'egg:golden' },
+  { id: 'win1000', name: 'Living Legend', desc: 'Win 1,000 battles', stat: 'wins', n: 1000, data: 5000, item: 'h:band' },
+  { id: 'nmw10', name: 'Nightmare Fighter', desc: 'Win 10 Nightmare battles', stat: 'nmWins', n: 10, data: 600 },
+  { id: 'nmw50', name: 'Fearless', desc: 'Win 50 Nightmare battles', stat: 'nmWins', n: 50, data: 2000, item: 'egg:golden' },
+  { id: 'uwin1', name: 'Ultra Slayer', desc: 'Beat an Ultra in a Nightmare battle', stat: 'ultraWins', n: 1, data: 600 },
+  { id: 'uwin10', name: 'Ultra Hunter', desc: 'Beat 10 Ultras in Nightmare battles', stat: 'ultraWins', n: 10, data: 2500, item: 'egg:golden' },
+  { id: 'streak25w', name: 'Untouchable', desc: 'Win 25 wild battles in a row with one Digimon', stat: 'bestStreak', n: 25, data: 1200, item: 'egg:rare' },
+  { id: 'dg25', name: 'Deep Diver', desc: 'Clear 25 dungeons', stat: 'dungeons', n: 25, data: 900, item: 'egg:rare' },
+  { id: 'dg50', name: 'Dungeon Lord', desc: 'Clear 50 dungeons', stat: 'dungeons', n: 50, data: 2000, item: 'h:amulet' },
+  { id: 'nm5', name: 'Nightmare Conqueror', desc: 'Clear 5 Nightmare dungeons', stat: 'nightmare', n: 5, data: 1500, item: 'egg:golden' },
+  { id: 'boss25', name: 'Boss Breaker', desc: 'Defeat 25 dungeon bosses', stat: 'bosses', n: 25, data: 1500, item: 'h:bracer' },
+  { id: 'evo50', name: 'Evolution Guru', desc: 'Digivolve 50 times', stat: 'evolves', n: 50, data: 800 },
+  { id: 'evo100', name: 'Master of Evolution', desc: 'Digivolve 100 times', stat: 'evolves', n: 100, data: 1600, item: 'egg:golden' },
+  { id: 'raised50', name: 'Caretaker', desc: 'Raise 50 different Digimon', stat: 'raised', n: 50, data: 500 },
+  { id: 'raised200', name: 'Digi-Rancher', desc: 'Raise 200 different Digimon', stat: 'raised', n: 200, data: 1500, item: 'egg:rare' },
+  { id: 'raised500', name: 'Grand Tamer', desc: 'Raise 500 different Digimon', stat: 'raised', n: 500, data: 4000, item: 'egg:golden' },
+  { id: 'mega25', name: 'Mega Collector', desc: 'Raise 25 different Megas', stat: 'megas', n: 25, data: 2500, item: 'egg:golden' },
+  { id: 'ultra1', name: 'Ultra Tamer', desc: 'Raise an Ultra (Mega + Mega Jogress)', stat: 'ultras', n: 1, data: 800, item: 'h:scarf' },
+  { id: 'ultra10', name: 'Ultra Collector', desc: 'Raise 10 different Ultras', stat: 'ultras', n: 10, data: 3000, item: 'egg:golden' },
+  { id: 'jog5', name: 'Fusion Fan', desc: 'Jogress 5 times', stat: 'jogress', n: 5, data: 600 },
+  { id: 'jog20', name: 'DNA Master', desc: 'Jogress 20 times', stat: 'jogress', n: 20, data: 1500, item: 'egg:rare' },
+  { id: 'mode10', name: 'Mode Master', desc: 'Use Mode Change 10 times', stat: 'modes', n: 10, data: 500 },
+  { id: 'found1500', name: 'Completionist', desc: 'Find 1,500 Digimon', stat: 'found', n: 1500, data: 5000, item: 'egg:golden' },
+  { id: 'hatch50', name: 'Hatchery', desc: 'Hatch 50 eggs', stat: 'hatches', n: 50, data: 600 },
+  { id: 'hatch150', name: 'Egg Whisperer', desc: 'Hatch 150 eggs', stat: 'hatches', n: 150, data: 1500, item: 'egg:golden' },
+  { id: 'train250', name: 'Gym Rat', desc: 'Train 250 times', stat: 'trains', n: 250, data: 600, item: 'vit:all' },
+  { id: 'perf100', name: 'Flawless', desc: 'Get 100 perfect trainings', stat: 'perfects', n: 100, data: 1000, item: 'vit:all' },
+  { id: 'exp50', name: 'Globetrotter', desc: 'Finish 50 expeditions', stat: 'exps', n: 50, data: 800, item: 'egg:rare' },
+  { id: 'farm100', name: 'Master Farmer', desc: 'Harvest 100 crops', stat: 'harvests', n: 100, data: 1000 },
+  { id: 'craft25', name: 'Artisan', desc: 'Craft 25 items', stat: 'crafts', n: 25, data: 700 },
+  { id: 'quest100', name: 'Quest Legend', desc: 'Claim 100 quests', stat: 'quests', n: 100, data: 1500, item: 'egg:golden' },
+  { id: 'colo6', name: 'Arena Veteran', desc: 'Clear Colosseum Silver III', stat: 'colo', n: 6, data: 700 },
+  { id: 'colo8', name: 'Gold Gladiator', desc: 'Clear Colosseum Gold II', stat: 'colo', n: 8, data: 1100, item: 'egg:rare' },
+  { id: 'pvp1', name: 'Duelist', desc: 'Win a live battle against a friend', stat: 'pvpWins', n: 1, data: 300 },
+  { id: 'pvp10', name: 'Arena Star', desc: 'Win 10 live battles', stat: 'pvpWins', n: 10, data: 1200, item: 'h:wing' },
+  { id: 'raid5', name: 'Raider', desc: 'Fight a raid boss 5 times', stat: 'raids', n: 5, data: 400 },
+  { id: 'raid30', name: 'Raid Veteran', desc: 'Fight a raid boss 30 times', stat: 'raids', n: 30, data: 1500, item: 'h:shell' },
+  { id: 'streak30', name: 'Devoted', desc: 'Reach a 30-day login streak', stat: 'streak', n: 30, data: 1500, item: 'egg:golden' },
+  { id: 'tamer40', name: 'Mythic Tamer', desc: 'Reach Tamer level 40', stat: 'tamer', n: 40, data: 4000, item: 'h:specs' },
+  { id: 'tamer60', name: 'Tamer Supreme', desc: 'Reach the max Tamer level, 60', stat: 'tamer', n: 60, data: 8000, item: 'egg:golden' },
+  { id: 'clean250', name: 'Spotless', desc: 'Clean up 250 messes', stat: 'cleans', n: 250, data: 800 },
+  { id: 'cure10', name: 'Digi-Medic', desc: 'Cure 10 sicknesses', stat: 'cures', n: 10, data: 300 },
+  { id: 'rich', name: 'DigiData Tycoon', desc: 'Hold 10,000 DigiData at once', stat: 'data', n: 10000, data: 0, item: 'h:charm' },
+  { id: 'ach25', name: 'Achiever', desc: 'Claim 25 achievements', stat: 'achs', n: 25, data: 1000, item: 'egg:golden' },
+  { id: 'ach60', name: 'Trophy Case', desc: 'Claim 60 achievements', stat: 'achs', n: 60, data: 3000, item: 'egg:golden' },
 ];
 function achValue(stat){
   if (stat === 'found') return foundCount();
@@ -3740,6 +3787,10 @@ function achValue(stat){
   if (stat === 'colo') return (G.colo && G.colo.best) || 0;
   if (stat === 'regions') return new Set([...Object.keys(G.visited || {}), 'file']).size;
   if (stat === 'bond') return Math.max(0, ...[...G.party, ...G.box].map(m => m.bond || 0));
+  if (stat === 'raised') return Object.values(G.col).filter(x => x === 'raised').length;
+  if (stat === 'ultras') return new Set([...ULTRA_IDS.filter(id => G.col[id] === 'raised'), ...(G.ultraIds || [])]).size;
+  if (stat === 'data') return Math.max(G.data || 0, (G.stats && G.stats.peakData) || 0);
+  if (stat === 'achs') return Object.keys(G.achClaimed || {}).length;
   return (G.stats && G.stats[stat]) || 0;
 }
 const achDone = a => achValue(a.stat) >= a.n;
@@ -3840,13 +3891,18 @@ function trainerScreen(tab, msg){
         return '<div class="day' + (done ? ' done' : '') + (today ? ' today' : '') + '"><b>Day ' + day + '</b><small>' + esc(rewardLine(r.data, r.item)) + '</small></div>'; }).join('') + '</div>' +
       (ready ? '<button class="big" id="dailyClaim">Claim day ' + (((next - 1) % 7) + 1) + ' reward</button>' : '<p class="ownline">Come back tomorrow to keep your streak going. Missing a day starts it over.</p>');
   } else if (tab === 'ach'){
-    const cl = G.achClaimed || {};
-    body = '<div class="achs">' + ACH.map(a => { const v = Math.min(a.n, achValue(a.stat)), done = v >= a.n, got = cl[a.id];
+    const cl = G.achClaimed || {}, ready = achClaimable();
+    G.stats = G.stats || {}; G.stats.peakData = Math.max(G.stats.peakData || 0, G.data || 0);
+    // ready to claim first, then the ones in progress, then the ones already claimed
+    const order = a => cl[a.id] ? 2 : achDone(a) ? 0 : 1, list = ACH.slice().sort((a, b) => order(a) - order(b));
+    body = '<div class="wallet"><span>Claimed <b>' + Object.keys(cl).length + ' / ' + ACH.length + '</b></span>' + (ready.length ? '<span>Ready <b>' + ready.length + '</b></span>' : '') + '</div>' +
+      (ready.length > 1 ? '<button class="big" id="achAll">🎁 Claim all ' + ready.length + ' rewards</button>' : '') +
+      '<div class="achs">' + list.map(a => { const v = Math.min(a.n, achValue(a.stat)), done = v >= a.n, got = cl[a.id];
       return '<div class="ach' + (got ? ' got' : done ? ' done' : '') + '"><div class="qtop"><b>' + esc(a.name) + '</b><span>' + v.toLocaleString() + ' / ' + a.n.toLocaleString() + '</span></div><small>' + esc(a.desc) + ' · ' + esc(rewardLine(a.data, a.item)) + ' · title “' + esc(a.name) + '”</small>' +
         '<div class="evotrack"><i style="width:' + (v / a.n * 100) + '%"></i></div>' + (done && !got ? '<button class="act" data-ach="' + a.id + '">Claim</button>' : got ? '<small class="okt">✓ Claimed</small>' : '') + '</div>'; }).join('') + '</div>';
   } else if (tab === 'col'){
     const cl = G.colClaimed || {};
-    body = '<p class="ownline">Rewards for discovering Digimon of each level (battling, hatching, raising and expeditions all count). Completing a level earns a title.</p><div class="achs">' + COL_LEVELS.map(lv => { const pr = colProgress(lv), pct = pr.total ? pr.have / pr.total * 100 : 0;
+    body = '<p class="ownline">Rewards for discovering Digimon of each level (battling, hatching, raising and expeditions all count). Completing a level earns a title.</p>' + (colClaimable() > 1 ? '<button class="big" id="colAll">🎁 Claim all ' + colClaimable() + ' rewards</button>' : '') + '<div class="achs">' + COL_LEVELS.map(lv => { const pr = colProgress(lv), pct = pr.total ? pr.have / pr.total * 100 : 0;
       return '<div class="ach"><div class="qtop"><b>' + esc(LEVEL_EN[lv] || lv) + '</b><span>' + pr.have + ' / ' + pr.total + '</span></div><div class="evotrack"><i style="width:' + pct + '%"></i></div><div class="csteps">' +
         COL_STEPS.map(s => { const ok = pct >= s.pct, got = cl[lv + ':' + s.pct];
           return got ? '<span class="rq ok">✓ ' + s.pct + '%</span>' : ok ? '<button class="act" data-col="' + lv + ':' + s.pct + '">' + s.pct + '% · Claim</button>' : '<span class="rq">' + s.pct + '% · ' + esc(rewardLine(s.data, s.item)) + '</span>'; }).join('') + '</div></div>'; }).join('') + '</div>';
@@ -3870,6 +3926,22 @@ function trainerScreen(tab, msg){
   $('#overlay').querySelectorAll('[data-tt]').forEach(b => b.onclick = () => trainerScreen(b.dataset.tt));
   tamerHandlers(again); alertsHandlers(again); cloudHandlers(again);
   const dc = $('#dailyClaim'); if (dc) dc.onclick = () => { const r = claimDaily(); if (r) again('Day ' + r.s + ' claimed: ' + rewardLine(r.r.data, r.r.item) + '!'); };
+  const aa = $('#achAll'); if (aa) aa.onclick = () => {
+    // claiming can complete "claim N achievements" too, so keep going until nothing new is ready
+    let n = 0, data = 0; const items = [];
+    for (let guard = 0; guard < 5; guard++){
+      const ready = achClaimable(); if (!ready.length) break;
+      for (const a of ready){ G.achClaimed = G.achClaimed || {}; G.achClaimed[a.id] = true; G.data += a.data; data += a.data; if (a.item){ grantItem(a.item); items.push(itemIcon(a.item) + ' ' + itemName(a.item)); } if (!G.title) G.title = a.name; n++; }
+    }
+    saveGame(); paintTitle();
+    again('Claimed ' + n + ' achievement' + (n === 1 ? '' : 's') + ': +' + data.toLocaleString() + ' DigiData' + (items.length ? ', ' + items.join(', ') : '') + '!');
+  };
+  const ca = $('#colAll'); if (ca) ca.onclick = () => {
+    let n = 0, data = 0; const items = []; G.colClaimed = G.colClaimed || {};
+    for (const lv of COL_LEVELS){ const pr = colProgress(lv); if (!pr.total) continue;
+      for (const s of COL_STEPS){ const k = lv + ':' + s.pct; if (G.colClaimed[k] || pr.have / pr.total * 100 < s.pct) continue; G.colClaimed[k] = true; G.data += s.data; data += s.data; if (s.item){ grantItem(s.item); items.push(itemIcon(s.item) + ' ' + itemName(s.item)); } n++; } }
+    saveGame(); again('Claimed ' + n + ' collection reward' + (n === 1 ? '' : 's') + ': +' + data.toLocaleString() + ' DigiData' + (items.length ? ', ' + items.join(', ') : '') + '!');
+  };
   $('#overlay').querySelectorAll('[data-ach]').forEach(b => b.onclick = () => { const a = ACH.find(x => x.id === b.dataset.ach); if (!a || !achDone(a) || (G.achClaimed || {})[a.id]) return;
     G.achClaimed = G.achClaimed || {}; G.achClaimed[a.id] = true; G.data += a.data; grantItem(a.item); if (!G.title) G.title = a.name; saveGame(); paintTitle(); again('Unlocked “' + a.name + '”: ' + rewardLine(a.data, a.item) + '!'); });
   $('#overlay').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { const [lv, pct] = b.dataset.col.split(':'), s = COL_STEPS.find(x => x.pct === +pct), pr = colProgress(lv);
@@ -3891,6 +3963,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 13, title: 'More achievements & Claim all', items: ['45 new achievements, from Ultra Slayer and Nightmare Fighter to Grand Tamer, Completionist and Tamer Supreme, each with a title and rewards.', 'A Claim all button collects every finished achievement at once. Collection rewards have one too.', 'Achievements ready to claim now sit at the top of the list, and claimed ones move to the bottom.'] },
   { v: 12, title: 'Ultras in Nightmare battles', items: ['Nightmare battles now sometimes (about 1 in 4) send an Ultra: a Mega born from two Megas, like Omegamon, Imperialdramon Paladin Mode or Ultimate Chaosmon.', 'Ultra foes have +12% stats and give 50% more DigiData and XP.'] },
   { v: 11, title: 'Clearer moves', items: ['Every move\'s description now says exactly what it does: which stat it uses, its multiplier, healing, power-ups and status chances.', 'In battle, press and hold any move to see what it does.', 'After a move hits a Digimon, its button shows the damage multiplier against that species next time (green ▲ strong, red ▼ weak).'] },
   { v: 10, title: '🎃 Halloween raid: Pumpkinmon', items: ['Pumpkinmon takes over the weekly raid through October (World → Online → Raid). It hits harder than a normal raid boss.', 'Help defeat it and you get a Pumpkinmon of your own (Ultimate) when you claim your reward, plus 300 extra DigiData.'] },
@@ -4818,7 +4891,7 @@ async function viewRaid(el){
 }
 function raidFight(boss){
   const p = P(), R = raidLocal(); if (!p || R.used >= RAID_TRIES || p.energy < 25 || busy) return;
-  p.energy = clamp(p.energy - 25); R.used++; saveGame();
+  p.energy = clamp(p.energy - 25); R.used++; bump('raids'); saveGame();
   const ev = raidEvent();
   battle(DIFFS[2], { foeId: boss.id, mult: ev ? ev.mult : 1.25, hpMul: 5, title: (ev ? ev.icon + ' ' + ev.title : '👑 Raid') + ' · ' + boss.name, noRun: true, onDone: async (outcome, info) => {
     const pct = info && info.max ? Math.round(100 * Math.min(1, info.dealt / info.max)) : 0, dmg = pct + (outcome === 'win' ? 50 : 0), join = !R.joined;
