@@ -370,6 +370,9 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .xr{--band:#3aa86b;--band2:#8fd16a;position:relative;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden;animation:xrIn .45s cubic-bezier(.2,.8,.3,1.2) both;animation-delay:var(--d,0ms)}
 .xr.ruins{--band:#b06a0c;--band2:#d39a2a}
 .xr.dark{--band:#6a3fc4;--band2:#c04fa8}
+.xr.volcano{--band:#c0391b;--band2:#ff8a3d}.xr.abyss{--band:#0f4c8a;--band2:#3fa9ff}.xr.storm{--band:#4b5bd6;--band2:#8fe3cf}.xr.kernel{--band:#0b8a8a;--band2:#e2c35a}
+.diff.hardx .dn::after{content:' HARD';font:700 .62rem var(--mono);color:var(--bad);margin-left:6px;vertical-align:middle}
+.diff .need{display:block;font:600 .72rem var(--mono);color:var(--muted);margin-top:3px}
 .xr.rough{--band:#8a8fa3;--band2:#b9bdcb}
 .xr-top{display:flex;align-items:center;gap:10px;padding:10px 12px;background:linear-gradient(110deg,var(--band),var(--band2));color:#fff}
 .xr-pic{width:52px;height:52px;object-fit:contain;flex:none;border-radius:50%;background:rgba(255,255,255,.22);padding:3px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
@@ -1855,13 +1858,31 @@ const EXPEDITIONS = [
   { key: 'fields', name: 'Data Fields', mins: 30, data: 1, xp: 1, egg: 0, rare: 0, risk: 0, finds: 1, chip: 0.2, clean: 0.05, desc: 'A short trip across calm data plains. Always safe.' },
   { key: 'ruins', name: 'Ancient Ruins', mins: 120, data: 3.2, xp: 3, egg: 0.06, rare: 0, risk: 0.12, finds: 2, relic: 0.2, chip: 0.4, clean: 0.12, desc: 'Crumbling code ruins with buried treasure.' },
   { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, relic: 0.35, crest: 0.1, xab: 0.12, chip: 0.7, clean: 0.25, desc: 'Dangerous depths with the richest rewards.' },
+  // hard expeditions: a stat check instead of a level check. Meet the needs for a 75% smooth trip; beat them for more, fall short and it drops fast
+  { key: 'volcano', name: 'Magma Core', icon: '🌋', mins: 240, data: 7, xp: 7, egg: 0.3, rare: 0.05, finds: 3, chip: 0.6, held: 0.1, relic: 0.2, need: { atk: 20, def: 18, hp: 140 }, eggPool: ['efire', 'emachine', 'dragon'], hard: true, desc: 'A furnace at the heart of a data volcano. Only tough, hard-hitting Digimon get through the heat.' },
+  { key: 'abyss', name: 'Net Ocean Abyss', icon: '🌊', mins: 360, data: 9, xp: 9, egg: 0.3, rare: 0.08, finds: 4, chip: 0.6, held: 0.12, relic: 0.25, need: { int: 22, hp: 160, sp: 30 }, eggPool: ['ewater', 'edark', 'rare'], hard: true, desc: 'Crushing pressure and strange signals far below the Net Ocean. Needs a sharp mind and deep reserves.' },
+  { key: 'storm', name: 'Storm Spire', icon: '🌪️', mins: 360, data: 9, xp: 9, egg: 0.3, rare: 0.06, finds: 4, chip: 0.6, held: 0.12, crest: 0.08, need: { spd: 18, int: 18, def: 16 }, eggPool: ['ewind', 'eholy', 'lucky'], hard: true, desc: 'A lightning-struck tower in the sky. Fast, clever Digimon dodge the bolts on the way up.' },
+  { key: 'kernel', name: 'Kernel Core', icon: '💠', mins: 720, data: 22, xp: 20, egg: 0.45, rare: 0.15, finds: 6, chip: 1, held: 0.3, relic: 0.4, crest: 0.25, xab: 0.25, need: { hp: 260, atk: 30, int: 30, def: 30, spd: 22 }, eggPool: ['golden', 'ultimate', 'xegg', 'mega'], hard: true, desc: 'The guarded core of the Digital World itself. Only a Mega-level Digimon in top shape comes back smoothly.' },
 ];
+const EXP_STAT = { hp: 'HP', sp: 'SP', atk: 'ATK', int: 'INT', def: 'DEF', spd: 'SPD' };
+// how a Digimon measures up to a hard expedition: 1 = exactly meets every need. In a team, each member also borrows 30% of the team's best in each stat
+function expScore(m, ex, team){
+  const me = partnerStats(m), best = {};
+  (team || []).forEach(t => { const st = partnerStats(t); for (const k in ex.need) best[k] = Math.max(best[k] || 0, st[k]); });
+  // the average matters, but one badly weak stat drags it down hard
+  const r = Object.keys(ex.need).map(k => Math.min(1.25, (best[k] ? me[k] * 0.7 + best[k] * 0.3 : me[k]) / ex.need[k]));
+  return 0.6 * r.reduce((a, b) => a + b, 0) / r.length + 0.4 * Math.min(...r);
+}
+const expNeedText = (m, ex, team) => { const me = partnerStats(m); return Object.entries(ex.need).map(([k, v]) => (me[k] >= v ? '✓ ' : '✗ ') + EXP_STAT[k] + ' ' + me[k] + '/' + v).join(' · '); };
 function expDone(m){ return !!(m.exp && Date.now() >= m.exp.end); }
 // a team on the same trip shares one slot (m.exp.team), a solo expedition uses its own
 const TEAM_MAX = 6;
 function expRunning(){ const teams = new Set(); let n = 0; for (const m of G.box) if (m.exp){ if (m.exp.team) teams.add(m.exp.team); else n++; } return n + teams.size; }
 function fmtLeft(ms){ const s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), mn = Math.floor(s % 3600 / 60); return h ? h + 'h ' + mn + 'm' : mn ? mn + 'm' : s + 's'; }
-function expOdds(m, ex){ return Math.max(0.5, 1 - ex.risk * Math.max(0.25, 1 - (m.level || 1) / 45)); }
+function expOdds(m, ex, team){
+  if (ex.need){ const sc = expScore(m, ex, team); return Math.max(0.05, Math.min(0.97, sc >= 1 ? 0.75 + (sc - 1) * 0.6 : 0.75 - (1 - sc) * 1.6)); }
+  return Math.max(0.5, 1 - ex.risk * Math.max(0.25, 1 - (m.level || 1) / 45));
+}
 function expEstimate(m, ex){ return { data: Math.round((8 + m.stage * 6) * ex.data), xp: Math.round((6 + m.stage * 4) * ex.xp) }; }
 // finishing early costs about 1 DigiData per 2 minutes left (min 10)
 function rushCost(m){ return m.exp ? Math.max(10, Math.ceil((m.exp.end - Date.now()) / 120000) + 5) : 0; }
@@ -1902,8 +1923,8 @@ function teamExpedition(exKey, sel){
   const show = html => { if ($('#overlay').hidden) openOv(html); else $('#overlay .sheet').innerHTML = html; };
   if (!ex){
     show('<h4>🧭 Send a team</h4><p class="ownline">Pick where the team goes, then choose up to ' + free + ' Digimon from your Box. The whole team only uses one expedition slot.</p><div class="diffs">' +
-      EXPEDITIONS.map(e => '<button class="diff" data-tex="' + e.key + '"><span class="dn">' + e.name + '<small>' + fmtLeft(expMs(e)) + '</small></span><span class="dd">' + e.desc + '</span>' +
-        '<span class="dr">' + (e.risk ? Math.round(e.risk * 100) + '% risk of a rough trip (less for high levels)' : 'Always a smooth trip') + (e.egg ? ' · ' + Math.round(e.egg * 100) + '% egg each' : '') + '</span></button>').join('') +
+      EXPEDITIONS.map(e => '<button class="diff' + (e.need ? ' hardx' : '') + '" data-tex="' + e.key + '"><span class="dn">' + (e.icon ? e.icon + ' ' : '') + e.name + '<small>' + fmtLeft(expMs(e)) + '</small></span><span class="dd">' + e.desc + '</span>' +
+        '<span class="dr">' + (e.need ? 'Stat check: needs ' + Object.entries(e.need).map(([k, v]) => EXP_STAT[k] + ' ' + v).join(', ') + '. Team members lend each other 30% of the team\'s best stats' : e.risk ? Math.round(e.risk * 100) + '% risk of a rough trip (less for high levels)' : 'Always a smooth trip') + (e.egg ? ' · ' + Math.round(e.egg * 100) + '% egg each' : '') + '</span></button>').join('') +
       '</div><button class="ghost" id="teCancel">Cancel</button>');
     $('#teCancel').onclick = () => { closeOv(); renderBox(); };
     $('#overlay').querySelectorAll('[data-tex]').forEach(b => b.onclick = () => teamExpedition(b.dataset.tex, new Set()));
@@ -1916,7 +1937,7 @@ function teamExpedition(exKey, sel){
     '<div class="teamsum"><span>Team <b>' + sel.size + ' / ' + free + '</b></span>' + (sel.size ? '<span>~<b>' + est.data + '</b> DigiData</span><span>~<b>' + est.xp + '</b> XP total</span>' : '<span>Tap Digimon to add them to the team</span>') + '</div>' +
     (tsyn.length ? '<div class="synbar">' + tsyn.map(a => '<span class="synchip">' + a.g.icon + ' ' + esc(a.g.name) + ' <small>×' + a.n + ' · +15% rewards</small></span>').join('') + '</div>' : '') +
     '<div class="bkrow"><button class="ghost" id="teBest">Pick the strongest ' + Math.min(free, idle.length) + '</button><button class="ghost" id="teClear"' + (sel.size ? '' : ' disabled') + '>Clear</button></div>' +
-    '<div class="boxgrid">' + idle.map((m, i) => '<button class="bcell pick' + (sel.has(m) ? ' on' : '') + '" data-tm="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + (synergiesOf(m).length ? ' · ' + synergiesOf(m).map(g => g.icon).join('') : '') + '</small><i>' + Math.round(expOdds(m, ex) * 100) + '% smooth</i></button>').join('') + '</div>' +
+    '<div class="boxgrid">' + idle.map((m, i) => '<button class="bcell pick' + (sel.has(m) ? ' on' : '') + '" data-tm="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + (synergiesOf(m).length ? ' · ' + synergiesOf(m).map(g => g.icon).join('') : '') + '</small><i>' + Math.round(expOdds(m, ex, ex.need ? [...sel, m] : null) * 100) + '% smooth</i></button>').join('') + '</div>' +
     '<p id="teMsg" style="margin:0;min-height:1.2em;font-size:.85rem;color:var(--bad)"></p>' +
     '<button class="big" id="teGo"' + (sel.size ? '' : ' disabled') + '>Send ' + (sel.size ? sel.size + ' Digimon' : 'the team') + ' to ' + esc(ex.name) + '</button>' +
     '<button class="ghost" id="teBack">← Choose another place</button>');
@@ -1925,7 +1946,7 @@ function teamExpedition(exKey, sel){
     if (sel.has(m)) sel.delete(m); else if (sel.size >= free){ $('#teMsg').textContent = free ? 'A team can have up to ' + TEAM_MAX + ' Digimon.' : 'All expedition slots are busy. Get more in the Shop.'; return; } else sel.add(m);
     teamExpedition(ex.key, sel);
   });
-  $('#teBest').onclick = () => { sel.clear(); idle.slice(0, free).forEach(m => sel.add(m)); teamExpedition(ex.key, sel); };
+  $('#teBest').onclick = () => { sel.clear(); (ex.need ? idle.slice().sort((a, b) => expScore(b, ex) - expScore(a, ex)) : idle).slice(0, free).forEach(m => sel.add(m)); teamExpedition(ex.key, sel); };
   $('#teClear').onclick = () => { sel.clear(); teamExpedition(ex.key, sel); };
   $('#teBack').onclick = () => teamExpedition(null, sel);
   $('#teGo').onclick = () => {
@@ -1976,10 +1997,10 @@ function boxMenu(i){
 
 function expeditionPicker(m){
   const card = ex => { const est = expEstimate(m, ex), odds = Math.round(expOdds(m, ex) * 100);
-    return '<button class="diff" data-ex="' + ex.key + '"><span class="dn">' + ex.name + '<small>' + fmtLeft(expMs(ex)) + '</small></span><span class="dd">' + ex.desc + '</span>' +
-      '<span class="dr">~' + est.data + ' DigiData · ~' + Math.round(est.xp * XP_MUL) + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + (ex.relic ? ' · ' + Math.round(ex.relic * 100) + '% Digimental' : '') + (ex.crest ? ' · Crests' : '') + (ex.chip ? ' · ' + Math.round(ex.chip * 100) + '% stat chip' : '') + (ex.clean ? ' · ' + Math.round(ex.clean * 100) + '% Clean Slate' : '') + ' · ' + odds + '% smooth trip</span></button>'; };
+    return '<button class="diff' + (ex.need ? ' hardx' : '') + '" data-ex="' + ex.key + '"><span class="dn">' + (ex.icon ? ex.icon + ' ' : '') + ex.name + '<small>' + fmtLeft(expMs(ex)) + '</small></span><span class="dd">' + ex.desc + '</span>' +
+      '<span class="dr">~' + est.data + ' DigiData · ~' + Math.round(est.xp * XP_MUL) + ' XP' + (ex.egg ? ' · ' + Math.round(ex.egg * 100) + '% egg' : '') + (ex.rare ? ' (sometimes Rare)' : '') + (ex.relic ? ' · ' + Math.round(ex.relic * 100) + '% Digimental' : '') + (ex.crest ? ' · Crests' : '') + (ex.chip ? ' · ' + Math.round(ex.chip * 100) + '% stat chip' : '') + (ex.clean ? ' · ' + Math.round(ex.clean * 100) + '% Clean Slate' : '') + (ex.held ? ' · ' + Math.round(ex.held * 100) + '% held item' : '') + ' · ' + odds + '% smooth trip</span>' + (ex.need ? '<span class="need">' + expNeedText(m, ex) + '</span>' : '') + '</button>'; };
   $('#overlay .sheet').innerHTML = '<h4>Send ' + esc(m.name) + ' to…</h4><div class="diffs">' + EXPEDITIONS.map(card).join('') + '</div>' +
-    '<p style="margin:0;color:var(--muted);font-size:.82rem">A rough trip brings back half the rewards. Higher levels make trips smoother. Each trip may also spot undiscovered Digimon for your Index.</p>' +
+    '<p style="margin:0;color:var(--muted);font-size:.82rem">A rough trip brings back half the rewards (30% on HARD trips). Higher levels make the first three trips smoother; HARD trips check your Digimon\'s stats instead. Each trip may also spot undiscovered Digimon for your Index.</p>' +
     '<button class="ghost" id="exCancel">Cancel</button>';
   $('#exCancel').onclick = () => { closeOv(); renderBox(); };
   $('#overlay').querySelectorAll('[data-ex]').forEach(b => b.onclick = () => {
@@ -1992,24 +2013,27 @@ function expeditionPicker(m){
 async function collectExpeditions(list){
   busy = true;
   const res = [], synOf = new Map(list.map(m => [m, expSynergies(m)]));
+  const teamOf = new Map(list.map(m => [m, m.exp && m.exp.team ? list.filter(o => o.exp && o.exp.team === m.exp.team) : null]));
   for (const m of list){
     if (!expDone(m)) continue;
     const ex = EXPEDITIONS.find(x => x.key === m.exp.key) || EXPEDITIONS[0], syn = synOf.get(m) || [], sb = syn.length;
-    const ok = Math.random() < Math.min(0.99, expOdds(m, ex) + SYN_EXP.odds * sb), est = expEstimate(m, ex);
-    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : 0.5) * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav')) * (1 + SYN_EXP.data * sb)), xp = Math.round(est.xp * (ok ? 1 : 0.5) * (1 + SYN_EXP.xp * sb));
+    const team = teamOf.get(m);
+    const ok = Math.random() < Math.min(0.99, expOdds(m, ex, team) + SYN_EXP.odds * sb), est = expEstimate(m, ex), rough = ex.hard ? 0.3 : 0.5;
+    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : rough) * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav')) * (1 + SYN_EXP.data * sb)), xp = Math.round(est.xp * (ok ? 1 : rough) * (1 + SYN_EXP.xp * sb));
     G.data += data;
     const loot = [], got = (icon, name, tier) => loot.push({ icon, name, tier: tier || '' });
     if (ok && ex.egg && Math.random() < Math.min(0.9, ex.egg * (evOn('eggs') ? 3 : 1) * (1 + 0.15 * perk('eggs')))){
       const rare = Math.random() < ex.rare / ex.egg, r2 = Math.random();
-      const k = rare ? 'rare' : ex.key === 'dark' && r2 < 0.5 ? pick(['rookie', 'dragon', 'dark', 'xegg', 'lucky', ...Object.keys(ELEMS).map(k => 'e' + k)]) : ex.key === 'ruins' && r2 < 0.3 ? pick(['lucky', 'rookie']) : 'mystery';
+      const k = rare ? 'rare' : ex.eggPool && r2 < 0.75 ? pick(ex.eggPool) : ex.key === 'dark' && r2 < 0.5 ? pick(['rookie', 'dragon', 'dark', 'xegg', 'lucky', ...Object.keys(ELEMS).map(k => 'e' + k)]) : ex.key === 'ruins' && r2 < 0.3 ? pick(['lucky', 'rookie']) : 'mystery';
       G.eggs.push(k); got('🥚', eggName(k), k === 'rare' ? 'epic' : 'rare');
     }
     if (ok && ex.relic && Math.random() < ex.relic){ const k = randomDigimental(); giveItem(k); got(itemIcon(k), itemName(k), 'rare'); }
     if (ok && ex.crest && Math.random() < ex.crest){ const k = randomCrest(); if (k){ giveItem(k); got(itemIcon(k), itemName(k), 'epic'); } }
+    if (ok && ex.held && Math.random() < ex.held){ const k = randomHeld(); giveItem(k); got(itemIcon(k), itemName(k), 'epic'); }
     if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); got(itemIcon('xab'), itemName('xab'), 'epic'); }
     if (ex.chip && Math.random() < ex.chip * (ok ? 1 : 0.5)){ const k = randomChip(); giveItem(k); got(itemIcon(k), itemName(k)); }
     if (ex.clean && Math.random() < ex.clean * (ok ? 1 : 0.5)){ giveItem('clean'); got(itemIcon('clean'), itemName('clean')); }
-    if (ok && ex.key !== 'fields' && Math.random() < (ex.key === 'dark' ? 0.15 : 0.06)){ giveItem('pers:?'); got(itemIcon('pers:?'), itemName('pers:?')); }
+    if (ok && ex.key !== 'fields' && Math.random() < (ex.key === 'dark' || ex.hard ? 0.15 : 0.06)){ giveItem('pers:?'); got(itemIcon('pers:?'), itemName('pers:?')); }
     const pool = (state.stageIds[m.stage] || []).filter(id => state.byId.has(id) && !known(id));
     const seen = [];
     for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; const d = state.byId.get(id); seen.push({ name: d.name, image: d.image }); } }
@@ -2019,7 +2043,7 @@ async function collectExpeditions(list){
     res.push({ m, ex, ok, data, xp: lv.gained, lv, loot, seen, syn });
   }
   saveGame();
-  const XR_ICON = { fields: '🌾', ruins: '🏛️', dark: '🌑' };
+  const XR_ICON = { fields: '🌾', ruins: '🏛️', dark: '🌑', volcano: '🌋', abyss: '🌊', storm: '🌪️', kernel: '💠' };
   const card = (r, n) => {
     const up = r.lv && r.lv.ups.length ? r.lv.ups[r.lv.ups.length - 1] : 0;
     return '<div class="xr ' + r.ex.key + (r.ok ? '' : ' rough') + '" style="--d:' + n * 140 + 'ms">' +
@@ -2032,7 +2056,7 @@ async function collectExpeditions(list){
       (r.syn && r.syn.length ? '<p class="xr-note syn">🔗 ' + r.syn.map(a => a.g.icon + ' ' + esc(a.g.name)).join(', ') + ' synergy: +' + Math.round(SYN_EXP.data * r.syn.length * 100) + '% DigiData & XP</p>' : '') +
       (r.loot.length ? '<p class="xr-h">Found</p><div class="xr-loot">' + r.loot.map((it, i) => '<span class="xr-item ' + it.tier + '" style="--i:' + i + '"><i>' + it.icon + '</i><small>' + esc(it.name) + '</small></span>').join('') + '</div>' : '<p class="xr-none">No items this time.</p>') +
       (r.seen.length ? '<p class="xr-h">Spotted · added to your Digidex</p><div class="xr-seen">' + r.seen.map(s => '<span><img alt="" src="' + esc(s.image) + '">' + esc(s.name) + '</span>').join('') + '</div>' : '') +
-      (r.ok ? '' : '<p class="xr-note">Ran into trouble, so rewards were halved. Higher levels make trips safer.</p>') +
+      (r.ok ? '' : r.ex.need ? '<p class="xr-note">Ran into trouble, so it only brought back 30% of the rewards. Stronger stats (' + Object.keys(r.ex.need).map(k => EXP_STAT[k]).join(', ') + ') make this trip safer.</p>' : '<p class="xr-note">Ran into trouble, so rewards were halved. Higher levels make trips safer.</p>') +
       '</div></div>';
   };
   const tot = res.reduce((a, r) => (a.data += r.data, a.xp += r.xp, a.loot += r.loot.length, a), { data: 0, xp: 0, loot: 0 });
@@ -4513,6 +4537,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 26, title: 'Hard expeditions', items: ['Four new HARD expeditions that check your Digimon\'s stats instead of its level: 🌋 Magma Core (ATK, DEF, HP), 🌊 Net Ocean Abyss (INT, HP, SP), 🌪️ Storm Spire (SPD, INT, DEF) and 💠 Kernel Core (every stat, Mega-level).', 'Meet every need for a 75% smooth trip; beat them for up to 97%. Fall short, especially badly in one stat, and it gets risky fast. A rough HARD trip only brings back 30% of the rewards.', 'In a team, each member borrows 30% of the team\'s best in each needed stat, so a strong leader carries the rest.', 'They pay much more and can bring element and level eggs, held items, Crests, X-Antibodies and even Golden or Mega Eggs.'] },
   { v: 25, title: 'Faster raids', items: ['Raid fights now refill every 3 hours: 3 fights every 3 hours instead of 3 a day. The Raid screen shows when your next fights are ready.'] },
   { v: 24, title: 'AI Tamers start fresh', items: ['The AI Tamers have been reset to nothing. They join over the next few days and level up like real players: one session most days, with days off. They only raid, trade and climb the boards as fast as their progress allows.'] },
   { v: 23, title: 'More Digivices', items: ['17 new Digivice shells for the Retro look in the Shop: the Adventure Digivices (Courage, Friendship, Light), Dark D-3, D-Power (Red), D-Tector, Digivice Burst, Dark Digivice, Fusion Loader (Blue), Darkness Loader, Pendulum X, D-Cyber, Digivice: (2020), App Drive, D-Zero, and Digivice -V- and -VV-.', 'The Digivices tab in the Shop is now grouped by series.'] },
