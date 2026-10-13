@@ -223,6 +223,11 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .bcell small{font:.6rem var(--mono);color:var(--muted)}
 .bcell i{font:700 .62rem var(--mono);font-style:normal;color:var(--link)}
 .bcell i.ok{color:var(--good)}
+.bcell.pick{cursor:pointer}
+.bcell.pick.on{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.bcell.pick.on::after{content:'✓';position:absolute;top:4px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--accent-ink);font:700 .7rem/18px var(--mono);text-align:center}
+.teamsum{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:.85rem;color:var(--muted)}
+.teamsum b{color:var(--fg)}
 .bcell.away img{opacity:.4}
 .bcell.empty{border-style:dashed;color:var(--muted);font:.68rem var(--mono);min-height:108px;align-content:center}
 .bhead{display:flex;gap:12px;align-items:center}
@@ -1592,11 +1597,54 @@ function renderBox(){
     '<p style="margin:0;color:var(--muted)">Digimon in the Box rest without getting hungry. Tap one to move it to your party, release it, or send it on a timed expedition. Use “Send to the Box” on the Partner tab to store one.</p>' +
     '<div class="segs">' + BOX_SORTS.map(([k, l]) => '<button class="seg' + (k === sortKey ? ' on' : '') + '" data-bsort="' + k + '">' + l + '</button>').join('') + '</div>' +
     (ready.length ? '<button class="big" id="collectAll">Collect ' + ready.length + ' finished expedition' + (ready.length === 1 ? '' : 's') + '</button>' : '') +
+    (G.box.some(m => !m.exp) ? '<button class="act" id="teamExp"' + (expRunning() < G.expSlots ? '' : ' disabled') + ' style="width:100%">🧭 Send a team on an expedition<small>' + (expRunning() < G.expSlots ? (G.expSlots - expRunning()) + ' expedition slot' + (G.expSlots - expRunning() === 1 ? '' : 's') + ' free' : 'all expedition slots are busy') + '</small></button>' : '') +
     '<div class="boxgrid">' + cells.join('') + '</div>';
   v.querySelectorAll('[data-box]').forEach(b => b.onclick = () => boxMenu(+b.dataset.box));
   v.querySelectorAll('[data-bsort]').forEach(b => b.onclick = () => { store.set('dx_boxsort', b.dataset.bsort); renderBox(); });
   $('#boxShop').onclick = () => setTab('shop');
   const ca = $('#collectAll'); if (ca) ca.onclick = () => collectExpeditions(ready);
+  const te = $('#teamExp'); if (te) te.onclick = () => { if (!busy) teamExpedition(); };
+}
+
+// ----- send several Box Digimon on the same expedition in one go (each one uses an expedition slot) -----
+function teamExpedition(exKey, sel){
+  busy = true; sel = sel || new Set();
+  const ex = EXPEDITIONS.find(e => e.key === exKey), free = Math.max(0, G.expSlots - expRunning());
+  const idle = G.box.filter(m => !m.exp).sort((a, b) => (b.stage - a.stage) || ((b.level || 1) - (a.level || 1)));
+  const show = html => { if ($('#overlay').hidden) openOv(html); else $('#overlay .sheet').innerHTML = html; };
+  if (!ex){
+    show('<h4>🧭 Send a team</h4><p class="ownline">Pick where the team goes, then choose up to ' + free + ' Digimon from your Box. Each one uses an expedition slot.</p><div class="diffs">' +
+      EXPEDITIONS.map(e => '<button class="diff" data-tex="' + e.key + '"><span class="dn">' + e.name + '<small>' + fmtLeft(expMs(e)) + '</small></span><span class="dd">' + e.desc + '</span>' +
+        '<span class="dr">' + (e.risk ? Math.round(e.risk * 100) + '% risk of a rough trip (less for high levels)' : 'Always a smooth trip') + (e.egg ? ' · ' + Math.round(e.egg * 100) + '% egg each' : '') + '</span></button>').join('') +
+      '</div><button class="ghost" id="teCancel">Cancel</button>');
+    $('#teCancel').onclick = () => { closeOv(); renderBox(); };
+    $('#overlay').querySelectorAll('[data-tex]').forEach(b => b.onclick = () => teamExpedition(b.dataset.tex, new Set()));
+    return;
+  }
+  for (const m of [...sel]) if (m.exp || !G.box.includes(m)) sel.delete(m);
+  const est = [...sel].reduce((a, m) => { const e = expEstimate(m, ex); a.data += e.data; a.xp += Math.round(e.xp * XP_MUL); return a; }, { data: 0, xp: 0 });
+  show('<h4>🧭 ' + esc(ex.name) + ' · ' + fmtLeft(expMs(ex)) + '</h4>' +
+    '<div class="teamsum"><span>Team <b>' + sel.size + ' / ' + free + '</b></span>' + (sel.size ? '<span>~<b>' + est.data + '</b> DigiData</span><span>~<b>' + est.xp + '</b> XP total</span>' : '<span>Tap Digimon to add them to the team</span>') + '</div>' +
+    '<div class="bkrow"><button class="ghost" id="teBest">Pick the strongest ' + Math.min(free, idle.length) + '</button><button class="ghost" id="teClear"' + (sel.size ? '' : ' disabled') + '>Clear</button></div>' +
+    '<div class="boxgrid">' + idle.map((m, i) => '<button class="bcell pick' + (sel.has(m) ? ' on' : '') + '" data-tm="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + '</small><i>' + Math.round(expOdds(m, ex) * 100) + '% smooth</i></button>').join('') + '</div>' +
+    '<p id="teMsg" style="margin:0;min-height:1.2em;font-size:.85rem;color:var(--bad)"></p>' +
+    '<button class="big" id="teGo"' + (sel.size ? '' : ' disabled') + '>Send ' + (sel.size ? sel.size + ' Digimon' : 'the team') + ' to ' + esc(ex.name) + '</button>' +
+    '<button class="ghost" id="teBack">← Choose another place</button>');
+  $('#overlay').querySelectorAll('[data-tm]').forEach(b => b.onclick = () => {
+    const m = idle[+b.dataset.tm]; if (!m) return;
+    if (sel.has(m)) sel.delete(m); else if (sel.size >= free){ $('#teMsg').textContent = 'Only ' + free + ' expedition slot' + (free === 1 ? '' : 's') + ' free. Get more in the Shop.'; return; } else sel.add(m);
+    teamExpedition(ex.key, sel);
+  });
+  $('#teBest').onclick = () => { sel.clear(); idle.slice(0, free).forEach(m => sel.add(m)); teamExpedition(ex.key, sel); };
+  $('#teClear').onclick = () => { sel.clear(); teamExpedition(ex.key, sel); };
+  $('#teBack').onclick = () => teamExpedition(null, sel);
+  $('#teGo').onclick = () => {
+    const now = Date.now(); let n = 0;
+    for (const m of sel){ if (m.exp || expRunning() >= G.expSlots) continue; m.exp = { key: ex.key, start: now, end: now + expMs(ex) }; nfExp(m); n++; }
+    saveGame(); renderBox();
+    $('#overlay .sheet').innerHTML = '<div class="reveal"><h4>🧭 Team sent!</h4><p style="margin:0">' + n + ' Digimon set off for ' + esc(ex.name) + '. They\'ll be back in ' + fmtLeft(expMs(ex)) + '.</p></div><button class="big" id="teOk">OK</button>';
+    $('#teOk').onclick = () => { closeOv(); renderBox(); };
+  };
 }
 
 function boxMenu(i){
@@ -4029,6 +4077,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 16, title: 'Team expeditions', items: ['Send several Box Digimon on the same expedition at once: tap 🧭 Send a team in the Box, pick a place, then tap the Digimon you want (or Pick the strongest).', 'It shows the team\'s total DigiData and XP estimate, and each Digimon\'s chance of a smooth trip. Each one still uses an expedition slot.'] },
   { v: 15, title: 'Living scenery', items: ['The background now shows where you are: palm-tree shores on File Island, a city skyline on Server Continent, volcanoes on Folder Continent, waves on Net Ocean, eerie rocks on Dark Ocean and a snowy peak on Spiral Mountain.', 'It follows your clock (dawn, day, dusk and a starry night with lit-up windows) and the region\'s weather: rain, thunderstorms with lightning, snow, fog, gales, blazing sun and the aurora.', 'Turn it off from your 👤 Tamer page if you prefer a plain background.'] },
   { v: 14, title: 'Move accuracy', items: ['Attacking moves now show their accuracy. In battle, each move button shows its hit chance against the current foe (🎯 87%), and holding a move shows it too.', 'Accuracy depends on speed: 95% against an equally fast foe, up to 97% against slower ones, down to 70% against much faster ones. Gale and Fog weather lower it a little more.'] },
   { v: 13, title: 'More achievements & Claim all', items: ['45 new achievements, from Ultra Slayer and Nightmare Fighter to Grand Tamer, Completionist and Tamer Supreme, each with a title and rewards.', 'A Claim all button collects every finished achievement at once. Collection rewards have one too.', 'Achievements ready to claim now sit at the top of the list, and claimed ones move to the bottom.'] },
@@ -4056,7 +4105,7 @@ const GUIDE = [
   ['🤝 Jogress & Ultra', '<p>Jogress (DNA digivolution) fuses your partner with a partner Digimon in your party or Box to jump to a stronger form. The other Digimon is merged in: your partner keeps half of its trained stats and all its moves.</p><p>Two <b>Megas</b> can Jogress into an <b>Ultra</b> form, like War Greymon + Metal Garurumon → Omegamon. Ultras get +12% to every stat.</p>'],
   ['⚔️ Battles', '<p>Pick a difficulty to fight a wild Digimon. Harder fights give more DigiData and XP and a chance at eggs.</p><ul><li>Easy: Baby and In-Training. Normal: Rookie and Champion. Hard: Ultimate. Nightmare: Mega, and sometimes an Ultra (+12% stats, +50% rewards).</li><li>Moves scale with ATK or INT. Attributes (Vaccine, Data, Virus) and elements matter: hitting a weakness does extra damage.</li><li>Press and hold a move to see exactly what it does. Once a move has hit a kind of Digimon, its button shows the damage multiplier against it: green ▲ means strong, red ▼ means weak.</li><li><b>Moves</b> lets you choose which moves your partner brings. New moves unlock as it levels up.</li></ul>'],
   ['🏰 Dungeons', '<p>Explore floors one step at a time, fight what you meet and find treasure. A boss waits at the bottom.</p><ul><li><b>Auto</b> in the dungeon header explores for you. Tap it again to stop.</li><li><b>Guard</b> next to your moves braces your partner against the next attack.</li><li>Watch out for lava tiles.</li></ul>'],
-  ['🌍 World', '<ul><li><b>Expeditions</b>: send a Digimon from your Box away for a while. Longer trips are riskier but bring back more DigiData, items and eggs.</li><li><b>Regions</b>: unlock new areas as you discover more Digimon. Each has its own foes and bonus rewards.</li><li><b>Colosseum</b>: fight a run of battles in a row for a best streak.</li><li><b>DigiFarm</b>: plant crops that grow in real time into DigiData, stat chips, Clean Slates and eggs.</li><li><b>Events</b>: limited-time bonuses like double XP or an egg hunt.</li></ul>'],
+  ['🌍 World', '<ul><li><b>Expeditions</b>: send a Digimon from your Box away for a while, or tap 🧭 Send a team in the Box to send several at once. Longer trips are riskier but bring back more DigiData, items and eggs.</li><li><b>Regions</b>: unlock new areas as you discover more Digimon. Each has its own foes and bonus rewards.</li><li><b>Colosseum</b>: fight a run of battles in a row for a best streak.</li><li><b>DigiFarm</b>: plant crops that grow in real time into DigiData, stat chips, Clean Slates and eggs.</li><li><b>Events</b>: limited-time bonuses like double XP or an egg hunt.</li></ul>'],
   ['🥚 Eggs & the Shop', '<p>Spend DigiData on eggs and items. Rookie, Champion and themed eggs (Dragon, Dark, X, and the element eggs) skip the baby stages. In-Training, Ultimate and Mega eggs hatch straight into those levels. Digimon that can\'t be raised any other way turn up twice as often in them.</p><p>Eggs you\'re given wait on the Partner page until you hatch them.</p>'],
   ['📦 Box & party', '<p>Keep up to six Digimon in your party; the rest live in the Box. Tap one to swap it in, send it on an expedition, or release it for DigiData.</p>'],
   ['🏆 Trainer, quests & achievements', '<ul><li><b>Tamer level</b> rises as you play. Spend skill points in the Tamer tree for lasting bonuses.</li><li><b>Daily</b> rewards grow with your login streak.</li><li><b>Quests</b> give DigiData for everyday goals.</li><li><b>Achievements</b> and <b>Collection</b> milestones give rewards and titles. Pick the title shown under the app name in Titles.</li></ul>'],
