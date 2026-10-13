@@ -1947,8 +1947,9 @@ function mxSet(foeId, att, name, am){
 }
 const mxBadge = v => v == null ? '' : '<span class="mx' + (v > 1 ? ' up' : v < 1 ? ' dn' : '') + '">×' + v + (v > 1 ? ' ▲' : v < 1 ? ' ▼' : '') + '</span>';
 const mxWord = v => v > 1.4 ? 'super effective' : v > 1 ? 'effective' : v < 0.7 ? 'barely effective' : v < 1 ? 'not very effective' : 'normal damage';
-function moveTipHtml(m, foeName, mx){
+function moveTipHtml(m, foeName, mx, acc){
   return '<div class="tt"><span class="mvk ' + (m.kind === 'atk' ? 'phys' : m.kind) + '">' + (KIND_LABEL[m.kind] || 'PHY') + '</span>' + esc(m.name) + '</div><div>' + esc(moveEffect(m)) + '</div>' +
+    (dealsDamage(m) ? '<div>🎯 ' + (acc != null ? '<b>' + acc + '% accuracy</b> against ' + esc(foeName) : '<b>' + ACC_TEXT + '</b>') + '</div>' : '') +
     (m.desc ? '<i>' + esc(m.desc) + '</i>' : '') +
     (dealsDamage(m) && foeName ? '<div class="tm">' + (mx != null ? 'Against ' + esc(foeName) + ': ' + mxBadge(mx) + ' ' + mxWord(mx) : 'Against ' + esc(foeName) + ': not tried yet. Use it once to see how well it works.') + '</div>' : '');
 }
@@ -2028,10 +2029,10 @@ async function movesScreen(){
   const draw = () => {
     const eq = new Set(p.equip);
     const row = m => { const b = toBattle(m, p.stage), on = eq.has(m.name);
-      return '<button class="mvrow' + (on ? ' on' : '') + '" data-eq="' + esc(m.name) + '"><span class="mvk ' + m.kind + '">' + KIND_LABEL[m.kind] + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>' + esc(moveLabel(b)) + '</small><small class="mvfx">' + esc(moveEffect(b, false)) + '</small></span><span class="mvc">' + (on ? '✓' : '') + '</span></button>'; };
+      return '<button class="mvrow' + (on ? ' on' : '') + '" data-eq="' + esc(m.name) + '"><span class="mvk ' + m.kind + '">' + KIND_LABEL[m.kind] + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>' + esc(moveLabel(b)) + (dealsDamage(b) ? ' · 🎯95%' : '') + '</small><small class="mvfx">' + esc(moveEffect(b, false)) + '</small></span><span class="mvc">' + (on ? '✓' : '') + '</span></button>'; };
     const next = d ? learnset(p.id, d, p.stage).filter(m => m.learn > p.level && !p.moves.some(k => k.name === m.name)) : [];
     $('#overlay .sheet').innerHTML = '<h4>Moves · ' + esc(p.name) + ' <span class="stage">Lv ' + p.level + '</span></h4>' +
-      '<p style="margin:0;color:var(--muted);font-size:.85rem">Tap a move to equip or unequip it. In battle, press and hold a move to see what it does. Up to 4 equipped moves are used in battles and dungeons, and Guard is always available. Moves stay learned when your Digimon digivolves.</p>' +
+      '<p style="margin:0;color:var(--muted);font-size:.85rem">Tap a move to equip or unequip it. In battle, press and hold a move to see what it does. 🎯 is accuracy against an equally fast foe: it drops against faster foes (down to 70%) and rises a little against slower ones. Up to 4 equipped moves are used in battles and dungeons, and Guard is always available. Moves stay learned when your Digimon digivolves.</p>' +
       '<div class="mvlist">' + p.moves.map(row).join('') + '</div>' +
       (next.length ? '<h3 style="margin:6px 0 0">Coming up</h3><div class="mvlist">' + next.map(m => '<div class="mvrow locked"><span class="mvk ' + m.kind + '">' + KIND_LABEL[m.kind] + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>Learns at Lv ' + m.learn + ' · ' + esc(moveLabel(toBattle(m, p.stage))) + '</small><small class="mvfx">' + esc(moveEffect(toBattle(m, p.stage), false)) + '</small></span><span></span></div>').join('') + '</div>' : '') +
       '<p id="mvMsg" style="margin:0;min-height:1.2em;font-size:.85rem;color:var(--bad)"></p><button class="big" id="mvDone">Done</button>';
@@ -2051,12 +2052,16 @@ function fighter(name, image, st, attr, moves, mood){
   const s = {}; STAT_KEYS.forEach(k => s[k] = Math.max(1, Math.round(st[k] * (k === 'hp' || k === 'sp' ? 1 : m))));
   return { name, image, st: s, hp: s.hp, sp: s.sp, attr, moves, guard: false };
 }
+// chance the defender dodges an attack: faster foes dodge more (3%–30%), plus weather like fog
+function evadeChance(att, def){ return Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (curWeather().evade || 0); }
+const hitPct = (att, def) => Math.max(0, Math.round(100 * (1 - evadeChance(att, def))));
+const ACC_TEXT = '95% accuracy against an equally fast foe (97% vs slower ones, down to 70% vs much faster ones)';
 function doMove(att, def, mv){
   if (mv.kind === 'heal'){ att.sp -= mv.cost || 0; const h = Math.max(1, Math.round(att.st.hp * mv.power)); att.hp = Math.min(att.st.hp, att.hp + h); return { text: att.name + ' used ' + mv.name + ' and restored ' + h + ' HP.', heal: h }; }
   if (mv.kind === 'buff'){ att.sp -= mv.cost || 0; att.buff = Math.min(1.9, (att.buff || 1) * mv.power); return { text: att.name + ' used ' + mv.name + '! Its attacks grew stronger.' }; }
   if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: `${att.name} guards and recovers ${g} SP.` }; }
   att.sp -= mv.cost || 0;
-  const evade = Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (curWeather().evade || 0);
+  const evade = evadeChance(att, def);
   if (Math.random() < evade) return { text: `${att.name} used ${mv.name}… but ${def.name} dodged!`, miss: true };
   const crit = Math.random() < Math.max(0.04, Math.min(0.33, 0.06 + (att.critBonus || 0) + (att.st.spd - def.st.spd) * 0.01));
   const em = elemMult(att.elem, def.elem), am = attrMult(att.attr, def.attr) * em;
@@ -2220,7 +2225,7 @@ async function battle(diff, opts){
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
     <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
     <div class="autorow"><button class="seg${autoOn ? ' on' : ''}" id="autoBtn">🤖 Auto ${autoOn ? 'on' : 'off'}</button><span>${skyTag()}</span></div>
-    <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}${dealsDamage(m) ? mxBadge(mxGet(foeKey, me, m.name)) : ''}</small></button>`).join('')}
+    <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}${dealsDamage(m) ? ' · 🎯' + hitPct(me, foe) + '%' + mxBadge(mxGet(foeKey, me, m.name)) : ''}</small></button>`).join('')}
       ${modes.length ? `<button class="act modebtn" data-mv="mode">✨ Mode Change<small>${modeCost} SP · once per battle</small></button>` : ''}
       ${opts.noRun ? '' : '<button class="act" data-mv="run">Run<small>Escape (SPD)</small></button>'}</div>`;
   const draw = () => {
@@ -2240,7 +2245,7 @@ async function battle(diff, opts){
     const m = me.moves[+b.dataset.mv], off = !on || (m && m.cost > me.sp) || (b.dataset.mv === 'mode' && (me.moded || me.sp < modeCost));
     b.classList.toggle('dis', !!off); b.setAttribute('aria-disabled', off ? 'true' : 'false');
   });
-  $('#overlay').querySelectorAll('[data-mv]').forEach(b => { const m = me.moves[+b.dataset.mv]; if (m) moveHold(b, () => moveTipHtml(m, foe.name, mxGet(foeKey, me, m.name))); });
+  $('#overlay').querySelectorAll('[data-mv]').forEach(b => { const m = me.moves[+b.dataset.mv]; if (m) moveHold(b, () => moveTipHtml(m, foe.name, mxGet(foeKey, me, m.name), hitPct(me, foe))); });
   const playerMove = () => new Promise(res => {
     if (autoOn){ setTimeout(() => res(autoChoice(me, foe, modes, modeCost)), 250); return; }
     pendRes = res; setButtons(true);
@@ -3963,6 +3968,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 14, title: 'Move accuracy', items: ['Attacking moves now show their accuracy. In battle, each move button shows its hit chance against the current foe (🎯 87%), and holding a move shows it too.', 'Accuracy depends on speed: 95% against an equally fast foe, up to 97% against slower ones, down to 70% against much faster ones. Gale and Fog weather lower it a little more.'] },
   { v: 13, title: 'More achievements & Claim all', items: ['45 new achievements, from Ultra Slayer and Nightmare Fighter to Grand Tamer, Completionist and Tamer Supreme, each with a title and rewards.', 'A Claim all button collects every finished achievement at once. Collection rewards have one too.', 'Achievements ready to claim now sit at the top of the list, and claimed ones move to the bottom.'] },
   { v: 12, title: 'Ultras in Nightmare battles', items: ['Nightmare battles now sometimes (about 1 in 4) send an Ultra: a Mega born from two Megas, like Omegamon, Imperialdramon Paladin Mode or Ultimate Chaosmon.', 'Ultra foes have +12% stats and give 50% more DigiData and XP.'] },
   { v: 11, title: 'Clearer moves', items: ['Every move\'s description now says exactly what it does: which stat it uses, its multiplier, healing, power-ups and status chances.', 'In battle, press and hold any move to see what it does.', 'After a move hits a Digimon, its button shows the damage multiplier against that species next time (green ▲ strong, red ▼ weak).'] },
