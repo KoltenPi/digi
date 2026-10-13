@@ -456,6 +456,10 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .choice{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px;display:grid;justify-items:center;gap:4px;text-align:center}
 .choice img{width:84px;height:84px;object-fit:contain}
 img.sil{filter:var(--silf)}
+/* pictures we can't edit (digimon.net, wikimon.net): a dark, blurred shape of the artwork until discovered */
+img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) img.sil.silw{filter:url(#dxsil) invert(1) blur(3px) opacity(.4)}}
+:root[data-theme="dark"] img.sil.silw{filter:url(#dxsil) invert(1) blur(3px) opacity(.4)}
 .choice b{font-size:.85rem;overflow-wrap:anywhere}
 .choice small{font:.66rem var(--mono);color:var(--good)}
 .choice.special{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
@@ -556,6 +560,7 @@ img.sil{filter:var(--silf)}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><filter id="dxsil" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -1.2 -1.2 -1.2 3.3 0"/></filter></svg>
 <header>
   <div class="wrap">
     <div class="top">
@@ -3269,14 +3274,15 @@ async function processImg(img){
   const orig = img.dataset.orig || img.getAttribute('src');
   if (!orig || orig.startsWith('data:')) return;
   const sil = img.classList.contains('sil');
+  if (!sil) img.classList.remove('silw');
   if (!retroOn && !sil && !isDark()){ if (img.dataset.orig){ img.src = orig; img.style.imageRendering = ''; delete img.dataset.orig; delete img.dataset.mode; } return; }
   const mode = retroOn ? 'retro' : 'cut';
   if (img.dataset.mode === mode) return;
   img.dataset.orig = orig; img.dataset.mode = mode;
   const big = img.matches('#sprite, .art, .reveal img');
   let url = await processArt(orig, retroOn ? (big ? 56 : 44) : (big ? 320 : 128), retroOn);
-  // pictures we can't cut out (from digimon.net) get a question-mark silhouette while undiscovered
-  if (url === orig && sil) url = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50" y="72" font-size="70" text-anchor="middle" font-family="sans-serif" font-weight="700">?</text></svg>');
+  // pictures we can't cut out (digimon.net, wikimon.net) show as a dark, blurred shape while undiscovered
+  if (url === orig && sil) img.classList.add('silw');
   if (url && img.dataset.orig === orig && img.dataset.mode === mode){ img.src = url; img.style.imageRendering = retroOn ? 'pixelated' : ''; }
 }
 const imgIO = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ imgIO.unobserve(e.target); processImg(e.target); } }), {rootMargin: '300px'});
