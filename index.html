@@ -596,6 +596,8 @@ img.sil{filter:var(--silf)}
 </nav>
 <div id="overlay" class="ov" hidden></div>
 
+<!-- official evolution lists from Wikimon (wikimon.net) -->
+<script src="wiki_evo.js"></script>
 <script>
 const API = 'https://digi-api.com/api/v1';
 const LEVELS = ['Baby I','Baby II','Child','Adult','Perfect','Ultimate','Armor','Hybrid','Unknown'];
@@ -701,6 +703,40 @@ function linkExtras(d){
   return Object.assign({}, d, { nextEvolutions: more(d.nextEvolutions, L.next.get(d.id)), priorEvolutions: more(d.priorEvolutions, L.prev.get(d.id)), _xl: true });
 }
 
+// ----- official evolutions from Wikimon (wikimon.net) -----
+// Every Digimon keeps only the evolutions Wikimon lists for it. Digimon left with none get Wikimon's list.
+// Digimon Wikimon has no list for keep what the database says, so nobody gets stuck.
+let WIKI_NEXT = null, WIKI_PREV = null;
+function wikiEvo(){
+  if (WIKI_NEXT) return true;
+  if (!window.WIKI_EVO) return false;
+  WIKI_NEXT = new Map(); WIKI_PREV = new Map();
+  for (const part of String(window.WIKI_EVO).split(',')){
+    const [a, b] = part.split(':'); if (!b) continue;
+    const from = parseInt(a, 36), tos = b.split('.').map(x => parseInt(x, 36)).filter(Number.isFinite);
+    WIKI_NEXT.set(from, new Set(tos));
+    for (const t of tos){ if (!WIKI_PREV.has(t)) WIKI_PREV.set(t, new Set()); WIKI_PREV.get(t).add(from); }
+  }
+  return true;
+}
+function wikiCanon(list, canon, entry){
+  const kept = (list || []).filter(e => canon.has(evoId(e)));
+  return { kept, all: kept.concat([...canon].filter(x => state.byId.has(x) && !kept.some(e => evoId(e) === x)).map(entry)) };
+}
+function wikiFill(d){
+  const s = state.levelOf.get(d.id); if (s == null) return d;
+  const entry = x => { const b = state.byId.get(x); return { id: x, digimon: b ? b.name : '?', condition: '', image: b ? b.image : '', url: '' }; };
+  const out = Object.assign({}, d);
+  const cn = WIKI_NEXT.get(d.id);
+  if (cn && cn.size){
+    const c = wikiCanon(d.nextEvolutions, cn, entry);
+    out.nextEvolutions = nextCands({ nextEvolutions: c.kept }, s).length ? c.kept : c.all;
+  }
+  const cp = WIKI_PREV.get(d.id);
+  if (cp && cp.size){ const c = wikiCanon(d.priorEvolutions, cp, entry); out.priorEvolutions = c.kept.some(e => state.byId.has(evoId(e))) ? c.kept : c.all; }
+  return out;
+}
+
 async function getJSON(url){
   const r = await fetch(url);
   if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -710,6 +746,7 @@ async function getDetail(id){
   let d = state.details.get(id);
   if (!d){ d = isExtra(id) ? extraDetail(id) : await getJSON(`${API}/digimon/${id}`); state.details.set(id, d); }
   if (state.ready && !d._xl){ d = linkExtras(d); state.details.set(id, d); }
+  if (state.ready && !d._wk && wikiEvo()){ d = Object.assign(wikiFill(d), { _wk: true }); state.details.set(id, d); }
   return d;
 }
 
