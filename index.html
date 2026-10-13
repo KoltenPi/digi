@@ -10,8 +10,8 @@
 <title>Digimon Index</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
-<script>try{var t=localStorage.getItem('dx_theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&family=Silkscreen&family=VT323&display=swap">
+<script>try{var d=document.documentElement,s=localStorage.getItem('dx_skin')||'card',t=localStorage.getItem('dx_theme');d.dataset.skin=s;d.dataset.device=localStorage.getItem('dx_device')||'v1';if(s==='card')d.dataset.theme='light';else if(s==='retro')d.dataset.theme='dark';else if(t==='dark'||t==='light')d.dataset.theme=t;}catch(e){}</script>
 <style>
 /* Layout: bottom tab bar switches between the Partner habitat (one-screen raising game) and the Index (search grid + detail with evo branches) */
 :root{
@@ -698,6 +698,150 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 #scene[data-w="sunny"]:not([data-ph="night"]) .wx{background:radial-gradient(circle at 82% 16%,rgba(255,220,120,.35),transparent 60%)}
 #scene[data-w="aurora"] .wx{background:linear-gradient(170deg,transparent 8%,rgba(80,255,180,.4) 22%,rgba(140,90,255,.35) 36%,transparent 52%);background-size:220% 100%;animation:aurora 12s ease-in-out infinite alternate}
 @keyframes aurora{to{background-position:100% 0}}
+/* ================= LOOKS: Trainer Card (default), Retro Digivice, and the classic light/dark ================= */
+/* --- Trainer Card: cream paper, thick ink outlines, chunky drop shadows, round friendly type --- */
+:root[data-skin="card"]{
+  --bg:#fff4dc; --panel:#ffffff; --sunk:#fbe8bf; --fg:#1b1b1f; --muted:#5e5440; --line:#1b1b1f; --ink:#1b1b1f;
+  --accent:#ff7a45; --accent-ink:#1b1b1f; --link:#1f5fc4; --star:#d99a00; --yellow:#ffd23f; --sky:#45c4ff; --pink:#ff7aa8; --leaf:#8fd16a;
+  --good:#2b9a4c; --warn:#c98400; --bad:#d6453d; --grid:rgba(27,27,31,.05); --silf:brightness(0) opacity(.45);
+  --display:"Fredoka",ui-rounded,system-ui,sans-serif; --body:"Nunito",ui-rounded,system-ui,sans-serif; --mono:"Nunito",ui-rounded,system-ui,sans-serif;
+  --r:16px; --pop:3px 4px 0 var(--ink); color-scheme:light;
+}
+[data-skin="card"] body{font-weight:600}
+[data-skin="card"] #scene::after{background:var(--bg) radial-gradient(#ecd6a6 1.3px,transparent 1.6px) 0 0/18px 18px;opacity:.82}
+[data-skin="card"] header{border-bottom:2.5px solid var(--ink)}
+[data-skin="card"] .brand{font-family:var(--display);font-weight:700;letter-spacing:0}
+[data-skin="card"] :is(h1,h2,h3,h4,h5,.ptop h2){font-family:var(--display);letter-spacing:0;font-weight:700}
+[data-skin="card"] :is(.act,.big,.ghost,.favbtn,.card,.meter,.evobox,.habitat,.region,.plot,.ach,.bcell,.shopitem,.diff,.mvrow,.slot,.tnode,.lrow,.seg,.stage,.dailybar,.evbanner,.synchip,.upd,.guide details,.profhead,.profcode,.pstats div,.fighter,.blog,.itile,.search input,.xr,.colomore,.quest,.qcard,.raidboss.ev,.sheet,.bubble,.skytag){border:2.5px solid var(--ink)}
+[data-skin="card"] :is(.slot.empty,.plot.empty,.bcell.empty,.colomore,.synchip.off){border-style:dashed}
+[data-skin="card"] :is(.act,.big,.ghost,.favbtn,.card,.meter,.evobox,.habitat,.region,.plot,.ach,.bcell,.shopitem,.diff,.dailybar,.evbanner,.profhead,.slot:not(.empty),.tnode,.fighter){box-shadow:var(--pop)}
+[data-skin="card"] :is(.act,.big,.ghost,.favbtn,.card,.slot,.seg,.dailybar,.diff,.bcell):active:not(:disabled){transform:translate(2px,3px);box-shadow:0 1px 0 var(--ink)}
+[data-skin="card"] :is(.act,.ghost,.favbtn,.card,.meter,.evobox,.region,.plot,.ach,.bcell,.shopitem,.diff,.mvrow,.dailybar,.evbanner,.tnode,.lrow,.xr,.upd,.profhead,.profcode){border-radius:16px}
+[data-skin="card"] .act{background:#fff;font-family:var(--display);font-weight:600;font-size:1rem}
+[data-skin="card"] .act small{font:700 .7rem var(--body);color:var(--muted)}
+[data-skin="card"] .act:disabled{opacity:.5;box-shadow:none}
+[data-skin="card"] .act[data-act="battle"]:not(:disabled){background:var(--sky)}
+[data-skin="card"] .act[data-act="dungeon"]:not(:disabled){background:var(--leaf)}
+[data-skin="card"] .act[data-act="feed"]:not(:disabled){background:#ffe39a}
+[data-skin="card"] .act[data-act="train"]:not(:disabled){background:#ffd0ba}
+[data-skin="card"] :is(.act[data-act="battle"],.act[data-act="dungeon"],.act[data-act="feed"],.act[data-act="train"]) small{color:#2a2a2e}
+[data-skin="card"] .big{background:var(--accent);color:var(--ink);border-radius:18px;font-family:var(--display);font-weight:700;letter-spacing:0}
+[data-skin="card"] .ghost{background:#fff;box-shadow:var(--pop)}
+[data-skin="card"] .ghost.danger{color:var(--bad)}
+[data-skin="card"] .favbtn{background:#fff;font-weight:800}
+[data-skin="card"] .stage{background:#fff;color:var(--ink);font:800 .72rem var(--body);letter-spacing:0;text-transform:none;border-width:2px}
+[data-skin="card"] .stage.ultra{background:linear-gradient(90deg,#ff7aa8,#9d7bff);color:#fff}
+[data-skin="card"] .seg{background:#fff;color:var(--ink);font:800 .78rem var(--body)}
+[data-skin="card"] .seg.on{background:var(--yellow);color:var(--ink);border-color:var(--ink)}
+[data-skin="card"] .dailybar{background:var(--yellow);color:var(--ink);font-family:var(--display);font-weight:600}
+[data-skin="card"] .evbanner{background:#ffe7a3}
+[data-skin="card"] .synchip{background:var(--yellow);color:var(--ink)}
+[data-skin="card"] .synchip.off{background:#fff}
+[data-skin="card"] .synchip small{color:#3a3426}
+[data-skin="card"] .ptop h2{font-size:1.9rem}
+/* the partner's card: an orange frame around a sky-and-grass scene */
+[data-skin="card"] .habitat{background:linear-gradient(#bfe8ff,#e2f5ff 70%);border-width:3px;border-radius:18px;margin:10px;box-shadow:0 0 0 7px var(--accent),0 0 0 9.5px var(--ink),5px 7px 0 9.5px var(--ink)}
+[data-skin="card"] .habitat::after{left:-10%;right:-10%;bottom:-38px;height:84px;background:var(--leaf);border-top:2.5px solid var(--ink)}
+[data-skin="card"] .habitat.ph-dawn{background:linear-gradient(#ffc9a3,#fff1df 70%)}
+[data-skin="card"] .habitat.ph-dusk{background:linear-gradient(#f39a6c,#b38bd6 75%)}
+[data-skin="card"] .habitat.ph-night{background:radial-gradient(2px 2px at 18% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 18%,#fff,transparent),radial-gradient(1.5px 1.5px at 44% 44%,#fffc,transparent),linear-gradient(#1d2a5c,#3c4d8f 75%)}
+[data-skin="card"] .habitat.ph-night::after,[data-skin="card"] .habitat.ph-dusk::after{background:#5f9a48}
+[data-skin="card"] .bubble{background:#fff;border-radius:14px;font-weight:700}
+[data-skin="card"] .skytag{background:#fff;color:var(--ink);font:800 .7rem var(--body);border-width:2px}
+[data-skin="card"] .meter{background:#fff}
+[data-skin="card"] .meter label{font:800 .78rem var(--body);letter-spacing:0;text-transform:none;color:var(--ink)}
+[data-skin="card"] :is(.track,.evotrack,.xptrack){height:14px;border:2.5px solid var(--ink);border-radius:8px;background:#fff}
+[data-skin="card"] .meters .meter:nth-child(1) .track i{background:var(--yellow)!important}
+[data-skin="card"] .meters .meter:nth-child(2) .track i{background:var(--sky)!important}
+[data-skin="card"] .meters .meter:nth-child(3) .track i{background:var(--pink)!important}
+[data-skin="card"] :is(.track,.evotrack,.xptrack) i{border-right:2.5px solid var(--ink);border-radius:0}
+[data-skin="card"] .evobox .row{font:800 .76rem var(--body);color:var(--muted)}
+[data-skin="card"] .evobox .statrow span{background:#fff;border:2px solid var(--ink);border-radius:10px;padding:2px 7px;color:var(--ink)}
+[data-skin="card"] .tabs{background:var(--ink);border-top:0;padding-inline:4px}
+[data-skin="card"] .tabs button{color:#fff4dc;font:600 .74rem var(--display);text-transform:none;border-radius:12px;margin:6px 2px}
+[data-skin="card"] .tabs button[aria-selected="true"]{color:var(--ink);background:var(--yellow);box-shadow:none}
+[data-skin="card"] .sheet{background:var(--bg);border-radius:22px;box-shadow:0 -4px 0 var(--ink)}
+[data-skin="card"] .card .nm{font-family:var(--display);font-weight:600}
+[data-skin="card"] .card.raised{border-color:var(--good);box-shadow:3px 4px 0 var(--good)}
+[data-skin="card"] .region.here,[data-skin="card"] .diff.on,[data-skin="card"] .mvrow.on,[data-skin="card"] .slot.on{background:#fff2c7;border-color:var(--ink);box-shadow:var(--pop)}
+[data-skin="card"] .ownline{color:var(--muted);font-weight:700}
+
+/* --- Retro: a Digivice handheld. Shell, green LCD screens, pixel type and pixel sprites. Each Digivice from the Shop swaps the shell and screen colours --- */
+:root[data-skin="retro"]{
+  --sh:#2a2d33; --sh2:#3b3f47; --sh3:#1d2025; --edge:#14161a; --shfg:#e8ecf2; --shmuted:#9aa2ae; --hi:#f2c14e; --hi-ink:#2a2208; --hi-dark:#c4962b;
+  --lcd:#9bb36a; --lcd-ink:#1f2a14; --lcd-dim:#86a058; --lcd-hi:#b3c98a;
+  --bg:var(--sh); --panel:var(--sh2); --sunk:var(--sh3); --fg:var(--shfg); --muted:var(--shmuted); --line:var(--edge);
+  --accent:var(--hi); --accent-ink:var(--hi-ink); --link:#8fd0ff; --star:var(--hi);
+  --good:#7ed27e; --warn:#f2c14e; --bad:#ff7b72; --grid:rgba(255,255,255,.03); --silf:brightness(0) invert(1) opacity(.3);
+  --display:"Silkscreen",ui-monospace,monospace; --body:"VT323",ui-monospace,monospace; --mono:"VT323",ui-monospace,monospace;
+  --r:12px; color-scheme:dark;
+}
+/* the Digivices (shell, button face, dark trim, text, highlight, screen, screen ink) */
+:root[data-skin="retro"][data-device="d3"]{--sh:#dfe5ee;--sh2:#f4f7fb;--sh3:#c3ccd9;--edge:#2b3442;--shfg:#18202c;--shmuted:#4d5a6d;--hi:#2f7de1;--hi-ink:#fff;--hi-dark:#1f5aa8;--lcd:#a8c4a0;--lcd-ink:#15241a;--lcd-dim:#8fae88;--lcd-hi:#c3d9bd;color-scheme:light}
+:root[data-skin="retro"][data-device="dpower"]{--sh:#eef1f5;--sh2:#ffffff;--sh3:#2559b8;--edge:#1c2a4a;--shfg:#14203a;--shmuted:#4a5a7a;--hi:#2559b8;--hi-ink:#fff;--hi-dark:#173d85;--lcd:#9fb7c9;--lcd-ink:#102231;--lcd-dim:#86a0b4;--lcd-hi:#bcd0de;color-scheme:light}
+:root[data-skin="retro"][data-device="dark"]{--sh:#1b1714;--sh2:#2b241f;--sh3:#120f0d;--edge:#070605;--shfg:#ffe7cf;--shmuted:#c9a98a;--hi:#ff8a1f;--hi-ink:#1b0e02;--hi-dark:#c26210;--lcd:#c9b56a;--lcd-ink:#2a2208;--lcd-dim:#b09d55;--lcd-hi:#dccb86}
+:root[data-skin="retro"][data-device="ic"]{--sh:#7a1218;--sh2:#a31b22;--sh3:#4e0b0f;--edge:#1a0507;--shfg:#fff1ef;--shmuted:#f2b6b0;--hi:#f5f5f5;--hi-ink:#7a1218;--hi-dark:#c9c9c9;--lcd:#9fb3a4;--lcd-ink:#13221a;--lcd-dim:#87a08e;--lcd-hi:#bccdbf}
+:root[data-skin="retro"][data-device="xros"]{--sh:#b3121b;--sh2:#d42a2a;--sh3:#5a0a0e;--edge:#250406;--shfg:#fff4e0;--shmuted:#ffc9a8;--hi:#ffcc33;--hi-ink:#3a2400;--hi-dark:#c99a12;--lcd:#8fb8c9;--lcd-ink:#0e2230;--lcd-dim:#78a1b3;--lcd-hi:#b1d0dc}
+:root[data-skin="retro"][data-device="pendulum"]{--sh:#3a2a5c;--sh2:#56407f;--sh3:#251a3c;--edge:#110b1d;--shfg:#f1eaff;--shmuted:#bfaee6;--hi:#ffb347;--hi-ink:#2a1600;--hi-dark:#c9852a;--lcd:#d6b46a;--lcd-ink:#2a1d06;--lcd-dim:#c09d52;--lcd-hi:#e6cb8d}
+:root[data-skin="retro"][data-device="vpet"]{--sh:#8c3b2e;--sh2:#a8503f;--sh3:#5c2219;--edge:#220c08;--shfg:#fff0e8;--shmuted:#f0bfae;--hi:#e8e0c8;--hi-ink:#3b1a12;--hi-dark:#bdb39a;--lcd:#b5b8a3;--lcd-ink:#22251c;--lcd-dim:#9da08b;--lcd-hi:#cdd0bc}
+:root[data-skin="retro"][data-device="gold"]{--sh:#6b5310;--sh2:#a8862a;--sh3:#3d2f08;--edge:#1c1503;--shfg:#fff7d6;--shmuted:#f0dc9c;--hi:#ffe066;--hi-ink:#3d2f08;--hi-dark:#c9a72a;--lcd:#9ec3d6;--lcd-ink:#0d2330;--lcd-dim:#86abbe;--lcd-hi:#bdd8e5}
+[data-skin="retro"] body{font-size:18px;letter-spacing:.02em}
+[data-skin="retro"] .brand{font-size:1rem}
+[data-skin="retro"] .bact .act{font-size:1.05rem}
+[data-skin="retro"] .bact .act small{white-space:normal}
+[data-skin="retro"] #scene{display:none}
+[data-skin="retro"] :is(h1,h2,h3,h4,h5,.brand,.ptop h2){font-family:var(--display);font-weight:400;letter-spacing:.02em}
+[data-skin="retro"] .brand small{font-family:var(--body);font-size:.95rem}
+[data-skin="retro"] header{background:var(--sh3);border-bottom:3px solid var(--edge)}
+[data-skin="retro"] header .brand,[data-skin="retro"] header .count{color:var(--shfg)}
+[data-skin="retro"] :is(.act,.ghost,.favbtn,.seg,.slot,.bcell,.region,.plot,.ach,.shopitem,.diff,.mvrow,.tnode,.lrow,.dailybar,.evbanner,.upd,.guide details,.profhead,.profcode,.pstats div,.xr,.card,.synchip){border:2px solid var(--edge);background:var(--sh2);color:var(--shfg);box-shadow:inset 0 -4px 0 rgba(0,0,0,.22)}
+[data-skin="retro"] :is(.act,.ghost,.favbtn,.seg,.slot,.card,.diff):active:not(:disabled){transform:translateY(2px);box-shadow:inset 0 -1px 0 rgba(0,0,0,.22)}
+[data-skin="retro"] .act{font-family:var(--body);font-weight:400;font-size:1.15rem;letter-spacing:.04em;text-transform:uppercase}
+[data-skin="retro"] .act small{font:1rem var(--body);text-transform:none;color:var(--shmuted)}
+[data-skin="retro"] .act[data-act="feed"]:not(:disabled){background:#d9534f;color:#fff;box-shadow:inset 0 -5px 0 #a33d3a}
+[data-skin="retro"] .act[data-act="train"]:not(:disabled){background:#f2c14e;color:#2a2208;box-shadow:inset 0 -5px 0 #c4962b}
+[data-skin="retro"] .act[data-act="battle"]:not(:disabled){background:#4f8fd9;color:#fff;box-shadow:inset 0 -5px 0 #3a6ba3}
+[data-skin="retro"] :is(.act[data-act="feed"],.act[data-act="train"],.act[data-act="battle"]) small{color:inherit;opacity:.85}
+[data-skin="retro"] .big{background:var(--hi);color:var(--hi-ink);font-family:var(--display);font-weight:400;border:2px solid var(--edge);box-shadow:inset 0 -5px 0 var(--hi-dark)}
+[data-skin="retro"] .stage{background:var(--sh3);color:var(--shfg);font:1rem var(--body);border:1px solid var(--edge)}
+[data-skin="retro"] .seg{font:1.05rem var(--body)}
+[data-skin="retro"] .seg.on{background:var(--hi);color:var(--hi-ink);box-shadow:inset 0 -4px 0 var(--hi-dark)}
+[data-skin="retro"] .tabs{background:var(--sh3);border-top:3px solid var(--edge)}
+[data-skin="retro"] .tabs button{font:.95rem var(--body);color:var(--shmuted)}
+[data-skin="retro"] .tabs button[aria-selected="true"]{color:var(--hi);box-shadow:inset 0 3px 0 var(--hi)}
+[data-skin="retro"] .sheet{background:var(--sh);border:3px solid var(--edge)}
+/* the screens: partner habitat, stats and battle log are LCD panels with scanlines */
+[data-skin="retro"] :is(.habitat,.evobox,.meter,.blog,.arena){--fg:var(--lcd-ink);--muted:var(--lcd-ink);--sunk:var(--lcd-dim);--panel:var(--lcd);--line:var(--lcd-ink);--accent:var(--lcd-ink);
+  color:var(--lcd-ink);background:var(--lcd) repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 1px,transparent 1px 3px)!important;border:3px solid var(--edge);border-radius:12px;box-shadow:inset 0 0 0 2px rgba(0,0,0,.12),inset 0 4px 12px rgba(0,0,0,.18)}
+[data-skin="retro"] .habitat::after{background:var(--lcd-dim)}
+[data-skin="retro"] .habitat.ph-night,[data-skin="retro"] .habitat.ph-dusk{filter:brightness(.82)}
+[data-skin="retro"] .habitat .sprite{filter:grayscale(1) contrast(1.35);mix-blend-mode:multiply}
+[data-skin="retro"] .bubble,[data-skin="retro"] .skytag{background:var(--lcd-hi);color:var(--lcd-ink);border:2px solid var(--lcd-ink);font-family:var(--body);font-size:1rem}
+[data-skin="retro"] :is(.track,.evotrack,.xptrack){border:2px solid currentColor;border-radius:0;background:transparent;padding:1px}
+[data-skin="retro"] .meter .track i,[data-skin="retro"] .evobox :is(.evotrack,.xptrack) i{background:var(--lcd-ink)!important;border-radius:0}
+[data-skin="retro"] .meter label,[data-skin="retro"] .evobox .row{font:1.05rem var(--body);letter-spacing:.04em}
+[data-skin="retro"] .card .nm{font-family:var(--body);font-size:1.05rem;font-weight:400}
+[data-skin="retro"] .ownline{color:var(--shmuted)}
+/* a little device preview for the Shop */
+.devprev{width:40px;height:52px;border-radius:12px 12px 16px 16px;border:2px solid var(--d-edge);background:var(--d-sh);display:grid;place-items:center;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+.devprev i{display:block;width:24px;height:20px;border-radius:4px;background:var(--d-lcd);border:2px solid var(--d-edge)}
+
+/* fewer buttons on the Partner page: the four main actions, what needs doing now, and the rest tucked under More */
+.actions.main{grid-template-columns:repeat(2,minmax(0,1fr))}
+.actions.main .act{padding:14px 6px;font-size:1.02rem}
+.actions.now{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))}
+details.more{display:grid;gap:8px}
+details.more>summary{list-style:none;cursor:pointer;text-align:center;font-weight:700;padding:10px;border:1px dashed var(--line);border-radius:12px;color:var(--muted)}
+details.more>summary::-webkit-details-marker{display:none}
+details.more[open]>summary{margin-bottom:8px}
+[data-skin="card"] details.more>summary{border:2.5px dashed var(--ink);border-radius:16px;color:var(--ink);font-family:var(--display);font-weight:600;background:#fff}
+[data-skin="retro"] details.more>summary{border:2px dashed #555b66;font:1.1rem var(--body);color:#c9cfd8}
+.lookpick{display:grid;gap:8px}
+.lookpick button{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;text-align:left;padding:12px}
+.lookpick button.on{outline:3px solid var(--accent);outline-offset:2px}
+.lookpick b{display:block}
+.lookpick small{color:var(--muted)}
+.lookpick span{font-size:1.6rem}
 @media (prefers-reduced-motion:reduce){#scene *,#scene *::after{animation:none!important}}
 </style>
 </head>
@@ -1359,17 +1503,25 @@ function renderPartner(){
            <div class="evotrack"><i style="width:${Math.min(100, p.evo / need * 100)}%"></i></div>`}
     </div>
     ${canEvolve(p) ? `<button class="big" id="evolveBtn">Digivolve!</button>` : ''}
-    <div class="actions">
+    <div class="actions main">
       <button class="act" data-act="feed" ${sl ? 'disabled' : ''}>🍖 Feed<small>${sl ? 'asleep' : '+hunger'}</small></button>
       <button class="act" data-act="play" ${sl ? 'disabled' : ''}>⚽ Play<small>${sl ? 'asleep' : '+mood'}</small></button>
-      ${sl ? '<button class="act" data-act="wake">⏰ Wake up<small>−8 mood</small></button>' : '<button class="act" data-act="rest">💤 Rest<small>+energy</small></button>'}
       <button class="act" data-act="train" ${p.energy < 20 || block ? 'disabled' : ''}>💪 Train<small>${block || (p.energy < 20 ? 'too tired' : 'raise stats')}</small></button>
       <button class="act" data-act="battle" ${p.energy < 25 || block ? 'disabled' : ''}>⚔️ Battle<small>${block || (p.energy < 25 ? 'too tired' : '+evo points')}</small></button>
-      <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
     </div>
-    ${careButtons(p)}
+    ${careNow(p, sl)}
     <button class="act wide" data-act="dungeon" ${p.energy < 30 || block ? 'disabled' : ''}>🗺️ Explore a dungeon<small>${block ? esc(p.name) + ' is ' + block : p.energy < 30 ? 'too tired (needs 30 energy)' : 'choose a difficulty · 3–8 floors'}</small></button>
-    <div class="actions two">${atTop ? '' : `<button class="act" data-act="paths">🧭 Evolution paths<small>what each form needs</small></button>`}<button class="act" data-act="tree">🌳 Evolution tree<small>branches you've found</small></button><button class="act" data-act="jogress">🧬 Jogress<small>DNA fusion</small></button><button class="act" data-act="bag">🎒 Bag<small>${USABLE_KEYS().reduce((n, k) => n + (G.items[k] || 0), 0)} usable items</small></button></div>
+    <details class="more"${store.get('dx_more', false) ? ' open' : ''}><summary>More: moves, care, evolution, bag</summary>
+      <div class="actions">
+        ${sl ? '' : '<button class="act" data-act="rest">💤 Rest<small>+energy</small></button>'}
+        <button class="act" data-act="moves">🌀 Moves<small>${p.moves.length} known · ${p.equip.length}/4 set</small></button>
+        <button class="act" data-act="bag">🎒 Bag<small>${USABLE_KEYS().reduce((n, k) => n + (G.items[k] || 0), 0)} usable items</small></button>
+        ${careButtons(p).replace(/^<div class="actions">|<\/div>$/g, '')}
+        ${atTop ? '' : `<button class="act" data-act="paths">🧭 Paths<small>what each form needs</small></button>`}
+        <button class="act" data-act="tree">🌳 Tree<small>branches found</small></button>
+        <button class="act" data-act="jogress">🧬 Jogress<small>DNA fusion</small></button>
+      </div>
+    </details>
     <div class="lineage" aria-label="Your partner's line so far">${lineImgs}</div>
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
@@ -1378,6 +1530,7 @@ function renderPartner(){
   `;
   updateCount();
   const eb = $('#evolveBtn'); if (eb) eb.onclick = digivolve;
+  const md = v.querySelector('details.more'); if (md) md.ontoggle = () => store.set('dx_more', md.open);
   const sb = $('#shopBtn'); if (sb) sb.onclick = openShop;
   const dd = $('#dedigiBtn'); if (dd) dd.onclick = () => {
     if (dd.dataset.armed){ dedigivolve(); return; }
@@ -1559,7 +1712,25 @@ function itemCard(k){
   const own = G.items[k] || 0, price = itemPrice(k), kept = itemKept(k);
   return shopCard(itemIcon(k), esc(itemName(k)), esc(itemDesc(k)), kept && own ? '<button class="act price" disabled>✓ Owned</button>' : priceBtn('data-item="' + k + '"', price, G.data >= price), !kept && own ? own + ' owned' : '');
 }
-const SHOP_TABS = [['eggs', '🥚 Eggs'], ['items', '🎒 Items'], ['upgrades', '⬆️ Upgrades'], ['craft', '🛠️ Craft']];
+const SHOP_TABS = [['eggs', '🥚 Eggs'], ['items', '🎒 Items'], ['devices', '📟 Digivices'], ['upgrades', '⬆️ Upgrades'], ['craft', '🛠️ Craft']];
+// Digivices: shells for the Retro look (shell, screen and trim colours for the Shop preview; the full palettes live in CSS)
+const DEVICES = [
+  { key: 'v1', name: 'Digivice', price: 0, sh: '#3b3f47', lcd: '#9bb36a', edge: '#14161a', desc: 'The classic grey handheld with a green screen. Free.' },
+  { key: 'd3', name: 'D-3', price: 1200, sh: '#f4f7fb', lcd: '#a8c4a0', edge: '#2b3442', desc: 'A bright white shell with blue buttons and a soft green screen.' },
+  { key: 'dpower', name: 'D-Power', price: 1500, sh: '#ffffff', lcd: '#9fb7c9', edge: '#2559b8', desc: 'White and royal blue with a cool blue-grey screen.' },
+  { key: 'dark', name: 'D-Ark', price: 1800, sh: '#2b241f', lcd: '#c9b56a', edge: '#ff8a1f', desc: 'A black shell with orange buttons and an amber screen.' },
+  { key: 'ic', name: 'Digivice iC', price: 1800, sh: '#a31b22', lcd: '#9fb3a4', edge: '#1a0507', desc: 'Bold red with white highlights.' },
+  { key: 'xros', name: 'Xros Loader', price: 2200, sh: '#d42a2a', lcd: '#8fb8c9', edge: '#ffcc33', desc: 'Red and gold with a blue screen.' },
+  { key: 'pendulum', name: 'Pendulum', price: 2200, sh: '#56407f', lcd: '#d6b46a', edge: '#110b1d', desc: 'A purple shell with a warm amber screen.' },
+  { key: 'vpet', name: 'Original V-Pet', price: 2500, sh: '#a8503f', lcd: '#b5b8a3', edge: '#220c08', desc: 'Brick red with the grey screen of the very first virtual pets.' },
+  { key: 'gold', name: 'Gold Edition', price: 6000, sh: '#a8862a', lcd: '#9ec3d6', edge: '#1c1503', desc: 'A rare golden shell with an icy blue screen.' },
+];
+const devOwned = k => !(DEVICES.find(d => d.key === k) || {}).price || (G.devices || []).includes(k);
+function equipDevice(k){
+  G.device = k; saveGame(); document.documentElement.dataset.device = k;
+  try{ localStorage.setItem('dx_device', k); }catch{}
+  if (curSkin() !== 'retro') applyLook(LOOKS[1]);
+}
 const EGG_GROUPS = [
   ['Everyday eggs', 'Hatch a Fresh Digimon to raise from the start.', ['mystery', 'lucky', 'rare']],
   ['Level eggs', 'Skip ahead and hatch straight into a later level.', ['intraining', 'rookie', 'champion', 'golden', 'ultimate', 'mega']],
@@ -1582,6 +1753,12 @@ function renderShop(){
       sec('Crests', 'Unlock special Ultimate and Mega forms.', CREST_VIRTUES.map(x => itemCard('crest:' + x)).join(''), ITEM_PRICE.crest + ' each') +
       sec('Special', '', itemCard('xab'), '') +
       sec('Held items', 'A lasting bonus for the Digimon holding it. Rarer ones come from crafting and dungeon bosses.', HELD_KEYS.filter(k => HELD[k].price).map(itemCard).join(''));
+  } else if (tab === 'devices'){
+    const cur = G.device || 'v1', retro = curSkin() === 'retro';
+    body = sec('Digivices', 'Shells for the 📟 Retro look. Equipping one switches to Retro and changes the device and screen colours.' + (retro ? '' : ' You\'re using the ' + curLook().name + ' look right now.'),
+      DEVICES.map(d => { const has = devOwned(d.key), on = has && cur === d.key;
+        const btn = !has ? priceBtn('data-devbuy="' + d.key + '"', d.price, G.data >= d.price) : on && retro ? '<button class="act price" disabled>✓ Equipped</button>' : '<button class="act price" data-dev="' + d.key + '">Equip</button>';
+        return shopCard('<span class="devprev" style="--d-sh:' + d.sh + ';--d-lcd:' + d.lcd + ';--d-edge:' + d.edge + '"><i></i></span>', esc(d.name), esc(d.desc), btn, on ? 'In use' : has && d.price ? 'Owned' : ''); }).join(''));
   } else if (tab === 'upgrades'){
     const c = upgradeCosts();
     body = sec('Upgrades', '', shopCard('📦', 'Box +5 slots', 'Store more Digimon. You have ' + G.boxCap + ' slots.', G.boxCap >= BOX_MAX ? '<button class="act price" disabled>Maxed</button>' : priceBtn('data-up="box"', c.box, G.data >= c.box)) +
@@ -1597,6 +1774,12 @@ function renderShop(){
     '<div class="segs">' + SHOP_TABS.map(([k, l]) => '<button class="seg' + (k === tab ? ' on' : '') + '" data-stab="' + k + '">' + l + '</button>').join('') + '</div>' +
     '<p id="shopMsg" style="margin:0;min-height:1.3em;font-size:.88rem"></p>' + body;
   v.querySelectorAll('[data-stab]').forEach(b => b.onclick = () => { store.set('dx_shoptab', b.dataset.stab); renderShop(); });
+  v.querySelectorAll('[data-devbuy]').forEach(b => b.onclick = () => {
+    const d = DEVICES.find(x => x.key === b.dataset.devbuy); if (!d || devOwned(d.key) || G.data < d.price) return;
+    G.data -= d.price; G.devices = [...new Set([...(G.devices || []), d.key])]; equipDevice(d.key); updateCount(); renderShop();
+    $('#shopMsg').textContent = 'Got the ' + d.name + '! It\'s equipped on your Retro look.';
+  });
+  v.querySelectorAll('[data-dev]').forEach(b => b.onclick = () => { const d = DEVICES.find(x => x.key === b.dataset.dev); if (!d || !devOwned(d.key)) return; equipDevice(d.key); renderShop(); $('#shopMsg').textContent = d.name + ' equipped.'; });
   v.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
     const it = SHOP.find(x => x.key === b.dataset.buy);
     if (G.data < salePrice(it.price, true)) return;
@@ -4205,6 +4388,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 19, title: 'New look: Trainer Card (and Retro)', items: ['The game has a brand-new look: bright paper cards with bold outlines, chunky buttons and your partner standing in a sky-and-grass scene.', 'Prefer the old days? Tap the look button at the top (🃏) and pick Retro: a Digivice with green LCD screens and pixel sprites. The classic dark and light looks are still there too.', 'New 📟 Digivices tab in the Shop: buy and equip different shells for the Retro look, like the D-3, D-Ark, Xros Loader, Pendulum, Original V-Pet and a rare Gold Edition.', 'The Partner page is tidier: Feed, Play, Train and Battle up front, jobs that need doing now (cleaning, medicine, rest) appear only when needed, and the rest is under More.'] },
   { v: 18, title: 'Cleaner screens', items: ['The Shop is split into Eggs, Items, Upgrades and Crafting tabs, with eggs grouped (Everyday, Level, Themed, Element) and every item shown the same way with what it does.', 'Your DigiData now sits in the top corner on every page instead of being repeated on each screen.', 'Partner page: no more duplicate level, personality or weather; only the next empty party slot shows a button.', 'DigiFarm shows one crop menu at a time, and the Colosseum folds away ranks you can\'t reach yet.', 'The themed Dark Egg is now the Shadow Egg, so it isn\'t confused with the Dark element egg.'] },
   { v: 17, title: 'Synergies', items: ['Digimon from the same group now power each other up: Royal Knights, Seven Great Demon Lords, Bagra Army, Team Xros Heart, Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, and element groups like Holy Light and Blaze.', 'In your party: members of an active synergy get stat bonuses in battle (shown under your party on the Partner page; tap to see all groups).', 'On expeditions: send group members together with 🧭 Send a team for +15% DigiData and XP each and smoother trips.'] },
   { v: 16, title: 'Team expeditions', items: ['Send several Box Digimon on the same expedition at once: tap 🧭 Send a team in the Box, pick a place, then tap the Digimon you want (or Pick the strongest).', 'It shows the team\'s total DigiData and XP estimate, and each Digimon\'s chance of a smooth trip. Each one still uses an expedition slot.'] },
@@ -4705,6 +4889,17 @@ function habitatExtras(p){
     (p.sick ? '<span class="sickic" aria-label="sick">🤒</span>' : '') + (sl ? '<span class="zzz" aria-hidden="true">Z<small>z</small><small>z</small></span>' : '');
 }
 function habitatClass(p){ return ' ph-' + dayPhase() + (asleep(p) ? ' sleeping' : '') + (lightsOff() ? ' dim' : ''); }
+// the care jobs that need doing right now get their own row above the fold
+function careNow(p, sl){
+  careInit(p);
+  const b = [];
+  if (sl) b.push('<button class="act" data-act="wake">⏰ Wake up<small>−8 mood</small></button>');
+  else if (p.energy < 35) b.push('<button class="act" data-act="rest">💤 Rest<small>energy is low</small></button>');
+  if (p.poop) b.push('<button class="act" data-act="clean">🧹 Clean<small>' + p.poop + ' mess' + (p.poop === 1 ? '' : 'es') + '</small></button>');
+  if (p.sick) b.push('<button class="act" data-act="med"' + (G.data >= MED_COST ? '' : ' disabled') + '>💊 Medicine<small>' + MED_COST + ' DigiData</small></button>');
+  if (sleepHour()) b.push('<button class="act" data-act="lights">' + (lightsOff() ? '💡 Lights on<small>room is dark</small>' : '🌙 Lights off<small>bedtime</small>') + '</button>');
+  return b.length ? '<div class="actions now">' + b.join('') + '</div>' : '';
+}
 function careButtons(p){
   careInit(p);
   const third = sleepHour()
@@ -5668,18 +5863,33 @@ function duelBanner(inv){
 }
 setTimeout(() => { if (onl().name) duelListen().catch(() => {}); }, 3000);
 
-setRetro(false);
+setRetro((document.documentElement.dataset.skin || 'card') === 'retro');
 // light / dark mode: follows the phone until you pick one, then remembers it
 function isDark(){ return document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : !!(window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches); }
-function paintThemeBtn(){ $('#themeBtn').textContent = isDark() ? '☀️' : '🌙'; $('#themeBtn').setAttribute('aria-label', isDark() ? 'Switch to light mode' : 'Switch to dark mode'); }
-$('#themeBtn').onclick = () => {
-  const next = isDark() ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  try{ localStorage.setItem('dx_theme', next); }catch{}
-  paintThemeBtn(); setRetro(false);   // re-process art: cut out white backgrounds in dark mode
+// looks: Trainer Card (default), Retro Digivice, and the classic dark / light
+const LOOKS = [
+  { skin: 'card', theme: 'light', icon: '🃏', name: 'Trainer Card', desc: 'Bright paper cards with bold outlines.' },
+  { skin: 'retro', theme: 'dark', icon: '📟', name: 'Retro', desc: 'A Digivice handheld: green LCD screens and pixel sprites.' },
+  { skin: 'classic', theme: 'dark', icon: '🌙', name: 'Classic dark', desc: 'The original dark look.' },
+  { skin: 'classic', theme: 'light', icon: '☀️', name: 'Classic light', desc: 'The original light look.' },
+];
+const curSkin = () => document.documentElement.dataset.skin || 'card';
+function curLook(){ const s = curSkin(), t = isDark() ? 'dark' : 'light'; return LOOKS.find(l => l.skin === s && (s !== 'classic' || l.theme === t)) || LOOKS[0]; }
+function applyLook(l){
+  const d = document.documentElement; d.dataset.skin = l.skin; d.dataset.theme = l.theme;
+  try{ localStorage.setItem('dx_skin', l.skin); localStorage.setItem('dx_theme', l.theme); }catch{}
+  paintThemeBtn(); setRetro(l.skin === 'retro');   // retro shows pixel sprites; re-process art for the new background
   if (typeof dg !== 'undefined' && dg && !dg.over) dgDraw();
+}
+function paintThemeBtn(){ const l = curLook(); $('#themeBtn').textContent = l.icon; $('#themeBtn').setAttribute('aria-label', 'Look: ' + l.name + '. Tap to change'); $('#themeBtn').title = 'Look: ' + l.name; }
+$('#themeBtn').onclick = () => {
+  if (busy) return; busy = true;
+  const cur = curLook();
+  openOv('<h4>Choose a look</h4><div class="lookpick">' + LOOKS.map((l, i) => '<button class="act' + (l === cur ? ' on' : '') + '" data-look="' + i + '"><span>' + l.icon + '</span><div><b>' + l.name + '</b><small>' + l.desc + '</small></div></button>').join('') + '</div><button class="ghost" id="lookClose">Close</button>');
+  $('#lookClose').onclick = closeOv;
+  $('#overlay').querySelectorAll('[data-look]').forEach(b => b.onclick = () => { applyLook(LOOKS[+b.dataset.look]); closeOv(); });
 };
-try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { paintThemeBtn(); setRetro(false); }); }catch{}
+try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { paintThemeBtn(); setRetro(curSkin() === 'retro'); }); }catch{}
 paintThemeBtn();
 $('#trainerBtn').onclick = () => { if (!busy) trainerScreen(); };
 $('#profBtn').onclick = () => { if (!busy) profileScreen(); };
@@ -5702,6 +5912,7 @@ function applyScene(){
   sc.dataset.r = r; sc.dataset.w = curWeather().key; sc.dataset.ph = dayPhase();
 }
 applyScene(); setInterval(applyScene, 60000);
+if (G.device){ document.documentElement.dataset.device = G.device; try{ localStorage.setItem('dx_device', G.device); }catch{} }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) applyScene(); });
 updateProfBadge();
 paintTitle();
