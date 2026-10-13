@@ -4512,6 +4512,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 25, title: 'Faster raids', items: ['Raid fights now refill every 3 hours: 3 fights every 3 hours instead of 3 a day. The Raid screen shows when your next fights are ready.'] },
   { v: 24, title: 'AI Tamers start fresh', items: ['The AI Tamers have been reset to nothing. They join over the next few days and level up like real players: one session most days, with days off. They only raid, trade and climb the boards as fast as their progress allows.'] },
   { v: 23, title: 'More Digivices', items: ['17 new Digivice shells for the Retro look in the Shop: the Adventure Digivices (Courage, Friendship, Light), Dark D-3, D-Power (Red), D-Tector, Digivice Burst, Dark Digivice, Fusion Loader (Blue), Darkness Loader, Pendulum X, D-Cyber, Digivice: (2020), App Drive, D-Zero, and Digivice -V- and -VV-.', 'The Digivices tab in the Shop is now grouped by series.'] },
   { v: 22, title: 'Move traits', items: ['Most attacks now have a trait on top of their damage, picked from the move\'s name: 🎯 Piercing (ignores DEF and Guard), 🔁 Multi-hit, 💨 Sure-hit (never misses), 💥 Reckless (stronger, with recoil), 🔥 Burn, 🧊 Freeze, 🔨 Armor break, 😱 Intimidate, 🗡️ Finisher (big damage on weak foes) and ✨ Purify.', 'Buff moves with barrier or shield names now raise a 🛡️ Barrier (−40% damage taken for 3 turns), and speed-themed ones give ⚡ Haste (+30% SPD).', 'Healing moves also cure poison, burns, paralysis and other status problems.', 'Two new status problems: 🔥 burned and 🧊 frozen.', 'Press and hold a move in battle (or open Moves) to see its trait.'] },
@@ -4553,7 +4554,7 @@ const GUIDE = [
   ['📦 Box & party', '<p>Keep up to six Digimon in your party; the rest live in the Box. Tap one to swap it in, send it on an expedition, or release it for DigiData.</p>'],
   ['🔗 Synergies', '<p>Digimon from the same group power each other up: Royal Knights, the Seven Great Demon Lords, Bagra Army, Team Xros Heart, the Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, plus element groups (3 or more Holy, Dark, Fire, Water, Plant, Wind, Machine or Beast Digimon).</p><ul><li><b>Party</b>: when 2 or more members of a group are in your party (3 for element groups), those members get the group\'s stat bonus in battles, dungeons and raids. Two extra members make it 1.5× stronger.</li><li><b>Expeditions</b>: send members of a group together with 🧭 Send a team for +15% DigiData and XP per synergy and smoother trips.</li><li>Active synergies show under your party on the Partner page. Tap one to see every group.</li></ul>'],
   ['🏆 Trainer, quests & achievements', '<ul><li><b>Tamer level</b> rises as you play. Spend skill points in the Tamer tree for lasting bonuses.</li><li><b>Daily</b> rewards grow with your login streak.</li><li><b>Quests</b> give DigiData for everyday goals.</li><li><b>Achievements</b> and <b>Collection</b> milestones give rewards and titles. Pick the title shown under the app name in Titles.</li></ul>'],
-  ['🌐 Online', '<p>Go online in World → Online with a Tamer name.</p><ul><li><b>Ranks</b>: leaderboards for discoveries, Tamer level, Colosseum and PvP, plus a feed of what the AI Tamers 🤖 are up to.</li><li><b>Raid</b>: a weekly boss everyone damages together, AI Tamers included.</li><li><b>Trades</b>: post a Digimon and swap with other Tamers. AI Tamers list new Digimon every 6 hours and may buy your fairly priced listings.</li><li><b>Friends</b>: add friends with their 8-character friend code, fight their team, or challenge them to a live battle.</li></ul>'],
+  ['🌐 Online', '<p>Go online in World → Online with a Tamer name.</p><ul><li><b>Ranks</b>: leaderboards for discoveries, Tamer level, Colosseum and PvP, plus a feed of what the AI Tamers 🤖 are up to.</li><li><b>Raid</b>: a weekly boss everyone damages together, AI Tamers included. You get 3 fights every 3 hours.</li><li><b>Trades</b>: post a Digimon and swap with other Tamers. AI Tamers list new Digimon every 6 hours and may buy your fairly priced listings.</li><li><b>Friends</b>: add friends with their 8-character friend code, fight their team, or challenge them to a live battle.</li></ul>'],
   ['☁️ Saving your game', '<p>Your game saves on this device automatically. To keep it safe, turn on <b>Cloud save</b> in Trainer → ☁️ Backup. You get a 16-character recovery code: enter it on any device to load your game. Keep it secret, since anyone with it can load your game.</p><p>You can also make an offline backup code there.</p>'],
 ];
 
@@ -5518,7 +5519,9 @@ async function viewRanks(el){
 
 // ----- weekly raid: one huge boss shared by every player -----
 var RAID_PER = 1200;           // raid HP each new attacker adds, so the boss stays a challenge however many join
-var RAID_TRIES = 3;            // raid fights per day
+var RAID_TRIES = 3;            // raid fights per window
+var RAID_WIN = 3 * 36e5;       // the fights refill every 3 hours
+const raidSlot = () => 'r' + Math.floor(Date.now() / RAID_WIN);
 // seasonal raid bosses take over the weekly raid for every week that overlaps their dates (month is 0-based, `to` is exclusive)
 const RAID_EVENTS = [
   { key: 'hw', id: 224, name: 'Pumpkinmon', icon: '🎃', title: 'Halloween raid', from: [9, 1], to: [10, 2], mult: 1.7,
@@ -5531,7 +5534,7 @@ function raidEvent(w = weekNo()){
 const raidWeek = () => 'w' + weekNo() + (raidEvent() ? '-' + raidEvent().key : '');
 function raidBossId(){ const ev = raidEvent(); if (ev) return ev.id; const pool = (state.stageIds[5] || []).filter(id => !isExtra(id) && !state.armor.has(id) && state.byId.has(id)); return pool[Math.floor(Math.abs(seeded(weekNo(), 4242)) * pool.length) % pool.length]; }
 function raidLocal(){
-  const w = raidWeek(), day = dayKey();
+  const w = raidWeek(), day = raidSlot();
   if (!G.raid || G.raid.week !== w) G.raid = { week: w, day, used: 0, dmg: 0, joined: false, claimed: false };
   if (G.raid.day !== day){ G.raid.day = day; G.raid.used = 0; }
   return G.raid;
@@ -5560,9 +5563,9 @@ async function viewRaid(el){
       '<small class="ownline">' + (ev ? esc(ev.title) : 'This week\'s raid boss') + ' · ends in ' + fmtLeft(ends) + '</small>' +
       '<div class="evotrack" style="margin-top:6px"><i style="width:' + (max ? Math.max(0, hp / max * 100) : 100) + '%;background:var(--bad)"></i></div>' +
       '<small>' + (down ? 'Defeated! 🎉' : max ? 'HP ' + hp.toLocaleString() + ' / ' + max.toLocaleString() : 'Nobody has attacked yet') + ' · ' + tamers + ' Tamer' + (tamers === 1 ? '' : 's') + (bots.length ? ' (' + bots.length + ' AI)' : '') + '</small></div></div>' +
-    '<div class="wallet"><span>Your damage <b>' + R.dmg + '</b></span><span>Fights left today <b>' + Math.max(0, left) + ' / ' + RAID_TRIES + '</b></span></div>' +
+    '<div class="wallet"><span>Your damage <b>' + R.dmg + '</b></span><span>Fights left <b>' + Math.max(0, left) + ' / ' + RAID_TRIES + '</b> · refills in ' + fmtLeft(RAID_WIN - Date.now() % RAID_WIN) + '</span></div>' +
     (down ? (R.dmg && !R.claimed ? '<button class="big" id="raidClaim">Claim your raid reward</button>' : R.claimed ? '<p class="ownline">✓ Reward claimed. A new boss arrives next week.</p>' : '<p class="ownline">The boss was defeated before you joined. A new boss arrives next week.</p>')
-      : '<button class="big" id="raidGo"' + (block || left <= 0 ? ' disabled' : '') + '>' + (left <= 0 ? 'No fights left today' : block ? (p ? esc(p.name) + ' is ' + block : 'You need a partner') : '⚔️ Attack with ' + esc(p.name) + ' · 25 energy') + '</button>') +
+      : '<button class="big" id="raidGo"' + (block || left <= 0 ? ' disabled' : '') + '>' + (left <= 0 ? 'No fights left · back in ' + fmtLeft(RAID_WIN - Date.now() % RAID_WIN) : block ? (p ? esc(p.name) + ' is ' + block : 'You need a partner') : '⚔️ Attack with ' + esc(p.name) + ' · 25 energy') + '</button>') +
     '<p class="ownline">Each fight, your partner battles a copy of the boss. The more of its HP you knock out, the more raid damage you deal (win for a bonus). Everyone who helps gets a reward when the boss falls, bigger for more damage.</p>' +
     '<h5 class="lockh">Top attackers</h5><div class="lbs">' + (hits.length ? hits.map((h, i) => '<div class="lbrow' + (h.me ? ' me' : '') + (h.bot ? ' bot' : '') + '"><b>#' + (i + 1) + '</b><span></span><span>' + esc(h.name || '?') + (h.bot ? ' ' + botTag : '') + '</span><b>' + (h.dmg || 0) + '</b></div>').join('') : '<p class="ownline">No attacks yet.</p>') + '</div>';
   const go = $('#raidGo'); if (go) go.onclick = () => raidFight(d.boss);
