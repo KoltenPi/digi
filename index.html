@@ -598,6 +598,12 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 .lbs{display:grid;gap:6px}
 .lbrow{display:grid;grid-template-columns:36px 38px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .lbrow.me{border-color:var(--accent)}
+.lbrow.bot{border-style:dashed}
+.botb{display:inline-block;margin-left:4px;padding:0 5px;border:1px solid var(--line);border-radius:6px;font-size:.62rem;font-weight:700;vertical-align:middle;color:var(--muted);background:var(--sunk)}
+.botfeed{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:2px 10px}
+.botfeed div{display:flex;justify-content:space-between;gap:8px;padding:6px 0;font-size:.8rem;border-bottom:1px dashed var(--line)}
+.botfeed div:last-child{border:0}
+.botfeed small{color:var(--muted);white-space:nowrap}
 .lbrow img{width:36px;height:36px;object-fit:contain}
 .lbrow b{font:700 .85rem var(--mono)}
 .lbrow small{display:block;color:var(--muted);font-size:.72rem}
@@ -4390,6 +4396,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 20, title: 'AI Tamers', items: ['14 computer-run AI Tamers 🤖 now play alongside you. They level up over time and show up on every leaderboard, marked with an AI tag.', 'They join the weekly raid and chip away at the boss each day, and they appear in Top attackers.', 'They post Digimon on the trade board every 6 hours (Rookies, Champions and the odd Ultimate) and may buy your listings that have been up a few hours if the price is fair.', 'Ranks has a new Recent activity feed showing what the AI Tamers have been doing.'] },
   { v: 19, title: 'New look: Trainer Card (and Retro)', items: ['The game has a brand-new look: bright paper cards with bold outlines, chunky buttons and your partner standing in a sky-and-grass scene.', 'Prefer the old days? Tap the look button at the top (🃏) and pick Retro: a Digivice with green LCD screens and pixel sprites. The Original look (dark or light) is still there too.', 'New 📟 Digivices tab in the Shop: buy and equip different shells for the Retro look, like the D-3, D-Ark, Xros Loader, Pendulum, Original V-Pet and a rare Gold Edition.', 'The Partner page is tidier: Feed, Play, Train and Battle up front, jobs that need doing now (cleaning, medicine, rest) appear only when needed, and the rest is under More.'] },
   { v: 18, title: 'Cleaner screens', items: ['The Shop is split into Eggs, Items, Upgrades and Crafting tabs, with eggs grouped (Everyday, Level, Themed, Element) and every item shown the same way with what it does.', 'Your DigiData now sits in the top corner on every page instead of being repeated on each screen.', 'Partner page: no more duplicate level, personality or weather; only the next empty party slot shows a button.', 'DigiFarm shows one crop menu at a time, and the Colosseum folds away ranks you can\'t reach yet.', 'The themed Dark Egg is now the Shadow Egg, so it isn\'t confused with the Dark element egg.'] },
   { v: 17, title: 'Synergies', items: ['Digimon from the same group now power each other up: Royal Knights, Seven Great Demon Lords, Bagra Army, Team Xros Heart, Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, and element groups like Holy Light and Blaze.', 'In your party: members of an active synergy get stat bonuses in battle (shown under your party on the Partner page; tap to see all groups).', 'On expeditions: send group members together with 🧭 Send a team for +15% DigiData and XP each and smoother trips.'] },
@@ -4426,7 +4433,7 @@ const GUIDE = [
   ['📦 Box & party', '<p>Keep up to six Digimon in your party; the rest live in the Box. Tap one to swap it in, send it on an expedition, or release it for DigiData.</p>'],
   ['🔗 Synergies', '<p>Digimon from the same group power each other up: Royal Knights, the Seven Great Demon Lords, Bagra Army, Team Xros Heart, the Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, plus element groups (3 or more Holy, Dark, Fire, Water, Plant, Wind, Machine or Beast Digimon).</p><ul><li><b>Party</b>: when 2 or more members of a group are in your party (3 for element groups), those members get the group\'s stat bonus in battles, dungeons and raids. Two extra members make it 1.5× stronger.</li><li><b>Expeditions</b>: send members of a group together with 🧭 Send a team for +15% DigiData and XP per synergy and smoother trips.</li><li>Active synergies show under your party on the Partner page. Tap one to see every group.</li></ul>'],
   ['🏆 Trainer, quests & achievements', '<ul><li><b>Tamer level</b> rises as you play. Spend skill points in the Tamer tree for lasting bonuses.</li><li><b>Daily</b> rewards grow with your login streak.</li><li><b>Quests</b> give DigiData for everyday goals.</li><li><b>Achievements</b> and <b>Collection</b> milestones give rewards and titles. Pick the title shown under the app name in Titles.</li></ul>'],
-  ['🌐 Online', '<p>Go online in World → Online with a Tamer name.</p><ul><li><b>Ranks</b>: leaderboards for discoveries, Tamer level, Colosseum and PvP.</li><li><b>Raid</b>: a weekly boss everyone damages together.</li><li><b>Trades</b>: post a Digimon and swap with other Tamers.</li><li><b>Friends</b>: add friends with their 8-character friend code, fight their team, or challenge them to a live battle.</li></ul>'],
+  ['🌐 Online', '<p>Go online in World → Online with a Tamer name.</p><ul><li><b>Ranks</b>: leaderboards for discoveries, Tamer level, Colosseum and PvP, plus a feed of what the AI Tamers 🤖 are up to.</li><li><b>Raid</b>: a weekly boss everyone damages together, AI Tamers included.</li><li><b>Trades</b>: post a Digimon and swap with other Tamers. AI Tamers list new Digimon every 6 hours and may buy your fairly priced listings.</li><li><b>Friends</b>: add friends with their 8-character friend code, fight their team, or challenge them to a live battle.</li></ul>'],
   ['☁️ Saving your game', '<p>Your game saves on this device automatically. To keep it safe, turn on <b>Cloud save</b> in Trainer → ☁️ Backup. You get a 16-character recovery code: enter it on any device to load your game. Keep it secret, since anyone with it can load your game.</p><p>You can also make an offline backup code there.</p>'],
 ];
 
@@ -5262,22 +5269,107 @@ async function onlineView(msg){
 }
 
 // ----- leaderboards -----
+
+// ----- AI Tamers: computer players who level up, climb the boards, hit the raid boss and use the trade board.
+// Everything about them comes from the clock and a seed, so every player sees the same AI Tamers doing the same things.
+const BOT_EPOCH = Date.UTC(2026, 9, 1);
+const BOT_TAMERS = [
+  ['ByteRunner', 1.25], ['NeonKoi', 1.1], ['PixelRook', 1.3], ['MossTamer', .85], ['Kitsu_7', 1.05], ['LunaGlitch', 1.15], ['ZeroDrift', 1.2],
+  ['SolarPup', .8], ['HexaQuill', .95], ['Tidecaller', 1], ['Juno.exe', 1.1], ['Brambleby', .75], ['CircuitFox', 1.2], ['RetroRio', .9]
+];
+const BOT_NOTES = ['Good home only!', 'Raised with care', 'Strong one', 'Duplicate, needs a Tamer', 'Loves to battle', 'Hatched last night', 'Swap me something cool', ''];
+const sd = (a, b) => Math.abs(seeded(a, b));
+const botR = (i, salt) => sd(i * 977 + 31, salt);
+function strSeed(str){ let h = 7; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h % 100000; }
+function botPool(st){ return (state.stageIds[st] || []).filter(id => state.byId.has(id) && !isExtra(id) && !state.armor.has(id)); }
+function botMon(st, a, b){ const pool = botPool(st); return pool.length ? state.byId.get(pool[Math.floor(sd(a, b) * pool.length) % pool.length]) : null; }
+function botStats(i, t = Date.now()){
+  const [name, s] = BOT_TAMERS[i], d = Math.max(0, (t - BOT_EPOCH) / 864e5) + 18 + botR(i, 1) * 45;
+  const lv = Math.min(60, Math.floor(2 + Math.sqrt(d) * s * 4.2));
+  const st = lv >= 34 ? 5 : lv >= 25 ? 4 : lv >= 16 ? 3 : 2, era = Math.floor(d / 9);
+  const pm = botMon(st, i * 13 + era, 77), total = (state.all || []).length || 1200;
+  return { uid: 'bot' + i, bot: true, name, tamerLv: lv,
+    found: Math.min(total, Math.floor(lv * (8 + botR(i, 2) * 6) + d * 1.5)),
+    bestStreak: Math.floor(3 + botR(i, 3) * lv * .9),
+    colo: Math.max(1, Math.min(COLO.length, Math.floor(lv / 6.5 + botR(i, 4) * 2))),
+    pvp: Math.floor(d * s * botR(i, 5) * 1.1),
+    title: botR(i, 6) < .6 ? ACH[Math.floor(botR(i, 7) * ACH.length) % ACH.length].name : '',
+    partner: pm ? { name: pm.name, image: pm.image, level: Math.min(99, lv + Math.floor(botR(i, 8) * 8)) } : null };
+}
+function fmtAgo(t){ const m = Math.max(1, Math.round((Date.now() - t) / 6e4)); return m < 60 ? m + 'm ago' : Math.round(m / 60) + 'h ago'; }
+const botAll = () => BOT_TAMERS.map((_, i) => botStats(i));
+// a feed of what the AI Tamers have been up to, one or two things an hour
+function botFeed(n = 8){
+  const out = [], H = 36e5, now = Date.now();
+  for (let h = Math.floor(now / H); out.length < n && h > Math.floor(now / H) - 48; h--){
+    for (let k = 0; k < 2 && out.length < n; k++){
+      if (k && sd(h, 501) < .5) continue;
+      const at = h * H + Math.floor(sd(h, 502 + k) * H); if (at > now) continue;
+      const i = Math.floor(sd(h, 503 + k) * BOT_TAMERS.length) % BOT_TAMERS.length, b = botStats(i, at), nm = esc(b.name), kind = Math.floor(sd(h, 504 + k) * 7);
+      const st = 1 + Math.floor(sd(h, 505 + k) * 4), a = botMon(st, h, 506 + k), z = botMon(st + 1, h, 507 + k);
+      const txt = kind === 0 && a && z ? nm + '\'s ' + esc(a.name) + ' digivolved into <b>' + esc(z.name) + '</b>'
+        : kind === 1 && a ? nm + ' hatched a <b>' + esc(a.name) + '</b>'
+        : kind === 2 ? nm + ' dealt <b>' + (40 + Math.floor(sd(h, 508) * 110)) + '</b> damage to the raid boss'
+        : kind === 3 ? nm + ' won a Colosseum match (' + esc(COLO[b.colo - 1].name) + ')'
+        : kind === 4 && z ? nm + ' found <b>' + esc(z.name) + '</b> on an expedition'
+        : kind === 5 ? nm + ' reached Tamer level <b>' + b.tamerLv + '</b>'
+        : nm + ' won a live battle 🔥';
+      out.push({ at, txt });
+    }
+  }
+  return out.sort((a, b) => b.at - a.at);
+}
+// raid: each AI Tamer joins early in the week and fights 2 or 3 times a day
+function botRaid(w = weekNo()){
+  const ws = (7 * w - 3) * 864e5, e = (Date.now() - ws) / 864e5, out = [];
+  BOT_TAMERS.forEach(([name], i) => {
+    if (sd(i + 1, w * 3 + 1) < .12) return;               // sits this week out
+    const join = sd(i + 1, w * 3 + 2) * 1.4, fpd = 2 + (sd(i + 1, w * 3 + 3) < .5 ? 1 : 0);
+    if (e < join) return;
+    const fights = Math.min(RAID_TRIES * 7, Math.floor((e - join) * fpd) + 1);
+    let dmg = 0; for (let f = 0; f < fights; f++) dmg += 55 + Math.floor(sd(i * 50 + f, w) * 75);
+    out.push({ name, dmg, bot: true });
+  });
+  return out;
+}
+// trades: a fresh batch of AI listings every 6 hours
+function botTrades(){
+  const slot = Math.floor(Date.now() / 216e5), n = 4 + Math.floor(sd(slot, 11) * 3), out = [];
+  G.botTaken = G.botTaken || {};
+  for (const k in G.botTaken) if (+k.split(':')[1] < slot - 1) delete G.botTaken[k];
+  for (let j = 0; j < n; j++){
+    const id = 'bot:' + slot + ':' + j; if (G.botTaken[id]) continue;
+    const r = sd(slot * 7 + j, 13), st = r < .45 ? 2 : r < .85 ? 3 : 4, b = botMon(st, slot * 7 + j, 14); if (!b) continue;
+    const i = Math.floor(sd(slot * 7 + j, 15) * BOT_TAMERS.length) % BOT_TAMERS.length;
+    const lvl = STAGE_MIN_LV[st] + Math.floor(sd(slot * 7 + j, 16) * 7);
+    const price = Math.round(([0, 0, 120, 350, 900][st] * (.7 + sd(slot * 7 + j, 17) * .8)) / 10) * 10;
+    out.push({ id, bot: true, from: 'bot' + i, fromName: BOT_TAMERS[i][0], monId: b.id, monName: b.name, monImage: b.image, monStage: st, monLevel: lvl, price,
+      note: BOT_NOTES[Math.floor(sd(slot * 7 + j, 18) * BOT_NOTES.length) % BOT_NOTES.length] });
+  }
+  return out;
+}
+// what an AI Tamer will pay for a Digimon, by level (Fresh up to Mega)
+const BOT_VALUE = [40, 80, 200, 500, 1200, 2600];
+const botTag = '<span class="botb" title="AI Tamer">🤖 AI</span>';
+
 var BOARDS = [['tamerLv', '⭐ Tamer level'], ['found', '📖 Digimon found'], ['bestStreak', '🔥 Win streak'], ['colo', '🏟️ Colosseum'], ['pvp', '⚡ Live wins']];
 const boardVal = (k, v) => k === 'colo' ? (v ? COLO[Math.min(v, COLO.length) - 1].name : '—') : (v || 0).toLocaleString();
 async function viewRanks(el){
   const N = await net(), F = N.F, k = state.onlBoard || 'tamerLv';
   const snap = await F.getDocs(F.query(F.collection(N.db, 'users'), F.orderBy(k, 'desc'), F.limit(25)));
-  const rows = snap.docs.map(d => Object.assign({ uid: d.id }, d.data()));
-  const row = (r, rank) => '<div class="lbrow' + (r.uid === N.uid ? ' me' : '') + '"><b>#' + rank + '</b>' + (r.partner && r.partner.image ? '<img alt="" src="' + esc(r.partner.image) + '">' : '<span></span>') +
-    '<span>' + esc(r.name || '?') + (r.title ? '<small>★ ' + esc(r.title) + '</small>' : r.partner ? '<small>' + esc(r.partner.name) + ' · Lv ' + (r.partner.level || 1) + '</small>' : '') + '</span><b>' + boardVal(k, r[k]) + '</b></div>';
+  const real = snap.docs.map(d => Object.assign({ uid: d.id }, d.data())), bots = botAll();
+  const rows = real.concat(bots).sort((a, b) => (b[k] || 0) - (a[k] || 0)).slice(0, 25);
+  const row = (r, rank) => '<div class="lbrow' + (r.uid === N.uid ? ' me' : '') + (r.bot ? ' bot' : '') + '"><b>#' + rank + '</b>' + (r.partner && r.partner.image ? '<img alt="" src="' + esc(r.partner.image) + '">' : '<span></span>') +
+    '<span>' + esc(r.name || '?') + (r.bot ? ' ' + botTag : '') + (r.title ? '<small>★ ' + esc(r.title) + '</small>' : r.partner ? '<small>' + esc(r.partner.name) + ' · Lv ' + (r.partner.level || 1) + '</small>' : '') + '</span><b>' + boardVal(k, r[k]) + '</b></div>';
   let me = '';
   if (!rows.some(r => r.uid === N.uid)){
     const md = await F.getDoc(F.doc(N.db, 'users', N.uid));
-    if (md.exists()){ const r = Object.assign({ uid: N.uid }, md.data()), c = await F.getCountFromServer(F.query(F.collection(N.db, 'users'), F.where(k, '>', r[k] || 0))); me = '<p class="ownline">Your rank</p>' + row(r, c.data().count + 1); }
+    if (md.exists()){ const r = Object.assign({ uid: N.uid }, md.data()), c = await F.getCountFromServer(F.query(F.collection(N.db, 'users'), F.where(k, '>', r[k] || 0))); me = '<p class="ownline">Your rank</p>' + row(r, c.data().count + bots.filter(b => (b[k] || 0) > (r[k] || 0)).length + 1); }
   }
   el.innerHTML = '<div class="segs">' + BOARDS.map(([b, l]) => '<button class="seg' + (b === k ? ' on' : '') + '" data-board="' + b + '">' + l + '</button>').join('') + '</div>' +
     '<div class="lbs">' + (rows.length ? rows.map((r, i) => row(r, i + 1)).join('') : '<p class="ownline">No Tamers yet. You could be the first!</p>') + '</div>' + me +
-    '<p class="ownline">Your stats upload when you open this section and when you leave the app.</p>';
+    '<h5 class="lockh">Recent activity</h5><div class="botfeed">' + botFeed().map(f => '<div><span>🤖 ' + f.txt + '</span><small>' + fmtAgo(f.at) + '</small></div>').join('') + '</div>' +
+    '<p class="ownline">Your stats upload when you open this section and when you leave the app. Tamers marked ' + botTag + ' are computer players who level up, raid and trade alongside everyone.</p>';
   el.querySelectorAll('[data-board]').forEach(b => b.onclick = () => { state.onlBoard = b.dataset.board; viewRanks(el).catch(e => onlSay(netErr(e))); });
 }
 
@@ -5313,20 +5405,23 @@ async function raidDoc(){
 }
 async function viewRaid(el){
   const N = await net(), F = N.F, R = raidLocal(), d = await raidDoc(), p = P();
-  const max = RAID_PER * (d.hitters || 0), down = d.hitters > 0 && d.hp <= 0, left = RAID_TRIES - R.used;
+  const bots = botRaid(), botDmg = bots.reduce((a, b) => a + b.dmg, 0), tamers = (d.hitters || 0) + bots.length;
+  const max = RAID_PER * tamers, dealt = RAID_PER * (d.hitters || 0) - (d.hp || 0) + botDmg;
+  const down = (d.hitters > 0 && d.hp <= 0) || (max > 0 && dealt >= max), hp = down ? 0 : Math.max(0, max - dealt), left = RAID_TRIES - R.used;
   const top = await F.getDocs(F.query(F.collection(N.db, 'raids', raidWeek(), 'hits'), F.orderBy('dmg', 'desc'), F.limit(10)));
+  const hits = top.docs.map(h => ({ name: h.data().name, dmg: h.data().dmg || 0, me: h.id === N.uid })).concat(bots).sort((a, b) => b.dmg - a.dmg).slice(0, 10);
   const ends = (weekNo() + 1) * 7 * 864e5 - 3 * 864e5 - Date.now();
   const block = !p ? 'no partner' : asleep(p) ? 'asleep' : careInit(p).sick ? 'sick' : p.energy < 25 ? 'too tired' : '', ev = raidEvent();
   el.innerHTML = (ev ? '<p class="raidev">' + ev.icon + ' ' + esc(ev.title) + ': ' + esc(ev.blurb) + '</p>' : '') +
     '<div class="raidboss' + (ev ? ' ev' : '') + '"><img alt="" src="' + esc(d.boss.image) + '"><div><h3 style="margin:0">' + (ev ? ev.icon : '👑') + ' ' + esc(d.boss.name) + '</h3>' +
       '<small class="ownline">' + (ev ? esc(ev.title) : 'This week\'s raid boss') + ' · ends in ' + fmtLeft(ends) + '</small>' +
-      '<div class="evotrack" style="margin-top:6px"><i style="width:' + (max ? Math.max(0, d.hp / max * 100) : 100) + '%;background:var(--bad)"></i></div>' +
-      '<small>' + (down ? 'Defeated! 🎉' : max ? 'HP ' + d.hp.toLocaleString() + ' / ' + max.toLocaleString() : 'Nobody has attacked yet') + ' · ' + (d.hitters || 0) + ' Tamer' + (d.hitters === 1 ? '' : 's') + '</small></div></div>' +
+      '<div class="evotrack" style="margin-top:6px"><i style="width:' + (max ? Math.max(0, hp / max * 100) : 100) + '%;background:var(--bad)"></i></div>' +
+      '<small>' + (down ? 'Defeated! 🎉' : max ? 'HP ' + hp.toLocaleString() + ' / ' + max.toLocaleString() : 'Nobody has attacked yet') + ' · ' + tamers + ' Tamer' + (tamers === 1 ? '' : 's') + (bots.length ? ' (' + bots.length + ' AI)' : '') + '</small></div></div>' +
     '<div class="wallet"><span>Your damage <b>' + R.dmg + '</b></span><span>Fights left today <b>' + Math.max(0, left) + ' / ' + RAID_TRIES + '</b></span></div>' +
     (down ? (R.dmg && !R.claimed ? '<button class="big" id="raidClaim">Claim your raid reward</button>' : R.claimed ? '<p class="ownline">✓ Reward claimed. A new boss arrives next week.</p>' : '<p class="ownline">The boss was defeated before you joined. A new boss arrives next week.</p>')
       : '<button class="big" id="raidGo"' + (block || left <= 0 ? ' disabled' : '') + '>' + (left <= 0 ? 'No fights left today' : block ? (p ? esc(p.name) + ' is ' + block : 'You need a partner') : '⚔️ Attack with ' + esc(p.name) + ' · 25 energy') + '</button>') +
     '<p class="ownline">Each fight, your partner battles a copy of the boss. The more of its HP you knock out, the more raid damage you deal (win for a bonus). Everyone who helps gets a reward when the boss falls, bigger for more damage.</p>' +
-    '<h5 class="lockh">Top attackers</h5><div class="lbs">' + (top.docs.length ? top.docs.map((h, i) => '<div class="lbrow' + (h.id === N.uid ? ' me' : '') + '"><b>#' + (i + 1) + '</b><span></span><span>' + esc(h.data().name || '?') + '</span><b>' + (h.data().dmg || 0) + '</b></div>').join('') : '<p class="ownline">No attacks yet.</p>') + '</div>';
+    '<h5 class="lockh">Top attackers</h5><div class="lbs">' + (hits.length ? hits.map((h, i) => '<div class="lbrow' + (h.me ? ' me' : '') + (h.bot ? ' bot' : '') + '"><b>#' + (i + 1) + '</b><span></span><span>' + esc(h.name || '?') + (h.bot ? ' ' + botTag : '') + '</span><b>' + (h.dmg || 0) + '</b></div>').join('') : '<p class="ownline">No attacks yet.</p>') + '</div>';
   const go = $('#raidGo'); if (go) go.onclick = () => raidFight(d.boss);
   const cl = $('#raidClaim'); if (cl) cl.onclick = () => {
     const item = pick(['egg:golden', 'egg:rare', 'egg:champion', randomCrest() || 'h:band', randomHeld()]), data = 300 + R.dmg * 2 + (ev ? 300 : 0);
@@ -5357,7 +5452,7 @@ function raidFight(boss){
         hp = Math.max(0, hp - dmg); tx.update(ref, { hp, hitters }); return { hp, hitters };
       });
       await F.setDoc(F.doc(N.db, 'raids', raidWeek(), 'hits', N.uid), { name: onl().name, dmg: F.increment(dmg), t: F.serverTimestamp() }, { merge: true });
-      const el = $('#raidRes'); if (el) el.innerHTML = line + '<br><small>' + (res.over ? 'The boss was already defeated!' : res.hp <= 0 ? '🎉 You landed the final blow! The boss is down.' : 'Boss HP left: ' + res.hp.toLocaleString()) + '</small>';
+      const el = $('#raidRes'); if (el) el.innerHTML = line + '<br><small>' + (res.over ? 'The boss was already defeated!' : (() => { const bs = botRaid(), left = Math.max(0, res.hp + RAID_PER * bs.length - bs.reduce((a, b) => a + b.dmg, 0)); return res.hp <= 0 || left <= 0 ? '🎉 You landed the final blow! The boss is down.' : 'Boss HP left: ' + left.toLocaleString(); })()) + '</small>';
     }catch(e){ const el = $('#raidRes'); if (el) el.innerHTML = line + '<br><small>' + esc(netErr(e)) + ' Your damage still counts toward your reward.</small>'; }
   } });
 }
@@ -5369,20 +5464,31 @@ async function viewTrades(el){
   const mine = await F.getDocs(F.query(F.collection(N.db, 'trades'), F.where('from', '==', N.uid)));
   const sold = [];
   for (const d of mine.docs){
-    const t = d.data(); if (t.status !== 'taken') continue;
+    const t = d.data();
+    if (t.status === 'open' && t.t && Date.now() - t.t.seconds * 1000 > 3 * 36e5 && (t.price || 0) <= BOT_VALUE[t.monStage || 0] * 2.2){
+      const slot = Math.floor(Date.now() / 3 / 36e5), roll = sd(strSeed(d.id), slot);
+      if (roll < ((t.price || 0) <= BOT_VALUE[t.monStage || 0] ? .5 : .25)){
+        try{
+          const gone = await F.runTransaction(N.db, async tx => { const s = await tx.get(d.ref); if (!s.exists() || s.data().status !== 'open') return false; tx.delete(d.ref); return true; });
+          if (gone && !O.claimed[d.id]){ O.claimed[d.id] = 1; G.data += t.price || 0; sold.push(t.monName + ' went to ' + BOT_TAMERS[Math.floor(roll * 1e3) % BOT_TAMERS.length][0] + ' 🤖' + (t.price ? ' for ' + t.price + ' DigiData' : '')); }
+        }catch{}
+        continue;
+      }
+    }
+    if (t.status !== 'taken') continue;
     if (!O.claimed[d.id]){ O.claimed[d.id] = 1; G.data += t.paid || 0; sold.push(t.monName + ' went to ' + (t.takerName || 'someone') + (t.paid ? ' for ' + t.paid + ' DigiData' : '')); }
     F.deleteDoc(d.ref).catch(() => {});
   }
   if (sold.length){ saveGame(); updateCount(); }
   const open = await F.getDocs(F.query(F.collection(N.db, 'trades'), F.where('status', '==', 'open'), F.limit(60)));
-  const list = open.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data())).sort((a, b) => ((b.t && b.t.seconds) || 0) - ((a.t && a.t.seconds) || 0));
-  const card = t => '<div class="tcard"><img alt="" src="' + esc(t.monImage) + '"><div><b>' + esc(t.monName) + '</b><small>' + LEVEL_EN[STAGES[t.monStage]] + ' · Lv ' + t.monLevel + ' · from ' + esc(t.fromName || '?') + '</small>' + (t.note ? '<small>“' + esc(t.note) + '”</small>' : '') + '</div>' +
+  const list = open.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data())).sort((a, b) => ((b.t && b.t.seconds) || 0) - ((a.t && a.t.seconds) || 0)).concat(botTrades());
+  const card = t => '<div class="tcard"><img alt="" src="' + esc(t.monImage) + '"><div><b>' + esc(t.monName) + '</b><small>' + LEVEL_EN[STAGES[t.monStage]] + ' · Lv ' + t.monLevel + ' · from ' + esc(t.fromName || '?') + (t.bot ? ' ' + botTag : '') + '</small>' + (t.note ? '<small>“' + esc(t.note) + '”</small>' : '') + '</div>' +
     (t.from === N.uid ? '<button class="ghost" data-tcancel="' + t.id + '">Cancel</button>' : '<button class="act" data-ttake="' + t.id + '"' + (G.data < (t.price || 0) ? ' disabled' : '') + '>' + (t.price ? t.price + ' DD' : 'Free') + '</button>') + '</div>';
   el.innerHTML = (sold.length ? '<p class="ownline" style="color:var(--good)">💰 ' + esc(sold.join('. ')) + '.</p>' : '') +
     '<div class="wallet"><span>DigiData <b>' + G.data.toLocaleString() + '</b></span><span>Box <b>' + G.box.length + ' / ' + G.boxCap + '</b></span></div>' +
     '<button class="act wide" id="tPostBtn">📤 Post a Digimon from your Box</button><div id="tPost" hidden></div>' +
     '<div class="lbs">' + (list.length ? list.map(card).join('') : '<p class="ownline">No trades posted yet.</p>') + '</div>' +
-    '<p class="ownline">Posting a Digimon takes it out of your Box until someone takes it or you cancel. When someone takes it, you get the price the next time you open this board.</p>';
+    '<p class="ownline">Posting a Digimon takes it out of your Box until someone takes it or you cancel. When someone takes it, you get the price the next time you open this board. AI Tamers 🤖 post new Digimon every 6 hours, and they may buy listings that have been up for a few hours if the price is fair.</p>';
   $('#tPostBtn').onclick = () => tradePostForm($('#tPost'));
   el.querySelectorAll('[data-ttake]').forEach(b => b.onclick = async () => {
     const t = list.find(x => x.id === b.dataset.ttake); if (!t) return;
@@ -5390,6 +5496,12 @@ async function viewTrades(el){
     if (G.data < (t.price || 0)){ onlSay('Not enough DigiData.'); return; }
     if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap to confirm'; return; }
     b.disabled = true;
+    if (t.bot){
+      const m = makePartner(t.monId); m.stage = t.monStage; m.stageLine = [t.monStage]; m.level = t.monLevel; m.xp = 0; m.line = [t.monId]; syncMoves(m);
+      G.data -= t.price || 0; G.box.push(m); G.botTaken[t.id] = 1; saveGame(); updateCount();
+      onlineView('🔁 ' + t.monName + ' joined your Box! ' + t.fromName + ' 🤖 says thanks.');
+      return;
+    }
     try{
       await F.runTransaction(N.db, async tx => {
         const s = await tx.get(t.ref); if (!s.exists() || s.data().status !== 'open') throw { code: 'gone' };
