@@ -1561,6 +1561,7 @@ function renderPartner(){
     <button class="linkbtn" data-act="line">View ${esc(p.name)}'s evolution line →</button>
     ${p.line.length > 1 ? `<button class="ghost" id="dedigiBtn">⏪ De-digivolve to ${esc(state.byId.get(p.line[p.line.length - 2])?.name || 'previous form')}</button>` : ''}
     <button class="ghost" id="boxBtn"${G.party.length < 2 || G.box.length >= G.boxCap ? ' disabled' : ''}>📦 Send ${esc(p.name)} to the Box${G.party.length < 2 ? ' (keep one in your party)' : G.box.length >= G.boxCap ? ' (Box full)' : ''}</button>
+    ${p.stage >= 5 ? `<button class="act" id="rebirthBtn"${(p.level || 1) < 40 || (p.gen || 0) >= 5 ? ' disabled' : ''}>🥚 Rebirth ${esc(p.name)}${p.gen ? ' (Gen ' + (p.gen + 2) + ')' : ''}<small>${(p.gen || 0) >= 5 ? 'already at the highest generation' : (p.level || 1) < 40 ? 'reach Lv 40 first (now Lv ' + (p.level || 1) + ')' : 'start over as an egg: +6% stats forever, keeps its moves'}</small></button>` : ''}
     <button class="${atTop ? 'big' : 'ghost danger'}" id="retireBtn">${atTop ? 'Retire' : 'Release'} ${esc(p.name)} · +${releaseValue(p)} DigiData</button>
   `;
   updateCount();
@@ -1573,6 +1574,11 @@ function renderPartner(){
     setTimeout(() => { if (dd.isConnected){ delete dd.dataset.armed; renderPartner(); } }, 3500);
   };
   const bxb = $('#boxBtn'); if (bxb) bxb.onclick = sendToBox;
+  const rbb = $('#rebirthBtn'); if (rbb) rbb.onclick = () => {
+    if ((p.gen || 0) >= 5 || (p.level || 1) < 40) return;
+    if (!rbb.dataset.armed){ rbb.dataset.armed = '1'; rbb.innerHTML = 'Tap again to rebirth ' + esc(p.name) + '<small>it goes back to the start of its line</small>'; setTimeout(() => { if (rbb.isConnected && rbb.dataset.armed) renderPartner(); }, 3500); return; }
+    rebirth(p); saveGame(); renderPartner(); updateCount();
+  };
   const rb = $('#retireBtn'); if (rb) rb.onclick = () => {
     if (rb.dataset.armed){ retire(); return; }
     const label = rb.textContent;
@@ -4747,7 +4753,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
-  { v: 31, title: 'Smarter defaults', items: ['Every Digimon you bring into a dungeon now earns the digivolution points, not just your partner (half for teammates that fainted along the way).', 'When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the best team” for team expeditions now picks the Digimon with the highest chance of a smooth trip on that expedition, counting synergies (picked together so their bonuses kick in) and, on HARD trips, the stats team members lend each other. Rewards only break ties.'] },
+  { v: 31, title: 'Smarter defaults', items: ['🥚 Rebirth is now also on the Partner page, next to Send to the Box, for a Lv 40+ Mega.', 'Every Digimon you bring into a dungeon now earns the digivolution points, not just your partner (half for teammates that fainted along the way).', 'When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the best team” for team expeditions now picks the Digimon with the highest chance of a smooth trip on that expedition, counting synergies (picked together so their bonuses kick in) and, on HARD trips, the stats team members lend each other. Rewards only break ties.'] },
   { v: 30, title: 'More synergies, achievements and titles', items: ['15 new synergies: Legendary Warriors, DATS Partners, Three Great Angels, DigiDestined 02, Knight Order, Dragon Kin, Heaven\'s Host, Night Haunt, Bug Swarm, Deep Ones, Joke Squad, and level groups: Rookie Rally, Champion Corps, Ultimate Vanguard and Mega Squad.', 'New titles: raise 3 different members of a named synergy group to unlock its title, like Knight Commander, Demon Lord, DigiDestined, Spirit Warrior or Dragon Tamer (21 in all). See your progress in the Synergies screen.', '23 new achievements (each one is also a title): Tower floors, Move Discs, rebirths, HARD expeditions, raid rewards, trades, synergies and more.'] },
   { v: 29, title: 'Leveling rebalance', items: ['Levels now take a bit longer: XP is +25% instead of +50%, about halfway between the old slow pace and the fast one. Catch-up for Digimon that lag behind their stage is now 1.5x for the first 4 levels.', 'Moves are learned 1–2 levels later than before. Moves your Digimon already know stay learned.'] },
   { v: 28, title: 'Tower, Move Discs, passives and rebirth', items: ['🗼 Tower (World tab): climb 50 floors of tougher foes, carrying your HP between floors. Every 5th floor gives a Move Disc, every 10th is a boss with a big prize (up to a Mega Egg). Resets every week.', '💿 Move Discs: teach any Digimon a new move from its Moves screen. 28 discs, from Double hits to Barriers. They drop from Hard and Nightmare battles, dungeon bosses, HARD expeditions and the Tower, and the Shop sells random ones.', 'Passives: every species now has a passive based on its attribute (Vaccine, Virus, Data or Free), like Guardian, Venom Touch, Analyzer or Second Wind. See it in the Moves screen and next to its name in battle.', '🥚 Rebirth: a Lv 40+ Mega in the Box can start over as a new generation, keeping its moves and 30% of its training, with +6% to every stat per generation (up to Gen 6).', '🔍 Box search: filter by name, level (rookie, mega), fav or away.', '⏩ Battle speed: tap the 1x/2x/4x button in any battle.'] },
