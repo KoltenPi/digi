@@ -2,6 +2,7 @@
 const fs=require('node:fs/promises'),syncfs=require('node:fs'),path=require('node:path'),http=require('node:http'),crypto=require('node:crypto');
 const {chromium}=require('playwright');
 const {roster,choose,pickTrade}=require('./policy.cjs');
+const {inspect,record,runnerFlag}=require('./findings.cjs');
 const root=path.resolve(__dirname,'..');
 const data=path.resolve(process.env.TRAINER_DATA_DIR||path.join(__dirname,'data'));
 const count=Math.max(1,Math.min(14,Number(process.env.TRAINER_COUNT)||14));
@@ -15,6 +16,14 @@ async function checkpoint(session){
   // Includes Firebase IndexedDB authentication. Never publish this state or put it in a public artifact.
   const state=await session.context.storageState({indexedDB:true});
   await atomic(path.join(data,session.bot.id+'.json'),state);
+}
+async function findings(session,before,after,action,error=false){
+  const saved=await session.page.evaluate(()=>({records:G.aiTrainer.findings||[],history:G.aiTrainer.findingHistory||{}}));
+  const flags=error?[runnerFlag()]:inspect(before,after,action,saved.history);
+  saved.records=record(saved.records,flags);
+  await session.page.evaluate(saved=>{G.aiTrainer.findings=saved.records;G.aiTrainer.findingHistory=saved.history;saveGame();},saved);
+  // A readable report without browser state, account IDs, or credentials.
+  await atomic(path.join(data,session.bot.id+'-findings.json'),{trainer:session.bot.name,findings:saved.records});
 }
 async function launch(bot){
   const file=path.join(data,bot.id+'.json');
@@ -66,6 +75,7 @@ async function step(bot){
         await checkpoint(session);
         if(prepared)await page.evaluate(()=>DigiTrainer.settle());
       }else await page.evaluate(({action,bot})=>DigiTrainer.run(action,bot),{action,bot});
+      await findings(session,observation,await page.evaluate(()=>DigiTrainer.snapshot()),action);
       await checkpoint(session);
       const result=await page.evaluate(()=>DigiTrainer.publish());
       await checkpoint(session);
@@ -77,7 +87,7 @@ async function step(bot){
     const message=String(e.message).replace(/AIza[\w-]+/g,'[redacted]').slice(0,240);
     status.trainers[bot.id]={name:bot.name,state:'error',error:message,updatedAt:new Date().toISOString()};
     console.error(JSON.stringify({trainer:bot.name,error:message}));
-    if(session){try{await checkpoint(session);}catch{}await session.context.close().catch(()=>{});sessions.delete(bot.id);}
+    if(session){try{await findings(session,null,null,null,true);await checkpoint(session);}catch{}await session.context.close().catch(()=>{});sessions.delete(bot.id);}
     // No newly minted replacement account after failure: the saved identity is reused on retry.
   }finally{clearTimeout(timer);}
 }

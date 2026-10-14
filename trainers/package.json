@@ -1,1 +1,1 @@
-{"name":"digi-chatgpt-trainers","version":"1.0.0","private":true,"scripts":{"start":"node runner.cjs","test":"node --test policy.test.cjs trades.test.cjs"},"dependencies":{"playwright":"1.62.1"}}
+{"name":"digi-chatgpt-trainers","version":"1.0.0","private":true,"scripts":{"start":"node runner.cjs","test":"node --test policy.test.cjs trades.test.cjs findings.test.cjs"},"dependencies":{"playwright":"1.62.1"}}
