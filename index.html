@@ -1461,7 +1461,7 @@ const higherStage = (id, s) => (state.stagesOf.get(id) || []).find(x => x > s);
 function makePartner(id){
   const b = state.byId.get(id), now = Date.now();
   const m = { id, name: b.name, image: b.image, stage: 0, hunger: 70, energy: 80, mood: 75, str: 2,
-    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, flags: {}, line: [id], stageLine: [0], final: false };
+    evo: 0, mistakes: 0, stageMistakes: 0, wins: 0, losses: 0, born: now, last: now, ageMs: 0, ageLast: now, flags: {}, line: [id], stageLine: [0], final: false };
   initMoves(m); syncMoves(m);
   G.col[id] = 'raised';
   return m;
@@ -1475,6 +1475,7 @@ function newPartner(id){
 
 // Time passes while you're away, for every Digimon in the party
 function tick(){
+  ageTick();
   const now = Date.now(); let changed = false;
   for (const p of G.party){
     const mins = Math.min((now - p.last) / 60000, 1440);
@@ -1501,9 +1502,41 @@ function meter(label, v){
   const n = Math.round(v);
   return `<div class="meter"><label>${label}<b>${n}</b></label><div class="track"><i style="width:${n}%;background:${meterColor(n)}"></i></div></div>`;
 }
-function ageText(p){
-  const h = (Date.now() - p.born) / 3600000;
-  return h < 1 ? `${Math.max(1, Math.round(h*60))} min old` : h < 48 ? `${Math.round(h)} h old` : `${Math.round(h/24)} days old`;
+function ageText(p){ const y = Math.floor(ageDays(p)); return '🎂 ' + y + ' yr' + (y === 1 ? '' : 's') + ' old'; }
+// ----- age and lifespan: every real day in your party is one year. Digimon resting in the Box (or on expeditions) don't age -----
+const DAY_MS = 864e5;
+const LIFE_BASE = [8, 10, 14, 18, 22, 26];   // years, by current level (Fresh … Mega)
+function ageInit(p){ if (p.ageMs == null){ p.ageMs = Math.min(Math.max(0, Date.now() - (p.born || Date.now())), 2 * DAY_MS); p.ageLast = Date.now(); } return p; }
+const ageDays = p => ageInit(p).ageMs / DAY_MS;
+// estimated lifespan in years: grows as it digivolves, with bond, rebirths and Longevity Chips; care mistakes shorten it
+function lifeParts(p){
+  const base = LIFE_BASE[Math.min(5, p.stage || 0)] + (p.ultra ? 2 : 0), bond = Math.min(10, Math.floor((p.bond || 0) / 10)), care = -Math.min(8, p.mistakes || 0), gen = 2 * Math.min(5, p.gen || 0), item = p.lifeBonus || 0;
+  return { base, bond, care, gen, item, total: Math.max(5, base + bond + care + gen + item) };
+}
+const lifeDays = p => lifeParts(p).total;
+const lifeLeft = p => lifeDays(p) - ageDays(p);
+function lifeText(d){ return d >= 1 ? '~' + Math.round(d) + ' day' + (Math.round(d) === 1 ? '' : 's') : d > 0 ? '~' + Math.max(1, Math.round(d * 24)) + ' hour' + (Math.round(d * 24) === 1 ? '' : 's') : 'any moment'; }
+function ageTick(){
+  const now = Date.now();
+  for (const m of G.box) { ageInit(m); m.ageLast = now; }   // the Box keeps Digimon as they are
+  for (const p of G.party){ ageInit(p); const dt = Math.max(0, now - (p.ageLast || now)); p.ageMs += dt; p.ageLast = now; if (lifeLeft(p) <= 1 && !p.flags.old){ p.flags.old = true; p.msg = p.name + ' is getting old. It has ' + lifeText(lifeLeft(p)) + ' left. Spend some time together, or rest it in the Box to pause its age.'; } }
+}
+// a partner that reaches the end of its lifespan returns to the Digital World and leaves an egg behind
+function memEntry(p){ return { n: p.name, i: p.image, s: p.stage || 0, l: p.level || 1, a: Math.round(ageDays(p) * 10) / 10, w: p.wins || 0, g: p.gen || 0, b: p.bond || 0, d: Date.now(), line: (p.line || []).map(id => state.byId.get(id)?.name).filter(Boolean).slice(-6) }; }
+function checkPassing(){
+  if (busy || !$('#overlay').hidden) return false;
+  const p = G.party.find(m => lifeLeft(m) <= 0); if (!p) return false;
+  busy = true;
+  const e = memEntry(p), value = releaseValue(p);
+  G.memorial = [e, ...(G.memorial || [])].slice(0, 60);
+  G.party.splice(G.party.indexOf(p), 1); G.active = Math.max(0, Math.min(G.active, G.party.length - 1));
+  G.eggs.push(p.stage >= 4 ? 'rare' : 'mystery'); G.data += value; bump('passings'); G.stats.longestLife = Math.max(G.stats.longestLife || 0, e.a);
+  saveGame(); if (NET && onl().name) netSync().catch(() => {});
+  openOv('<h4>🕊️ Farewell, ' + esc(p.name) + '</h4><img alt="" src="' + esc(p.image) + '" style="width:96px;height:96px;object-fit:contain;display:block;margin:4px auto;image-rendering:pixelated">' +
+    '<p style="margin:0">After ' + Math.floor(e.a) + ' year' + (Math.floor(e.a) === 1 ? '' : 's') + ' together, ' + esc(p.name) + ' returned to the Digital World. It won ' + e.w + ' battle' + (e.w === 1 ? '' : 's') + ' and reached Lv ' + e.l + '.</p>' +
+    '<p class="ownline">It left behind a ' + (p.stage >= 4 ? 'Rare Mystery Egg' : 'Mystery Egg') + ' and ' + value + ' DigiData. You can find it in the 🕊️ Memorial (World → Online).</p><button class="big" id="memOk">Goodbye, ' + esc(p.name) + '</button>');
+  $('#memOk').onclick = () => { busy = false; closeOv(); renderPartner(); updateCount(); };
+  return true;
 }
 function moodLine(p){
   if (p.msg){ const m = p.msg; p.msg = ''; return m; }
@@ -1521,6 +1554,7 @@ function renderPartner(){
   if (state.tab !== 'partner') return;
   const v = $('#partnerView');
   if (!state.ready){ if (!v.querySelector('.status')) v.innerHTML = '<div class="status">Loading…</div>'; return; }
+  if (checkPassing()) return;
   const p = P();
   if (!p) return renderEgg();
   initMoves(p);
@@ -1547,6 +1581,10 @@ function renderPartner(){
       <div class="xptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div>
       <div class="row"><span>BOND <b>♥ ${p.bond || 0}</b> · ${BOND_TIERS[bondTier(p)].name}</span><span title="Personality">🧬 ${esc(persOf(p).name)}: ${esc(persOf(p).desc)}</span></div>
       <div class="evotrack bondtrack"><i style="width:${p.bond || 0}%"></i></div>
+      ${(() => { const lp = lifeParts(p), a = ageDays(p), left = lp.total - a, old = left <= 1;
+        return `<div class="row lifeinfo" title="1 year = 1 day in your party. Base ${lp.base} for its level, bond ${lp.bond >= 0 ? '+' : ''}${lp.bond}, care mistakes ${lp.care}, rebirths +${lp.gen}${lp.item ? ', Longevity +' + lp.item : ''}. Digimon in the Box don't age."><span>🎂 AGE <b>${Math.floor(a)} yr${Math.floor(a) === 1 ? '' : 's'}</b> · EST. LIFESPAN <b>~${lp.total} yrs</b></span><span${old ? ' style="color:var(--bad)"' : ''}>${old ? '⚠️ ' : ''}${lifeText(left)} left</span></div>
+          <div class="evotrack lifetrack"><i style="width:${Math.min(100, a / lp.total * 100)}%;background:${left <= 1 ? 'var(--bad)' : left <= 3 ? 'var(--warn)' : 'var(--good)'}"></i></div>
+          <p class="ownline lifenote">Lifespan grows as it digivolves, with bond, rebirths and 🧪 Longevity Chips. Care mistakes shorten it (${lp.care}). Digimon resting in the Box don't age.</p>`; })()}
       <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b>${(p.streak || 0) >= 2 ? ` · 🔥 STREAK <b>${p.streak}</b>` : ''}</span><span>THIS STAGE <b>${p.stageWins || 0}W · ${failures(p)} fail${failures(p) === 1 ? '' : 's'}</b></span></div>
       ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
         : `<div class="row"><span>DIGIVOLUTION</span><b>${Math.min(p.evo, need)} / ${need}</b></div>
@@ -1778,6 +1816,7 @@ const MARKET_POOL = [
   { k: 'h:band', price: 1500 }, { k: 'h:amulet', price: 1400 }, { k: 'h:charm', price: 1400 }, { k: 'h:scarf', price: 1200 }, { k: 'xab', price: 150 },
   { k: 'disc:?', price: 650 }, { k: 'disc:?', price: 650 }, { k: 'use:xpl', price: 1000, n: 2 }, { k: 'vit:all', price: 900, n: 3 }, { k: 'bst:data', price: 900, n: 3 },
   { k: 'egg:rare', price: 200 }, { k: 'bst:xp', price: 900, n: 3 }, { k: 'use:treat', price: 400, n: 4 }, { k: 'pers:?', price: 300, n: 3 },
+  { k: 'use:life', price: 1100, n: 2 },
 ];
 function marketDeals(){
   const d = dayKey(), seed = strSeed('mkt' + d), out = [], used = new Set();
@@ -2173,7 +2212,7 @@ async function rebirth(m){
   const g = growthOf(m); Object.keys(g).forEach(k => g[k] = Math.round((g[k] || 0) * 0.3));
   const prev = m.name;
   Object.assign(m, { id: first, name: b.name, image: b.image, stage: st, level: STAGE_MIN_LV[st] || 1, xp: 0, evo: 0, mistakes: 0, stageMistakes: 0, stageLosses: 0, stageWins: 0,
-    line: [first], stageLine: [st], final: false, ultra: false, gen: Math.min(5, (m.gen || 0) + 1), bond: Math.round((m.bond || 0) / 2), streak: 0, born: Date.now(), last: Date.now(), flags: {} });
+    line: [first], stageLine: [st], final: false, ultra: false, gen: Math.min(5, (m.gen || 0) + 1), bond: Math.round((m.bond || 0) / 2), streak: 0, born: Date.now(), last: Date.now(), flags: {}, ageMs: 0, ageLast: Date.now(), lifeBonus: 0 });
   bump('rebirths'); G.col[first] = 'raised';
   say('🥚 ' + prev + ' was reborn as ' + m.name + ' (Gen ' + (m.gen + 1) + ')! Every stat is now +' + Math.round(6 * m.gen) + '% for good.', 'happy');
 }
@@ -3859,6 +3898,7 @@ const SUPPLY = {
   'use:xps':   { name: 'XP Disk S', icon: '📀', price: 120, xp: 150, desc: 'Gives 150 XP.' },
   'use:xpm':   { name: 'XP Disk M', icon: '📀', price: 420, xp: 600, desc: 'Gives 600 XP.' },
   'use:xpl':   { name: 'XP Disk L', icon: '📀', price: 1300, xp: 2000, desc: 'Gives 2,000 XP.' },
+  'use:life':  { name: 'Longevity Chip', icon: '🧪', price: 1500, desc: '+2 years to a Digimon\'s lifespan (up to +10 per Digimon).' },
   'bst:data':  { name: 'Data Booster', icon: '📈', price: 450, mins: 30, desc: '+50% DigiData from battles, dungeons and expeditions for 30 minutes.' },
   'bst:xp':    { name: 'Training Manual', icon: '📘', price: 450, mins: 30, desc: '+50% XP for every Digimon for 30 minutes.' },
   'bst:rare':  { name: 'Rare Lure', icon: '🧲', price: 350, mins: 30, desc: 'Rare weather and night encounters show up 3× as often for 30 minutes.' },
@@ -4013,6 +4053,7 @@ function bagScreen(msg){
       else if (k === 'use:feast'){ p.hunger = 100; p.mood = clamp(p.mood + 15); note = p.name + ' ate the whole feast and is full!'; }
       else if (k === 'use:nrg'){ if (p.energy >= 100) return; p.energy = clamp(p.energy + 50); note = p.name + ' perked up: energy ' + Math.round(p.energy) + '.'; }
       else if (k === 'use:med'){ careInit(p); p.sick = 0; p.energy = clamp(p.energy + 25); note = p.name + ' feels much better.'; }
+      else if (k === 'use:life'){ if ((p.lifeBonus || 0) >= 10) return; p.lifeBonus = (p.lifeBonus || 0) + 2; delete p.flags.old; note = p.name + '\'s estimated lifespan is now ~' + lifeDays(p) + ' years.'; }
       else if (k === 'use:treat'){ addBond(p, 5); p.mood = clamp(p.mood + 25); note = p.name + ' loved the treat! Bond +5.'; }
     }
     else if (k.startsWith('pers:')){
@@ -4931,6 +4972,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 34, title: 'Age, lifespan and the Memorial', items: ['🎂 Digimon now age like a real V-Pet: every day in your party is one year. The Partner page shows its age, its estimated lifespan and about how long it has left.', 'Lifespan grows as it digivolves (Fresh ~8 years up to Mega ~26), with bond (up to +10), rebirths (+2 each) and the new 🧪 Longevity Chip (+2, up to +10). Each care mistake takes a year off (up to −8).', '📦 Digimon resting in the Box or out on expeditions don\'t age, so you can pause a partner any time. Rebirth starts a whole new life.', '🕊️ When a partner reaches the end of its lifespan it returns to the Digital World and leaves an egg and DigiData behind. Digimon you already had start out at most 2 years old.', '🕊️ New Memorial in World → Online: every Tamer\'s departed partners, sorted by Newest or Longest lived, plus your own past partners.'] },
   { v: 33, title: 'New items, the Black Market, raising rewards and 7 new areas', items: ['🗺️ 7 new places on the World map: Gear Savannah, Tropical Jungle, Toy Town, Witchelny, Frozen Lands, Heaven\'s Gate and the Dark Area. Each has its own Digimon, weather, scenery, first-visit gift and win drops.', '🛒 New Supplies in Shop → Items: Digi Feast, Energy Drink, Recovery Floppy, Bond Treat and XP Disks S/M/L. Use them from 🎒 Bag.', '📈 Boosters: Data Booster (+50% DigiData), Training Manual (+50% XP) and Rare Lure (3× rare encounters), 30 minutes each. Switch them on from 🎒 Bag.', '🕶️ The Black Market (Shop → Market): 5 rare deals that change every day, like DigiCores, Mega Eggs, Crests and specific Move Discs.', '🛡️ 5 new held items: Spirit Orb, War Gauntlet, Aegis Plate, Sage Crown and the rare DigiCore (every stat +8%).', '⬆️ New upgrades: Rest Pod (faster energy), Farm Sprinkler (faster crops) and Egg Nest (hatches can come holding an item).', '🥚 Raising rewards in Trainer → Collection: milestones for how many different Digimon you\'ve raised (5 up to 500) and for raising 10–100% of each level, with Mega Eggs, DigiCores and new titles. Every 10 raised also gives a permanent +1% DigiData and XP (up to +25%).'] },
   { v: 32, title: 'Rare encounters, AI battles, gifts and a login calendar', items: ['✨ Rare encounters: some Digimon only show up in certain weather or at night (ice Digimon in snow, water Digimon in rain, ghosts at midnight and more). About 1 in 10 wild battles in the right conditions; they give double rewards and sometimes leave an egg.', '🤖 Battle the AI Tamers: World → Online → Friends lists every AI Tamer. Your first win against each one every day pays DigiData and sometimes a Move Disc.', '🎁 Friend gifts: send each friend one small gift a day (+15 DigiData for you); they open it from their Friends list.', '📅 Login calendar: every daily reward you claim also stamps a 28-day monthly calendar, with big prizes on days 7, 14, 21 and 28 (a Mega Egg).', '🗼 Tower leaderboard: a new Ranks tab for the highest Tower floor this week, AI Tamers included.', 'Your partner\'s passive now shows on the Partner page and in the Box. ⏩ Speed (1x/2x/4x) now works in dungeons too.'] },
   { v: 31, title: 'Smarter defaults', items: ['🥚 Rebirth is now also on the Partner page, next to Send to the Box, for a Lv 40+ Mega, and it always goes all the way back to a baby (Fresh) Digimon, even if your Digimon first hatched at a higher level.', 'Every Digimon you bring into a dungeon now earns the digivolution points, not just your partner (half for teammates that fainted along the way).', 'When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the best team” for team expeditions now picks the Digimon with the highest chance of a smooth trip on that expedition, counting synergies (picked together so their bonuses kick in) and, on HARD trips, the stats team members lend each other. Rewards only break ties.'] },
@@ -5846,13 +5888,31 @@ async function netSync(){
   await F.setDoc(F.doc(N.db, 'users', N.uid), jclean({ name: O.name, code: myCode(N.uid), title: titleOf() || '', tamerLv: (G.tamer && G.tamer.lv) || 1, found: foundCount(),
     bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0, pvp: (G.stats && G.stats.pvpWins) || 0, [towerKey()]: towerState().best || 0, gifts: giftsOut(),
     partner: p ? { id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1 } : null, team: teamSnap(),
-    ai: typeof aiTrainerProfile === 'function' ? aiTrainerProfile() : null }));
+    ai: typeof aiTrainerProfile === 'function' ? aiTrainerProfile() : null,
+    mem: (G.memorial || []).slice(0, 15), memBest: Math.max(0, ...(G.memorial || []).map(e => e.a || 0)), memLast: (G.memorial || []).length ? G.memorial[0].d : 0 }));
   O.synced = Date.now(); saveGame();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && NET && onl().name) netSync().catch(() => {}); });
 
 // ----- the Online section of the World tab -----
-var ONL_TABS = [['ranks', '🏆 Ranks'], ['raid', '👑 Raid'], ['trades', '🔁 Trades'], ['friends', '👥 Friends'], ['trainers', '🤖 Trainers']];
+var ONL_TABS = [['ranks', '🏆 Ranks'], ['raid', '👑 Raid'], ['trades', '🔁 Trades'], ['friends', '👥 Friends'], ['trainers', '🤖 Trainers'], ['memorial', '🕊️ Memorial']];
+// ----- Memorial: every Tamer's partners that lived out their lifespan, newest first or longest lived -----
+async function viewMemorial(el){
+  const N = await net(), F = N.F, sort = state.memSort || 'new', key = sort === 'new' ? 'memLast' : 'memBest';
+  const snap = await F.getDocs(F.query(F.collection(N.db, 'users'), F.orderBy(key, 'desc'), F.limit(40)));
+  const all = [];
+  snap.docs.forEach(d => { const u = d.data(); if (d.id === N.uid) return; (u.mem || []).forEach(e => all.push(Object.assign({ who: u.name || '?', mine: false }, e))); });
+  (G.memorial || []).forEach(e => all.push(Object.assign({ who: onl().name, mine: true }, e)));
+  const rows = all.filter(e => e && e.n && e.a > 0).sort((a, b) => sort === 'new' ? (b.d || 0) - (a.d || 0) : (b.a || 0) - (a.a || 0)).slice(0, 40);
+  const lvl = st => LEVEL_EN[STAGES[st]] || '';
+  const row = (e, i) => '<div class="lbrow memrow' + (e.mine ? ' me' : '') + '"><b>' + (sort === 'new' ? '🕊️' : '#' + (i + 1)) + '</b>' + (e.i ? '<img alt="" src="' + esc(e.i) + '">' : '<span></span>') +
+    '<span>' + esc(e.n) + (e.g ? ' <small style="display:inline">Gen ' + (e.g + 1) + '</small>' : '') + '<small>' + esc(e.who) + '\'s partner · ' + esc(lvl(e.s)) + ' Lv ' + e.l + ' · ' + e.w + ' wins · ' + ((Date.now() - e.d) >= 864e5 ? Math.floor((Date.now() - e.d) / 864e5) + 'd ago' : fmtAgo(e.d)) + '</small></span><b>' + Math.floor(e.a) + ' yrs</b></div>';
+  el.innerHTML = '<p class="ownline">Partners that lived out their full lifespan, from every Tamer. Each year is a day spent in a party.</p>' +
+    '<div class="segs"><button class="seg' + (sort === 'new' ? ' on' : '') + '" data-msort="new">🕒 Newest</button><button class="seg' + (sort === 'long' ? ' on' : '') + '" data-msort="long">🎂 Longest lived</button></div>' +
+    '<div class="lbs">' + (rows.length ? rows.map(row).join('') : '<p class="ownline">No one has been remembered here yet. Partners appear when they reach the end of their lifespan.</p>') + '</div>' +
+    ((G.memorial || []).length ? '<h5 class="lockh">Your past partners · ' + G.memorial.length + '</h5><div class="lbs">' + G.memorial.slice(0, 20).map(e => row(Object.assign({ who: onl().name, mine: true }, e), 0).replace(/<b>#1<\/b>|<b>🕊️<\/b>/, '<b>🕊️</b>')).join('') + '</div>' : '');
+  el.querySelectorAll('[data-msort]').forEach(b => b.onclick = () => { state.memSort = b.dataset.msort; viewMemorial(el).catch(e => { el.innerHTML = '<div class="err">' + esc(netErr(e)) + '</div>'; }); });
+}
 async function onlineView(msg){
   const el = $('#onl'); if (!el) return;
   const O = onl();
@@ -5879,7 +5939,7 @@ async function onlineView(msg){
     if (!O.synced || Date.now() - O.synced > 60000) netSync().catch(() => {});
     duelListen().catch(() => {});
     const body = $('#onlBody'); if (!body) return;
-    if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else if (sub === 'trainers') await viewAiTrainers(body); else await viewFriends(body);
+    if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else if (sub === 'trainers') await viewAiTrainers(body); else if (sub === 'memorial') await viewMemorial(body); else await viewFriends(body);
   }catch(e){
     const b = $('#onlBody'); if (!b) return;
     b.innerHTML = '<div class="err">' + esc(netErr(e)) + '</div><button class="act" id="onlRetry">Try again</button>';
