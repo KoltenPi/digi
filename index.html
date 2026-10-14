@@ -704,6 +704,15 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 #scene[data-r="ocean"]{--l1:#2f7fc0;--l2:#1d5d99}
 #scene[data-r="dark"]{--l1:#2c2445;--l2:#151126}
 #scene[data-r="spiral"]{--l1:#7d7aa0;--l2:#4d4a6e}
+#scene[data-r="savanna"]{--l1:#c9a24f;--l2:#7f8a3a}
+#scene[data-r="jungle"]{--l1:#2f8a4a;--l2:#1b5a30}
+#scene[data-r="toy"]{--l1:#e37a9e;--l2:#7a5cc4}
+#scene[data-r="witch"]{--l1:#4a3f7a;--l2:#2a2350}
+#scene[data-r="frozen"]{--l1:#b9cfe6;--l2:#8aa9cc}
+#scene[data-r="heaven"]{--l1:#f2ecd8;--l2:#e6eefc}
+#scene[data-r="abyss"]{--l1:#1c1020;--l2:#0b060d}
+#scene[data-r="abyss"] .sky{filter:saturate(.4) brightness(.55) hue-rotate(-20deg)}
+#scene[data-r="witch"] .sky{filter:hue-rotate(40deg) saturate(.8)}
 #scene[data-r="dark"] .sky{filter:saturate(.5) brightness(.7) hue-rotate(20deg)}
 #scene .wx{background:none}
 #scene[data-w="rain"] .wx,#scene[data-w="storm"] .wx{background-image:repeating-linear-gradient(100deg,transparent 0 18px,rgba(200,215,255,.5) 18px 19px);background-size:100% 80px;animation:rain .35s linear infinite}
@@ -1473,7 +1482,7 @@ function tick(){
     const pr = persOf(p), sl = asleep(p), nur = 1 - 0.1 * perk('nurture');
     p.hunger = clamp(p.hunger - mins / 4 * (pr.hunger || 1) * nur * (sl ? 0.35 : 1));
     p.mood = clamp(p.mood - mins / 5 * (pr.mood || 1) * nur * (sl ? 0.3 : 1));
-    p.energy = clamp(p.energy + mins / 6 * (pr.energy || 1) * (sl ? (lightsOff() ? 2.5 : 1) : 1));
+    p.energy = clamp(p.energy + mins / 6 * (pr.energy || 1) * (1 + 0.25 * upLv('pod')) * (sl ? (lightsOff() ? 2.5 : 1) : 1));
     p.last = now;
     careTick(p, mins);
     checkNeglect(p); changed = true;
@@ -1696,6 +1705,7 @@ function hatchNew(type = 'mystery', toBox, forcedId){
   if (type === 'rare'){ const g = growthOf(m); g.hp += 6; g.sp += 2; g.atk += 2; g.int += 2; g.spd += 2; m.mood = 90; }
   if (type === 'golden'){ const g = growthOf(m); g.hp += 20; g.sp += 5; ['atk', 'int', 'def', 'spd'].forEach(k => g[k] = (g[k] || 0) + 4); m.mood = 100; m.bond = 40; m.held = randomHeld(); }
   if (type === 'lucky'){ m.bond = 25; m.held = randomHeld(); m.mood = 90; }
+  if (!m.held && upLv('nest') && Math.random() < 0.05 * upLv('nest')) m.held = randomHeld();
   saveGame();
   return m;
 }
@@ -1745,6 +1755,7 @@ const priceBtn = (attr, price, ok) => '<button class="act price" ' + attr + (ok 
 function itemDesc(k){
   const t = itemType(k), v = k.split(':')[1];
   if (t === 'disc'){ const dm = discOf(k); return dm ? 'Teaches ' + dm.name + ' in the Moves screen. ' + moveEffect(toBattle(dm, 3), false) : 'A Move Disc.'; }
+  if (SUPPLY[k]) return SUPPLY[k].desc + (k.startsWith('bst:') ? ' Switch it on from 🎒 Bag; using more adds more time.' : ' Use it from 🎒 Bag.');
   if (k === 'clean') return 'Clears this stage\'s care mistakes and lost battles.';
   if (k === 'vit:all') return 'Raises every stat at once (more at higher stages).';
   if (t === 'vit') return 'Raises ' + (STAT_LABEL[v] || v) + ' (more at higher stages).';
@@ -1760,7 +1771,24 @@ function itemCard(k){
   const own = G.items[k] || 0, price = itemPrice(k), kept = itemKept(k);
   return shopCard(itemIcon(k), esc(itemName(k)), esc(itemDesc(k)), kept && own ? '<button class="act price" disabled>✓ Owned</button>' : priceBtn('data-item="' + k + '"', price, G.data >= price), !kept && own ? own + ' owned' : '');
 }
-const SHOP_TABS = [['eggs', '🥚 Eggs'], ['items', '🎒 Items'], ['devices', '📟 Digivices'], ['upgrades', '⬆️ Upgrades'], ['craft', '🛠️ Craft']];
+const SHOP_TABS = [['eggs', '🥚 Eggs'], ['items', '🎒 Items'], ['market', '🕶️ Market'], ['devices', '📟 Digivices'], ['upgrades', '⬆️ Upgrades'], ['craft', '🛠️ Craft']];
+// the Black Market: 5 deals that change every day, each can be bought once
+const MARKET_POOL = [
+  { k: 'h:core', price: 3200 }, { k: 'egg:mega', price: 8500 }, { k: 'egg:ultimate', price: 4200 }, { k: 'egg:golden', price: 2000 }, { k: 'crest:?', price: 650 },
+  { k: 'h:band', price: 1500 }, { k: 'h:amulet', price: 1400 }, { k: 'h:charm', price: 1400 }, { k: 'h:scarf', price: 1200 }, { k: 'xab', price: 150 },
+  { k: 'disc:?', price: 650 }, { k: 'disc:?', price: 650 }, { k: 'use:xpl', price: 1000, n: 2 }, { k: 'vit:all', price: 900, n: 3 }, { k: 'bst:data', price: 900, n: 3 },
+  { k: 'egg:rare', price: 200 }, { k: 'bst:xp', price: 900, n: 3 }, { k: 'use:treat', price: 400, n: 4 }, { k: 'pers:?', price: 300, n: 3 },
+];
+function marketDeals(){
+  const d = dayKey(), seed = strSeed('mkt' + d), out = [], used = new Set();
+  for (let i = 0; out.length < 5 && i < 40; i++){ const j = Math.floor(Math.abs(seeded(seed, 700 + i)) * MARKET_POOL.length) % MARKET_POOL.length; if (used.has(j)) continue; used.add(j);
+    let it = Object.assign({}, MARKET_POOL[j]);
+    if (it.k === 'disc:?') it.k = 'disc:' + (Math.floor(Math.abs(seeded(seed, 800 + i)) * DISCS.length) % DISCS.length);
+    if (it.k === 'crest:?'){ const left = CREST_VIRTUES.filter(v => !hasItem('crest:' + v)); if (!left.length) continue; it.k = 'crest:' + left[Math.floor(Math.abs(seeded(seed, 900 + i)) * left.length) % left.length]; }
+    it.n = it.n || 1; it.id = d + ':' + j; out.push(it); }
+  return out;
+}
+const marketBought = id => !!((G.market || {}).d === dayKey() && G.market.got[id]);
 // Digivices: shells for the Retro look (shell, screen and trim colours for the Shop preview; the full palettes live in CSS)
 const DEVICES = [
   { key: 'v1', name: 'Digivice', era: 'Classic', price: 0, sh: '#3b3f47', lcd: '#9bb36a', edge: '#14161a', desc: 'The classic grey handheld with a green screen. Free.' },
@@ -1812,12 +1840,19 @@ function renderShop(){
       return shopCard('<span class="egg mini ' + it.key + '"></span>', esc(it.name), esc(it.desc), priceBtn('data-buy="' + it.key + '"', price, G.data >= price), n ? n + ' waiting to hatch' : ''); };
     body = EGG_GROUPS.map(([t, note, keys]) => sec(t, note, (keys || Object.keys(ELEMS).map(k => 'e' + k)).map(k => SHOP.find(x => x.key === k)).filter(Boolean).map(eggCard).join(''))).join('');
   } else if (tab === 'items'){
-    body = sec('Care & training', 'Use these from 🎒 Bag on the Partner tab.', ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].map(itemCard).join('')) +
+    body = sec('Supplies', 'Food, energy, medicine and XP Disks. Use them from 🎒 Bag on the Partner tab.', SUPPLY_KEYS.filter(k => k.startsWith('use:')).map(itemCard).join('')) +
+      sec('Boosters', 'Switch one on from 🎒 Bag. Each lasts 30 minutes; using another adds 30 more.', SUPPLY_KEYS.filter(k => k.startsWith('bst:')).map(k => itemCard(k)).join('')) +
+      sec('Care & training', 'Use these from 🎒 Bag on the Partner tab.', ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all'].map(itemCard).join('')) +
       sec('Personality Mints', 'Change a Digimon\'s personality from 🎒 Bag.', MINT_KEYS().map(itemCard).join('')) +
       sec('Digimentals', 'Unlock Armor digivolutions from Rookies.', VIRTUES.map(x => itemCard('dm:' + x)).join(''), ITEM_PRICE.dm + ' each') +
       sec('Crests', 'Unlock special Ultimate and Mega forms.', CREST_VIRTUES.map(x => itemCard('crest:' + x)).join(''), ITEM_PRICE.crest + ' each') +
       sec('Special', '', itemCard('xab') + shopCard('💿', 'Random Move Disc', 'Teaches one of ' + DISCS.length + ' moves (double hits, flurries, status, barriers, heals and more) to any Digimon, from its Moves screen.', priceBtn('data-discbuy="1"', 900, G.data >= 900)), '') +
       sec('Held items', 'A lasting bonus for the Digimon holding it. Rarer ones come from crafting and dungeon bosses.', HELD_KEYS.filter(k => HELD[k].price).map(itemCard).join(''));
+  } else if (tab === 'market'){
+    const ends = new Date(); ends.setHours(24, 0, 0, 0);
+    body = '<p class="ownline">🕶️ Rare goods you can\'t find anywhere else in the shop. Five new deals every day, one of each per Tamer. New stock in ' + fmtLeft(ends - Date.now()) + '.</p>' +
+      sec('Today\'s deals', '', marketDeals().map(it => { const got = marketBought(it.id), pr = salePrice(it.price), nm = (it.n > 1 ? it.n + '× ' : '') + itemName(it.k);
+        return shopCard(itemIcon(it.k), esc(nm), esc(it.k.startsWith('egg:') ? (SHOP.find(x => x.key === it.k.slice(4)) || {}).desc || '' : itemDesc(it.k)), got ? '<button class="act price" disabled>✓ Bought</button>' : priceBtn('data-mkt="' + it.id + '"', pr, G.data >= pr), ''); }).join(''));
   } else if (tab === 'devices'){
     const cur = G.device || 'v1', retro = curSkin() === 'retro';
     const devCard = d => { const has = devOwned(d.key), on = has && cur === d.key;
@@ -1828,7 +1863,9 @@ function renderShop(){
   } else if (tab === 'upgrades'){
     const c = upgradeCosts();
     body = sec('Upgrades', '', shopCard('📦', 'Box +5 slots', 'Store more Digimon. You have ' + G.boxCap + ' slots.', G.boxCap >= BOX_MAX ? '<button class="act price" disabled>Maxed</button>' : priceBtn('data-up="box"', c.box, G.data >= c.box)) +
-      shopCard('🧭', 'Expedition slot +1', 'Run more expeditions at once. You have ' + G.expSlots + '.', G.expSlots >= 6 ? '<button class="act price" disabled>Maxed</button>' : priceBtn('data-up="exp"', c.exp, G.data >= c.exp)));
+      shopCard('🧭', 'Expedition slot +1', 'Run more expeditions at once. You have ' + G.expSlots + '.', G.expSlots >= 6 ? '<button class="act price" disabled>Maxed</button>' : priceBtn('data-up="exp"', c.exp, G.data >= c.exp)) +
+      [['pod', '🛏️', 'Rest Pod', 'Your party gets back energy 25% faster per level'], ['sprk', '💦', 'Farm Sprinkler', 'Crops grow 10% faster per level'], ['nest', '🪺', 'Egg Nest', 'Every hatch has a +5% chance per level to come with a random held item']].map(([k, ic, nm, d]) =>
+        shopCard(ic, nm + ' · Lv ' + upLv(k) + ' / ' + UP_MAX[k], d + '.', upLv(k) >= UP_MAX[k] ? '<button class="act price" disabled>Maxed</button>' : priceBtn('data-up="' + k + '"', c[k], G.data >= c[k]))).join(''));
   } else {
     body = sec('Crafting', 'Turn spare items into rarer ones. Items also turn up in Hard and Nightmare dungeons and on Ruins and Dark Area expeditions.', RECIPES.map((r, i) =>
       shopCard(r.out === 'crest:?' ? '🔰' : itemIcon(r.out), esc(r.out === 'crest:?' ? 'Random Crest' : itemName(r.out)),
@@ -1840,6 +1877,12 @@ function renderShop(){
     '<div class="segs">' + SHOP_TABS.map(([k, l]) => '<button class="seg' + (k === tab ? ' on' : '') + '" data-stab="' + k + '">' + l + '</button>').join('') + '</div>' +
     '<p id="shopMsg" style="margin:0;min-height:1.3em;font-size:.88rem"></p>' + body;
   v.querySelectorAll('[data-stab]').forEach(b => b.onclick = () => { store.set('dx_shoptab', b.dataset.stab); renderShop(); });
+  v.querySelectorAll('[data-mkt]').forEach(b => b.onclick = () => {
+    const it = marketDeals().find(x => x.id === b.dataset.mkt), pr = it && salePrice(it.price); if (!it || marketBought(it.id) || G.data < pr) return;
+    G.data -= pr; if (!G.market || G.market.d !== dayKey()) G.market = { d: dayKey(), got: {} }; G.market.got[it.id] = 1;
+    for (let i = 0; i < it.n; i++) grantItem(it.k); bump('marketBuys'); saveGame(); updateCount(); renderShop();
+    $('#shopMsg').textContent = 'Got ' + (it.n > 1 ? it.n + '× ' : '') + itemIcon(it.k) + ' ' + itemName(it.k) + '!';
+  });
   v.querySelectorAll('[data-discbuy]').forEach(b => b.onclick = () => { if (G.data < 900) return; G.data -= 900; const k = randomDisc(); giveItem(k); saveGame(); updateCount(); renderShop(); $('#shopMsg').textContent = 'Got 💿 ' + itemName(k) + '! Teach it from the Moves screen.'; });
   v.querySelectorAll('[data-devbuy]').forEach(b => b.onclick = () => {
     const d = DEVICES.find(x => x.key === b.dataset.devbuy); if (!d || devOwned(d.key) || G.data < d.price) return;
@@ -1867,9 +1910,10 @@ function renderShop(){
     const k = b.dataset.up, cost = upgradeCosts()[k];
     if (G.data < cost) return;
     G.data -= cost;
-    if (k === 'box') G.boxCap = Math.min(BOX_MAX, G.boxCap + 5); else G.expSlots = Math.min(6, G.expSlots + 1);
+    if (UP_MAX[k]){ if (upLv(k) >= UP_MAX[k] || cost == null){ G.data += cost || 0; return; } G.ups = G.ups || {}; G.ups[k] = upLv(k) + 1; }
+    else if (k === 'box') G.boxCap = Math.min(BOX_MAX, G.boxCap + 5); else G.expSlots = Math.min(6, G.expSlots + 1);
     saveGame(); renderShop(); updateCount();
-    $('#shopMsg').textContent = k === 'box' ? 'Box expanded to ' + G.boxCap + ' slots!' : 'You can now run ' + G.expSlots + ' expeditions at once!';
+    $('#shopMsg').textContent = UP_MAX[k] ? { pod: 'Rest Pod', sprk: 'Farm Sprinkler', nest: 'Egg Nest' }[k] + ' is now level ' + upLv(k) + '!' : k === 'box' ? 'Box expanded to ' + G.boxCap + ' slots!' : 'You can now run ' + G.expSlots + ' expeditions at once!';
   });
 }
 // ----- storage box and timed expeditions -----
@@ -1907,7 +1951,9 @@ function expEstimate(m, ex){ return { data: Math.round((8 + m.stage * 6) * ex.da
 // finishing early costs about 1 DigiData per 2 minutes left (min 10)
 function rushCost(m){ return m.exp ? Math.max(10, Math.ceil((m.exp.end - Date.now()) / 120000) + 5) : 0; }
 function updateBoxBadge(){ const n = G.box.filter(expDone).length; const t = $('#tabBox'); if (t) t.textContent = n ? 'Box · ' + n : 'Box'; }
-function upgradeCosts(){ return { box: 150 + 100 * Math.round((G.boxCap - 10) / 5), exp: 300 * (G.expSlots - 2) }; }
+const UP_MAX = { pod: 3, sprk: 3, nest: 3 };
+const upLv = k => (G.ups || {})[k] || 0;
+function upgradeCosts(){ return { box: 150 + 100 * Math.round((G.boxCap - 10) / 5), exp: 300 * (G.expSlots - 2), pod: [800, 1800, 4000][upLv('pod')], sprk: [600, 1500, 3200][upLv('sprk')], nest: [1000, 2500, 6000][upLv('nest')] }; }
 
 function renderBox(){
   updateBoxBadge();
@@ -2050,7 +2096,7 @@ async function collectExpeditions(list){
     const ex = EXPEDITIONS.find(x => x.key === m.exp.key) || EXPEDITIONS[0], syn = synOf.get(m) || [], sb = syn.length;
     const team = teamOf.get(m);
     const ok = Math.random() < Math.min(0.99, expOdds(m, ex, team) + SYN_EXP.odds * sb), est = expEstimate(m, ex), rough = ex.hard ? 0.3 : 0.5;
-    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : rough) * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav')) * (1 + SYN_EXP.data * sb)), xp = Math.round(est.xp * (ok ? 1 : rough) * (1 + SYN_EXP.xp * sb));
+    const data = Math.round(est.data * rand(0.85, 1.15) * (ok ? 1 : rough) * (evOn('data') ? 2 : 1) * ddMul() * (1 + 0.1 * perk('scav')) * (1 + SYN_EXP.data * sb)), xp = Math.round(est.xp * (ok ? 1 : rough) * (1 + SYN_EXP.xp * sb));
     G.data += data;
     const loot = [], got = (icon, name, tier) => loot.push({ icon, name, tier: tier || '' });
     if (ok && ex.egg && Math.random() < Math.min(0.9, ex.egg * (evOn('eggs') ? 3 : 1) * (1 + 0.15 * perk('eggs')))){
@@ -2608,7 +2654,7 @@ async function syncMoves(p){
 }
 async function gainXP(p, amount){
   initMoves(p);
-  const gained = Math.max(0, Math.round(amount * XP_MUL * xpCatchUp(p) * (heldOf(p) === 'h:amulet' ? 1.3 : 1) * (evOn('xp') ? 2 : 1) * (1 + 0.1 * perk('study')))); p.xp += gained; const ups = [];
+  const gained = Math.max(0, Math.round(amount * XP_MUL * xpCatchUp(p) * (heldOf(p) === 'h:amulet' ? 1.3 : 1) * (evOn('xp') ? 2 : 1) * (boostOn('xp') ? 1.5 : 1) * (1 + colBonus() / 100) * (1 + 0.1 * perk('study')))); p.xp += gained; const ups = [];
   while (p.xp >= XP_NEED(p.level) && p.level < 99){
     p.xp -= XP_NEED(p.level); p.level++;
     const g = growthOf(p), gk = pick(['atk', 'int', 'def', 'spd']); g[gk] = (g[gk] || 0) + 1; g.hp += 2;
@@ -3082,7 +3128,7 @@ async function battle(diff, opts){
   if (outcome === 'win'){
     const g = growthOf(p), k = pick(['atk', 'int', 'def', 'spd', 'hp', 'sp']), v = k === 'hp' ? 3 + p.stage : k === 'sp' ? 2 : 1 + Math.floor(p.stage / 2);
     g[k] = (g[k] || 0) + v;
-    const ev = evoWin(p, diff), dd = Math.round((1 + 0.05 * Math.min(p.streak || 0, 10)) * (4 + 3 * fStage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1) * (rareEnc ? 2 : 1) * (ultraFoe ? ULTRA_REWARD : 1) * (1 + 0.1 * perk('scav')));
+    const ev = evoWin(p, diff), dd = Math.round((1 + 0.05 * Math.min(p.streak || 0, 10)) * (4 + 3 * fStage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * ddMul() * (rareUp ? 3 : 1) * (rareEnc ? 2 : 1) * (ultraFoe ? ULTRA_REWARD : 1) * (1 + 0.1 * perk('scav')));
     bump('wins'); addBond(p, 2);
     questProgress('win'); if (diff.key === 'hard' || diff.key === 'nightmare') questProgress('winHard');
     if (wild && diff.key === 'nightmare') bump('nmWins'); if (ultraFoe) bump('ultraWins');
@@ -3122,7 +3168,7 @@ const RARE_ENC = {
 const RARE_CHANCE = 0.1;
 function rareEncounter(st, pid){
   const w = curWeather().key, t = RARE_ENC[w] || (dayPhase() === 'night' ? RARE_ENC.night : null);
-  if (!t || Math.random() >= RARE_CHANCE) return null;
+  if (!t || Math.random() >= RARE_CHANCE * (boostOn('rare') ? 3 : 1)) return null;
   for (const s2 of [st, st + 1, st - 1]){
     const pool = (state.stageIds[s2] || []).filter(id => id !== pid && state.byId.has(id) && !isExtra(id) && t.re.test(state.byId.get(id).name));
     if (pool.length) return { id: pick(pool), label: t.label };
@@ -3521,7 +3567,7 @@ function dgEnd(result){
     note = 'Your whole team fainted on floor ' + r.floor + '. Half the DigiData and any eggs or items were lost.';
   } else { title = 'Left the dungeon'; note = 'You escaped from floor ' + r.floor + ' with everything you found.'; }
   if (r.team.some(u => heldOf(u.ref) === 'h:charm')) data = Math.round(data * 1.3);
-  data = Math.round(data * curRegion().reward * (evOn('data') ? 2 : 1) * (1 + 0.1 * perk('scav')));
+  data = Math.round(data * curRegion().reward * (evOn('data') ? 2 : 1) * ddMul() * (1 + 0.1 * perk('scav')));
   // every Digimon on the team earns the digivolution points (half for teammates that fainted, unless the whole team went down)
   G.data += data; for (const u of r.team) u.ref.evo = (u.ref.evo || 0) + (u.hp > 0 || result === 'faint' ? evo : Math.round(evo / 2)); for (let i = 0; i < eggs; i++) G.eggs.push('mystery');
   if (r.rareEgg && result === 'clear'){ G.eggs.push('rare'); eggs++; }
@@ -3794,16 +3840,37 @@ const CHIP_KEYS = ['atk', 'int', 'def', 'spd', 'hp', 'sp'];
 // how much a stat chip adds, scaled to the Digimon's stage
 function chipGain(k, stage){ return { atk: 2 + stage, int: 2 + stage, def: 2 + stage, spd: 1 + stage, hp: 10 + 5 * stage, sp: 3 + stage }[k]; }
 const itemPrice = k => salePrice(itemBasePrice(k));
-const itemBasePrice = k => k === 'pers:?' ? 150 : k.startsWith('pers:') ? 350 : k.startsWith('h:') ? (HELD[k].price || 600) : k === 'vit:all' ? ITEM_PRICE.all : ITEM_PRICE[itemType(k)];
+const itemBasePrice = k => SUPPLY[k] ? SUPPLY[k].price : k === 'pers:?' ? 150 : k.startsWith('pers:') ? 350 : k.startsWith('h:') ? (HELD[k].price || 600) : k === 'vit:all' ? ITEM_PRICE.all : ITEM_PRICE[itemType(k)];
 const randomChip = () => Math.random() < 0.08 ? 'vit:all' : 'vit:' + pick(CHIP_KEYS);
 const virtue = w => { w = String(w || '').replace(/[^A-Za-z]/g, ''); w = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); return VIRTUE_ALIAS[w] || (VIRTUES.includes(w) ? w : 'Miracles'); };
 const itemType = k => k.split(':')[0];
-const itemName = k => k.startsWith('disc:') ? 'Disc: ' + ((discOf(k) || {}).name || '?') : k.startsWith('egg:') ? eggName(k.slice(4)) : k === 'pers:?' ? 'Mystery Mint' : k.startsWith('pers:') ? (PERS[k.slice(5)] ? PERS[k.slice(5)].name + ' Mint' : 'Mint') : k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
-const itemIcon = k => k.startsWith('disc:') ? '💿' : k.startsWith('egg:') ? '🥚' : k === 'pers:?' ? '🎲' : k.startsWith('pers:') ? '🌿' : k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
-const itemUsable = k => k === 'clean' || itemType(k) === 'vit' || itemType(k) === 'pers';
+const itemName = k => SUPPLY[k] ? SUPPLY[k].name : k.startsWith('disc:') ? 'Disc: ' + ((discOf(k) || {}).name || '?') : k.startsWith('egg:') ? eggName(k.slice(4)) : k === 'pers:?' ? 'Mystery Mint' : k.startsWith('pers:') ? (PERS[k.slice(5)] ? PERS[k.slice(5)].name + ' Mint' : 'Mint') : k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
+const itemIcon = k => SUPPLY[k] ? SUPPLY[k].icon : k.startsWith('disc:') ? '💿' : k.startsWith('egg:') ? '🥚' : k === 'pers:?' ? '🎲' : k.startsWith('pers:') ? '🌿' : k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
+const itemUsable = k => k === 'clean' || itemType(k) === 'vit' || itemType(k) === 'pers' || !!SUPPLY[k];
 const MINT_KEYS = () => ['pers:?', ...PERS_KEYS.map(k => 'pers:' + k)];
-const USABLE_KEYS = () => ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all', ...MINT_KEYS()];
+const USABLE_KEYS = () => [...SUPPLY_KEYS, 'clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all', ...MINT_KEYS()];
 const itemKept = k => itemType(k) === 'crest';
+// supplies (used on a Digimon from the Bag) and boosters (switched on for a while, for everything you do)
+const SUPPLY = {
+  'use:feast': { name: 'Digi Feast', icon: '🍖', price: 60, desc: 'Fills hunger all the way and lifts mood.' },
+  'use:nrg':   { name: 'Energy Drink', icon: '🥤', price: 90, desc: 'Restores 50 energy.' },
+  'use:med':   { name: 'Recovery Floppy', icon: '💊', price: 120, desc: 'Cures sickness and restores 25 energy.' },
+  'use:treat': { name: 'Bond Treat', icon: '🍬', price: 160, desc: '+5 bond and a big mood boost.' },
+  'use:xps':   { name: 'XP Disk S', icon: '📀', price: 120, xp: 150, desc: 'Gives 150 XP.' },
+  'use:xpm':   { name: 'XP Disk M', icon: '📀', price: 420, xp: 600, desc: 'Gives 600 XP.' },
+  'use:xpl':   { name: 'XP Disk L', icon: '📀', price: 1300, xp: 2000, desc: 'Gives 2,000 XP.' },
+  'bst:data':  { name: 'Data Booster', icon: '📈', price: 450, mins: 30, desc: '+50% DigiData from battles, dungeons and expeditions for 30 minutes.' },
+  'bst:xp':    { name: 'Training Manual', icon: '📘', price: 450, mins: 30, desc: '+50% XP for every Digimon for 30 minutes.' },
+  'bst:rare':  { name: 'Rare Lure', icon: '🧲', price: 350, mins: 30, desc: 'Rare weather and night encounters show up 3× as often for 30 minutes.' },
+};
+const SUPPLY_KEYS = Object.keys(SUPPLY);
+const boostLeft = k => Math.max(0, ((G.boost || {})[k] || 0) - Date.now());
+const boostOn = k => boostLeft(k) > 0;
+function startBoost(k){ G.boost = G.boost || {}; const until = Math.max(Date.now(), G.boost[k] || 0) + SUPPLY['bst:' + k].mins * 60000; G.boost[k] = until; }
+// collector bonus: every 10 different Digimon you've raised gives +1% DigiData and XP (up to +25%)
+const raisedCount = () => { let n = 0; for (const id in G.col) if (G.col[id] === 'raised') n++; return n; };
+const colBonus = () => Math.min(25, Math.floor(raisedCount() / 10));
+const ddMul = () => (1 + colBonus() / 100) * (boostOn('data') ? 1.5 : 1);
 const hasItem = k => (G.items[k] || 0) > 0;
 function giveItem(k, n){ G.items[k] = (G.items[k] || 0) + (n || 1); }
 const randomDigimental = () => 'dm:' + pick(VIRTUES);
@@ -3917,11 +3984,11 @@ function bagScreen(msg){
   const evoItems = Object.keys(G.items).filter(k => hasItem(k) && !itemUsable(k) && !k.startsWith('h:') && !k.startsWith('disc:'));
   const discInv = Object.keys(G.items).filter(k => hasItem(k) && k.startsWith('disc:'));
   const cur = heldOf(p), heldOwned = HELD_KEYS.filter(hasItem);
-  const effect = k => k === 'pers:?' ? 'Random new personality (now ' + persOf(p).name + ')' : k.startsWith('pers:') ? 'Become ' + PERS[k.slice(5)].name + ': ' + PERS[k.slice(5)].desc + (p.pers === k.slice(5) ? ' (already)' : '') : k === 'clean' ? 'Clears ' + failures(p) + ' failure' + (failures(p) === 1 ? '' : 's') + ' this stage'
+  const effect = k => SUPPLY[k] ? SUPPLY[k].desc + (k.startsWith('bst:') && boostOn(k.slice(4)) ? ' Active: ' + fmtLeft(boostLeft(k.slice(4))) + ' left.' : '') : k === 'pers:?' ? 'Random new personality (now ' + persOf(p).name + ')' : k.startsWith('pers:') ? 'Become ' + PERS[k.slice(5)].name + ': ' + PERS[k.slice(5)].desc + (p.pers === k.slice(5) ? ' (already)' : '') : k === 'clean' ? 'Clears ' + failures(p) + ' failure' + (failures(p) === 1 ? '' : 's') + ' this stage'
     : k === 'vit:all' ? 'All stats up' : '+' + chipGain(k.split(':')[1], p.stage) + ' ' + STAT_LABEL[k.split(':')[1]];
   const html = '<h4>🎒 Bag · ' + esc(p.name) + '</h4>' +
     '<div class="row statrow pstats">' + statChips(partnerStats(p)) + '</div>' +
-    '<div class="wallet"><span>Failures this stage <b>' + failures(p) + '</b></span></div>' +
+    '<div class="wallet"><span>Failures this stage <b>' + failures(p) + '</b></span>' + ['data', 'xp', 'rare'].filter(boostOn).map(b => '<span>' + SUPPLY['bst:' + b].icon + ' <b>' + fmtLeft(boostLeft(b)) + '</b></span>').join('') + '</div>' +
     (usable.length ? '<div class="shop">' + usable.map(k => '<div class="shopitem"><span class="upic" aria-hidden="true">' + itemIcon(k) + '</span><div class="info"><b>' + esc(itemName(k)) + ' ×' + G.items[k] + '</b><small>' + esc(effect(k)) + '</small></div>' +
       '<button class="act" data-use="' + k + '"' + ((k === 'clean' && !failures(p)) || k === 'pers:' + p.pers ? ' disabled' : '') + '>Use</button></div>').join('') + '</div>'
       : '<p class="ownline">No usable items. Buy Clean Slates and stat chips in the Shop, or find them on expeditions.</p>') +
@@ -3939,7 +4006,16 @@ function bagScreen(msg){
   $('#overlay').querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
     const k = b.dataset.use; if (!hasItem(k)) return;
     let note;
-    if (k.startsWith('pers:')){
+    if (SUPPLY[k]){
+      const it = SUPPLY[k];
+      if (k.startsWith('bst:')){ startBoost(k.slice(4)); note = it.name + ' on: ' + fmtLeft(boostLeft(k.slice(4))) + ' left.'; }
+      else if (it.xp){ G.items[k]--; saveGame(); b.disabled = true; gainXP(p, it.xp).then(r => { saveGame(); bagScreen(p.name + ' read the ' + it.name + ': +' + r.gained + ' XP' + (r.ups.length ? ', now Lv ' + p.level + '!' : '.')); }); return; }
+      else if (k === 'use:feast'){ p.hunger = 100; p.mood = clamp(p.mood + 15); note = p.name + ' ate the whole feast and is full!'; }
+      else if (k === 'use:nrg'){ if (p.energy >= 100) return; p.energy = clamp(p.energy + 50); note = p.name + ' perked up: energy ' + Math.round(p.energy) + '.'; }
+      else if (k === 'use:med'){ careInit(p); p.sick = 0; p.energy = clamp(p.energy + 25); note = p.name + ' feels much better.'; }
+      else if (k === 'use:treat'){ addBond(p, 5); p.mood = clamp(p.mood + 25); note = p.name + ' loved the treat! Bond +5.'; }
+    }
+    else if (k.startsWith('pers:')){
       persOf(p); const old = p.pers, nk = k === 'pers:?' ? pick(PERS_KEYS.filter(x => x !== old)) : k.slice(5);
       if (!PERS[nk] || nk === old) return;
       p.pers = nk; note = p.name + ' went from ' + PERS[old].name + ' to ' + PERS[nk].name + '! (' + PERS[nk].desc + ')';
@@ -4359,10 +4435,15 @@ const HELD = {
   'h:amulet': { name: 'Exp Amulet',   icon: '📿', desc: '+30% XP' },
   'h:band':   { name: 'Focus Band',   icon: '🎗️', desc: 'Survive one knockout per battle with 1 HP' },
   'h:scarf':  { name: 'Guard Scarf',  icon: '🧣', desc: 'Immune to poison, paralysis and sleep' },
+  'h:orb':    { name: 'Spirit Orb',   icon: '🔮', desc: 'SP +20%', mul: { sp: 1.2 }, price: 500 },
+  'h:gauntlet': { name: 'War Gauntlet', icon: '🦾', desc: 'ATK +10% and SPD +10%', mul: { atk: 1.1, spd: 1.1 }, price: 1100 },
+  'h:aegis':  { name: 'Aegis Plate',  icon: '🛡️', desc: 'DEF +12% and HP +12%', mul: { def: 1.12, hp: 1.12 }, price: 1100 },
+  'h:crown':  { name: 'Sage Crown',   icon: '👑', desc: 'INT +12% and SP +12%', mul: { int: 1.12, sp: 1.12 }, price: 1100 },
+  'h:core':   { name: 'DigiCore',     icon: '💠', desc: 'Every stat +8%', mul: { hp: 1.08, sp: 1.08, atk: 1.08, int: 1.08, def: 1.08, spd: 1.08 } },
 };
 const HELD_KEYS = Object.keys(HELD);
 const heldOf = p => p && p.held && HELD[p.held] ? p.held : null;
-const randomHeld = () => pick(HELD_KEYS);
+const randomHeld = () => Math.random() < 0.04 ? 'h:core' : pick(HELD_KEYS.filter(k => k !== 'h:core'));
 // battle perks for a unit made from a partner
 function applyPerks(u, p){
   if (!p) return u;
@@ -4640,12 +4721,30 @@ const COL_LEVELS = ['Baby I', 'Baby II', 'Child', 'Adult', 'Perfect', 'Ultimate'
 const COL_STEPS = [{ pct: 25, data: 75 }, { pct: 50, data: 150, item: 'clean' }, { pct: 75, data: 300, item: 'egg:rare' }, { pct: 100, data: 600, item: 'vit:all' }];
 function colIds(lv){ return lv === 'Armor' ? [...state.armor] : (state.levelSets[lv] ? [...state.levelSets[lv]] : []); }
 function colProgress(lv){ const ids = colIds(lv); return { have: ids.filter(id => G.col[id]).length, total: ids.length }; }
-function colTitles(){ return COL_LEVELS.filter(lv => (G.colClaimed || {})[lv + ':100']).map(lv => ({ name: (LEVEL_EN[lv] || lv) + ' Master', col: true }))
+function colTitles(){ const cl = G.colClaimed || {}; return COL_LEVELS.filter(lv => cl[lv + ':100']).map(lv => ({ name: (LEVEL_EN[lv] || lv) + ' Master', col: true }))
+  .concat(RAISE_STEPS.filter(st => st.title && cl['R:' + st.n]).map(st => ({ name: st.title, col: true })))
+  .concat(COL_LEVELS.filter(lv => cl['r:' + lv + ':50']).map(lv => ({ name: (LEVEL_EN[lv] || lv) + ' Keeper', col: true })))
   .concat(SYNERGIES.filter(g => g.title && synRaised(g) >= SYN_TITLE_N).map(g => ({ name: g.title, col: true }))); }
 // synergy group titles: raise this many different members of a group
 const SYN_TITLE_N = 3;
 function synRaised(g){ if (!g.re) return 0; let n = 0; for (const id in G.col) if (G.col[id] === 'raised'){ const d = state.byId.get(+id); if (d && g.re.test(d.name)) n++; } return n; }
-const colClaimable = () => COL_LEVELS.reduce((n, lv) => { const pr = colProgress(lv); return n + COL_STEPS.filter(s => pr.total && pr.have / pr.total * 100 >= s.pct && !(G.colClaimed || {})[lv + ':' + s.pct]).length; }, 0);
+const colClaimable = () => raiseReady().length + COL_LEVELS.reduce((n, lv) => { const pr = colProgress(lv); return n + COL_STEPS.filter(s => pr.total && pr.have / pr.total * 100 >= s.pct && !(G.colClaimed || {})[lv + ':' + s.pct]).length; }, 0);
+// rewards for Digimon you've actually raised (hatched, digivolved into, traded for or reborn as), not just seen
+const RAISE_STEPS = [
+  { n: 5, data: 100, item: 'use:xps' }, { n: 10, data: 200, item: 'egg:lucky' }, { n: 20, data: 350, item: 'use:xpm' }, { n: 35, data: 500, item: 'egg:rare' },
+  { n: 50, data: 800, item: 'h:gauntlet', title: 'Collector' }, { n: 75, data: 1000, item: 'egg:champion' }, { n: 100, data: 1500, item: 'h:core', title: 'Centurion Tamer' },
+  { n: 150, data: 2000, item: 'egg:golden' }, { n: 200, data: 3000, item: 'egg:ultimate', title: 'Living Digidex' }, { n: 300, data: 4000, item: 'egg:mega' },
+  { n: 400, data: 5000, item: 'egg:mega', title: 'Digital Archivist' }, { n: 500, data: 7500, item: 'egg:mega', title: 'Keeper of the Digital World' },
+];
+const RCOL_STEPS = [{ pct: 10, data: 150, item: 'use:xpm' }, { pct: 25, data: 400, item: 'egg:rare' }, { pct: 50, data: 900, item: 'h:core' }, { pct: 100, data: 2500, item: 'egg:mega' }];
+function rcolProgress(lv){ const ids = colIds(lv); return { have: ids.filter(id => G.col[id] === 'raised').length, total: ids.length }; }
+function raiseReady(){
+  const cl = G.colClaimed || {}, n = raisedCount(), out = [];
+  RAISE_STEPS.forEach(st => { if (n >= st.n && !cl['R:' + st.n]) out.push({ k: 'R:' + st.n, data: st.data, item: st.item, title: st.title }); });
+  COL_LEVELS.forEach(lv => { const pr = rcolProgress(lv); if (!pr.total) return; RCOL_STEPS.forEach(st => { if (pr.have / pr.total * 100 >= st.pct && !cl['r:' + lv + ':' + st.pct]) out.push({ k: 'r:' + lv + ':' + st.pct, data: st.data, item: st.item, title: st.pct === 50 ? (LEVEL_EN[lv] || lv) + ' Keeper' : null }); }); });
+  return out;
+}
+function claimRaise(r){ G.colClaimed = G.colClaimed || {}; if (G.colClaimed[r.k]) return false; G.colClaimed[r.k] = true; G.data += r.data; if (r.item) grantItem(r.item); bump('colClaims'); return true; }
 
 // ----- daily login streak -----
 const DAILY = [{ data: 40 }, { data: 60, item: 'vit:atk' }, { data: 80, item: 'clean' }, { data: 120 }, { data: 150, item: 'dm:Courage' }, { data: 200, item: 'vit:all' }, { data: 300, item: 'egg:rare' }];
@@ -4760,7 +4859,16 @@ function trainerScreen(tab, msg){
         '<div class="evotrack"><i style="width:' + (v / a.n * 100) + '%"></i></div>' + (done && !got ? '<button class="act" data-ach="' + a.id + '">Claim</button>' : got ? '<small class="okt">✓ Claimed</small>' : '') + '</div>'; }).join('') + '</div>';
   } else if (tab === 'col'){
     const cl = G.colClaimed || {};
-    body = '<p class="ownline">Rewards for discovering Digimon of each level (battling, hatching, raising and expeditions all count). Completing a level earns a title.</p>' + (colClaimable() > 1 ? '<button class="big" id="colAll">🎁 Claim all ' + colClaimable() + ' rewards</button>' : '') + '<div class="achs">' + COL_LEVELS.map(lv => { const pr = colProgress(lv), pct = pr.total ? pr.have / pr.total * 100 : 0;
+    const rn = raisedCount(), rr = raiseReady(), rk = new Set(rr.map(r => r.k)), rItem = (k, st) => cl[k] ? '<span class="rq ok">✓ ' + st + '</span>' : rk.has(k) ? '<button class="act" data-rcol="' + k + '">' + st + ' · Claim</button>' : null;
+    const nextR = RAISE_STEPS.find(st => !cl['R:' + st.n]);
+    body = (colClaimable() > 1 ? '<button class="big" id="colAll">🎁 Claim all ' + colClaimable() + ' rewards</button>' : '') +
+      '<h5 class="lockh">🥚 Raised · ' + rn + ' different Digimon</h5><p class="ownline">These count Digimon you\'ve actually raised: hatched, digivolved into, traded for or reborn as. <b>Collector bonus: +' + colBonus() + '% DigiData and XP</b> from everything (+1% per 10 raised, up to +25%).</p>' +
+      '<div class="achs"><div class="ach"><div class="qtop"><b>Raising milestones</b><span>' + rn + (nextR ? ' / ' + nextR.n : '') + '</span></div>' + (nextR ? '<div class="evotrack"><i style="width:' + Math.min(100, rn / nextR.n * 100) + '%"></i></div>' : '') + '<div class="csteps">' +
+        RAISE_STEPS.map(st => rItem('R:' + st.n, st.n) || '<span class="rq">' + st.n + ' · ' + esc(rewardLine(st.data, st.item)) + (st.title ? ' · title “' + esc(st.title) + '”' : '') + '</span>').join('') + '</div></div>' +
+      COL_LEVELS.map(lv => { const pr = rcolProgress(lv), pct = pr.total ? pr.have / pr.total * 100 : 0;
+        return '<div class="ach"><div class="qtop"><b>Raised ' + esc(LEVEL_EN[lv] || lv) + '</b><span>' + pr.have + ' / ' + pr.total + '</span></div><div class="evotrack"><i style="width:' + pct + '%"></i></div><div class="csteps">' +
+          RCOL_STEPS.map(st => rItem('r:' + lv + ':' + st.pct, st.pct + '%') || '<span class="rq">' + st.pct + '% · ' + esc(rewardLine(st.data, st.item)) + (st.pct === 50 ? ' · title “' + esc((LEVEL_EN[lv] || lv) + ' Keeper') + '”' : '') + '</span>').join('') + '</div></div>'; }).join('') + '</div>' +
+      '<h5 class="lockh">👁️ Discovered</h5><p class="ownline">Rewards for discovering Digimon of each level (battling, hatching, raising and expeditions all count). Completing a level earns a title.</p><div class="achs">' + COL_LEVELS.map(lv => { const pr = colProgress(lv), pct = pr.total ? pr.have / pr.total * 100 : 0;
       return '<div class="ach"><div class="qtop"><b>' + esc(LEVEL_EN[lv] || lv) + '</b><span>' + pr.have + ' / ' + pr.total + '</span></div><div class="evotrack"><i style="width:' + pct + '%"></i></div><div class="csteps">' +
         COL_STEPS.map(s => { const ok = pct >= s.pct, got = cl[lv + ':' + s.pct];
           return got ? '<span class="rq ok">✓ ' + s.pct + '%</span>' : ok ? '<button class="act" data-col="' + lv + ':' + s.pct + '">' + s.pct + '% · Claim</button>' : '<span class="rq">' + s.pct + '% · ' + esc(rewardLine(s.data, s.item)) + '</span>'; }).join('') + '</div></div>'; }).join('') + '</div>';
@@ -4794,8 +4902,10 @@ function trainerScreen(tab, msg){
     saveGame(); paintTitle();
     again('Claimed ' + n + ' achievement' + (n === 1 ? '' : 's') + ': +' + data.toLocaleString() + ' DigiData' + (items.length ? ', ' + items.join(', ') : '') + '!');
   };
+  $('#overlay').querySelectorAll('[data-rcol]').forEach(b => b.onclick = () => { const r = raiseReady().find(x => x.k === b.dataset.rcol); if (!r || !claimRaise(r)) return; saveGame(); paintTitle(); again('Raised reward: ' + rewardLine(r.data, r.item) + (r.title ? ' · title “' + r.title + '”' : '') + '!'); });
   const ca = $('#colAll'); if (ca) ca.onclick = () => {
     let n = 0, data = 0; const items = []; G.colClaimed = G.colClaimed || {};
+    for (const r of raiseReady()){ if (!claimRaise(r)) continue; data += r.data; if (r.item) items.push(itemIcon(r.item) + ' ' + itemName(r.item)); n++; }
     for (const lv of COL_LEVELS){ const pr = colProgress(lv); if (!pr.total) continue;
       for (const s of COL_STEPS){ const k = lv + ':' + s.pct; if (G.colClaimed[k] || pr.have / pr.total * 100 < s.pct) continue; G.colClaimed[k] = true; G.data += s.data; data += s.data; if (s.item){ grantItem(s.item); items.push(itemIcon(s.item) + ' ' + itemName(s.item)); } n++; } }
     saveGame(); again('Claimed ' + n + ' collection reward' + (n === 1 ? '' : 's') + ': +' + data.toLocaleString() + ' DigiData' + (items.length ? ', ' + items.join(', ') : '') + '!');
@@ -4821,6 +4931,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 33, title: 'New items, the Black Market, raising rewards and 7 new areas', items: ['🗺️ 7 new places on the World map: Gear Savannah, Tropical Jungle, Toy Town, Witchelny, Frozen Lands, Heaven\'s Gate and the Dark Area. Each has its own Digimon, weather, scenery, first-visit gift and win drops.', '🛒 New Supplies in Shop → Items: Digi Feast, Energy Drink, Recovery Floppy, Bond Treat and XP Disks S/M/L. Use them from 🎒 Bag.', '📈 Boosters: Data Booster (+50% DigiData), Training Manual (+50% XP) and Rare Lure (3× rare encounters), 30 minutes each. Switch them on from 🎒 Bag.', '🕶️ The Black Market (Shop → Market): 5 rare deals that change every day, like DigiCores, Mega Eggs, Crests and specific Move Discs.', '🛡️ 5 new held items: Spirit Orb, War Gauntlet, Aegis Plate, Sage Crown and the rare DigiCore (every stat +8%).', '⬆️ New upgrades: Rest Pod (faster energy), Farm Sprinkler (faster crops) and Egg Nest (hatches can come holding an item).', '🥚 Raising rewards in Trainer → Collection: milestones for how many different Digimon you\'ve raised (5 up to 500) and for raising 10–100% of each level, with Mega Eggs, DigiCores and new titles. Every 10 raised also gives a permanent +1% DigiData and XP (up to +25%).'] },
   { v: 32, title: 'Rare encounters, AI battles, gifts and a login calendar', items: ['✨ Rare encounters: some Digimon only show up in certain weather or at night (ice Digimon in snow, water Digimon in rain, ghosts at midnight and more). About 1 in 10 wild battles in the right conditions; they give double rewards and sometimes leave an egg.', '🤖 Battle the AI Tamers: World → Online → Friends lists every AI Tamer. Your first win against each one every day pays DigiData and sometimes a Move Disc.', '🎁 Friend gifts: send each friend one small gift a day (+15 DigiData for you); they open it from their Friends list.', '📅 Login calendar: every daily reward you claim also stamps a 28-day monthly calendar, with big prizes on days 7, 14, 21 and 28 (a Mega Egg).', '🗼 Tower leaderboard: a new Ranks tab for the highest Tower floor this week, AI Tamers included.', 'Your partner\'s passive now shows on the Partner page and in the Box. ⏩ Speed (1x/2x/4x) now works in dungeons too.'] },
   { v: 31, title: 'Smarter defaults', items: ['🥚 Rebirth is now also on the Partner page, next to Send to the Box, for a Lv 40+ Mega, and it always goes all the way back to a baby (Fresh) Digimon, even if your Digimon first hatched at a higher level.', 'Every Digimon you bring into a dungeon now earns the digivolution points, not just your partner (half for teammates that fainted along the way).', 'When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the best team” for team expeditions now picks the Digimon with the highest chance of a smooth trip on that expedition, counting synergies (picked together so their bonuses kick in) and, on HARD trips, the stats team members lend each other. Rewards only break ties.'] },
   { v: 30, title: 'More synergies, achievements and titles', items: ['15 new synergies: Legendary Warriors, DATS Partners, Three Great Angels, DigiDestined 02, Knight Order, Dragon Kin, Heaven\'s Host, Night Haunt, Bug Swarm, Deep Ones, Joke Squad, and level groups: Rookie Rally, Champion Corps, Ultimate Vanguard and Mega Squad.', 'New titles: raise 3 different members of a named synergy group to unlock its title, like Knight Commander, Demon Lord, DigiDestined, Spirit Warrior or Dragon Tamer (21 in all). See your progress in the Synergies screen.', '23 new achievements (each one is also a title): Tower floors, Move Discs, rebirths, HARD expeditions, raid rewards, trades, synergies and more.'] },
@@ -5027,7 +5138,15 @@ const REGIONS = [
   { key: 'ocean', name: 'Net Ocean', icon: '🌊', need: 120, foe: 1.2, reward: 1.5, gift: 'h:shell', re: /Gomamon|Seadramon|Shellmon|Gesomon|Ikkakumon|Whamon|Marin|Dolphmon|Coelamon|Ebidramon|Octmon|Hangyomon|Pukumon|Syakomon|Otamamon|Gekomon|Betamon|Rukamon|Zudomon|Mantaray|Divermon|Aqua|Sea|Shark|Crab|Ganimon|Tortamon/i, desc: 'Sea Digimon everywhere. +50% DigiData and Hard Shell drops.' },
   { key: 'dark', name: 'Dark Ocean', icon: '🌑', need: 200, foe: 1.3, reward: 1.8, gift: 'egg:dark', re: /Devi|Dark|Black|Impmon|Gazimon|Keramon|Lopmon|Phascomon|Psychemon|Ghost|Bake|Vamde|Dago|Mummy|Phantom|Skull|Death|Evil|Lilith|Daemon|Belial/i, desc: 'Home of dark Digimon. Foes +30%, DigiData +80%, and wins can drop Dark Eggs.' },
   { key: 'spiral', name: 'Spiral Mountain', icon: '⛰️', need: 350, foe: 1.45, reward: 2.2, gift: 'egg:golden', desc: 'The final challenge. Foes +45%, DigiData ×2.2, and wins can drop Crests and held items.' },
+  { key: 'savanna', name: 'Gear Savannah', icon: '🦁', need: 60, foe: 1.1, reward: 1.25, gift: 'vit:atk', re: /Leomon|Garurumon|Gabumon|Elecmon|Gaomon|Liollmon|Gazimon|Leormon|Bearmon|Grizzlymon|Kyubimon|Renamon|Kudamon|Tailmon|Gatomon|Plotmon|Salamon|Wolf|Lion|Tiger|Panda|Monochromon|Tyranomon|Mammon|Elephant|Cerberus|Sangloupmon|Dobermon|Firamon|Gaogamon|BanchoLeomon|Labramon|Hackmon|Dorulumon|Ganemon/i, desc: 'Grassland of beasts and hunters. Wins sometimes drop ATK Chips. +25% DigiData.' },
+  { key: 'jungle', name: 'Tropical Jungle', icon: '🌴', need: 100, foe: 1.18, reward: 1.4, gift: 'pers:?', re: /Palmon|Togemon|Lilimon|Rosemon|Tentomon|Kabuterimon|Kuwagamon|Wormmon|Stingmon|Floramon|Woodmon|Mushroomon|Lalamon|Sunflowmon|Lotusmon|Lilamon|Jureimon|Cherrymon|Vegiemon|Blossomon|Kiwimon|Ginkgo|Snimon|Okuwamon|Fanbeemon|Waspmon|Dokunemon|Dokugumon|Arukenimon|Lopmon|Tanemon|Yokomon|Pyocomon|Lalamon|Flora|Bee|Bug|Insect|Mantis|Plant|Fly|Ant/i, desc: 'Plants and bugs in a steamy rainforest. Wins sometimes drop Mints. +40% DigiData.' },
+  { key: 'toy', name: 'Toy Town', icon: '🧸', need: 150, foe: 1.22, reward: 1.55, gift: 'egg:lucky', re: /Toy|Monzaemon|Pinochimon|Pinocchimon|Puppetmon|Tinkermon|Clockmon|Numemon|Sukamon|Chuumon|Geremon|Etemon|Nanimon|Mamemon|Kokuwamon|PicoDevimon|Pumpmon|Gotsumon|Kumamon|Bearmon|Teddy|Doll|Clown|Piemon|Pierrot|Jester|Joker|Gekomon|Tonosama|Otamamon|Choromon|Tsumemon|Puttimon|Cupimon/i, desc: 'A town of toys, clowns and puppets. Wins sometimes drop Bond Treats. +55% DigiData.' },
+  { key: 'witch', name: 'Witchelny', icon: '🪄', need: 250, foe: 1.33, reward: 1.9, gift: 'egg:rare', re: /Wizard|Witch|Sorceri|Mage|Baalmon|Candmon|Wizarmon|Mistymon|Dynasmon|Majiramon|Lady|Sorcerer|Warlock|Phelesmon|Kyubimon|Taomon|Sakuyamon|Doumon|Dorimon|Aegiomon|Fumamon|Lopmon|Cherubimon|Mephis|Merukimon|Magi/i, desc: 'The hidden world of wizards and witches. Foes +33%. Wins sometimes drop Move Discs. DigiData ×1.9.' },
+  { key: 'frozen', name: 'Frozen Lands', icon: '🧊', need: 300, foe: 1.4, reward: 2.05, gift: 'h:aegis', re: /Frigimon|Yukidarumon|Ice|Snow|Hyogamon|Ikkakumon|Zudomon|Mojyamon|Penmon|Gabumon|Garurumon|Mammon|Yeti|Frost|Blizzard|Glacier|Polar|Pengu|Seal|Gomamon|Coelamon|Kiwimon|Crys|Freeze|Vikemon|Hyougamon|Lobomon|Kendogarurumon|Wolfmon|Fenrir|Kumamon|Korikakumon/i, desc: 'Endless snowfields of ice Digimon. Foes +40%, DigiData ×2.05, and wins can drop Hard Shells and Aegis Plates.' },
+  { key: 'heaven', name: 'Heaven\'s Gate', icon: '🕊️', need: 420, foe: 1.5, reward: 2.35, gift: 'h:crown', re: HOLY_RE, desc: 'Home of the angels and holy beasts. Foes +50%, DigiData ×2.35, and wins can drop Crests.' },
+  { key: 'abyss', name: 'Dark Area', icon: '🕳️', need: 550, foe: 1.65, reward: 2.7, gift: 'egg:mega', re: /Lucemon|Daemon|Lilithmon|Barbamon|Beelzebumon|Belphemon|Leviamon|Ogudomon|Demon|Devi|Death|Skull|Chaos|Venom|Vamde|Piemon|Myotismon|Apocaly|Millennium|Kimeramon|Diablo|Necro|Grim|Undead|Zombie|Dark/i, desc: 'The end of the Digital World, where the Demon Lords sleep. Foes +65%, DigiData ×2.7, and wins can drop DigiCores.' },
 ];
+const REGIONS_BY_NEED = () => REGIONS.slice().sort((a, b) => a.need - b.need);
 const curRegion = () => REGIONS.find(r => r.key === G.region) || REGIONS[0];
 const regionOpen = r => foundCount() >= r.need;
 // wild Digimon for a stage, themed by the current region when it has enough matches
@@ -5043,6 +5162,13 @@ function regionDrop(){
   if (r.key === 'dark' && x < 0.08) return 'egg:dark';
   if (r.key === 'ocean' && x < 0.05) return 'h:shell';
   if (r.key === 'spiral' && x < 0.08) return randomCrest() || randomHeld();
+  if (r.key === 'savanna' && x < 0.08) return 'vit:atk';
+  if (r.key === 'jungle' && x < 0.06) return 'pers:?';
+  if (r.key === 'toy' && x < 0.08) return 'use:treat';
+  if (r.key === 'witch' && x < 0.05) return randomDisc();
+  if (r.key === 'frozen' && x < 0.06) return x < 0.015 ? 'h:aegis' : 'h:shell';
+  if (r.key === 'heaven' && x < 0.06) return randomCrest() || 'vit:all';
+  if (r.key === 'abyss' && x < 0.06) return x < 0.012 ? 'h:core' : 'egg:dark';
   return null;
 }
 
@@ -5153,7 +5279,7 @@ const CROPS = [
 ];
 const GYM = [{ rate: 0, cost: 300 }, { rate: 5, cost: 900 }, { rate: 10, cost: 2400 }, { rate: 18 }];   // XP per hour per Box Digimon
 function farmInit(){ if (!G.farm) G.farm = { plots: [null, null], gym: 0, gymLast: Date.now() }; return G.farm; }
-const cropMs = c => c.mins * 60000 * (evOn('harvest') ? 0.5 : 1) * (weatherAt('file').farm || 1) * (1 - 0.1 * perk('thumb'));
+const cropMs = c => c.mins * 60000 * (evOn('harvest') ? 0.5 : 1) * (weatherAt('file').farm || 1) * (1 - 0.1 * perk('thumb')) * (1 - 0.1 * upLv('sprk'));
 const plotReady = pl => pl && Date.now() - pl.start >= cropMs(CROPS.find(c => c.key === pl.crop));
 const plotCost = () => 200 * (farmInit().plots.length - 1);
 function gymPending(){ const F = farmInit(), rate = GYM[F.gym].rate; if (!rate) return 0; return Math.floor(Math.min(24, (Date.now() - F.gymLast) / 3600000) * rate); }
@@ -5185,7 +5311,7 @@ function renderWorld(sub, msg){
   if (sub === 'map'){
     const cur = curRegion();
     body = '<p class="ownline">Travel to a region to change which wild Digimon you meet in battles and dungeons. Tougher regions pay more. Regions open up as you find more Digimon (' + found + ' found).</p><div class="regions">' +
-      REGIONS.map(r => { const open = regionOpen(r), here = r === cur;
+      REGIONS_BY_NEED().map(r => { const open = regionOpen(r), here = r === cur;
         return '<div class="region' + (here ? ' here' : '') + (open ? '' : ' locked') + '"><div class="qtop"><b>' + r.icon + ' ' + esc(r.name) + '</b><span>' + (here ? 'You are here' : open ? 'Open' : '🔒 ' + found + ' / ' + r.need + ' found') + '</span></div>' +
           '<small>' + esc(r.desc) + '</small><small>' + weatherAt(r.key).icon + ' ' + weatherAt(r.key).name + ' now · Foes ×' + r.foe + ' · DigiData ×' + r.reward + (r.gift && !(G.visited || {})[r.key] ? ' · first-visit gift: ' + esc(itemIcon(r.gift) + ' ' + itemName(r.gift)) : '') + '</small>' +
           (!open ? '<div class="evotrack"><i style="width:' + Math.min(100, found / r.need * 100) + '%"></i></div>' : here ? '' : '<button class="act" data-travel="' + r.key + '">Travel here</button>') + '</div>'; }).join('') + '</div>';
@@ -5271,7 +5397,9 @@ var WEATHER = {
   aurora: { icon: '🌌', name: 'Aurora', up: ['holy'], xp: 1.25, desc: 'Holy attacks +20%, and battles give 25% more XP.' },
 };
 var REGION_WEATHER = { file: ['clear', 'clear', 'sunny', 'rain', 'wind', 'fog'], server: ['clear', 'storm', 'rain', 'fog', 'sunny'], folder: ['sunny', 'sunny', 'clear', 'storm', 'wind'],
-  ocean: ['rain', 'rain', 'storm', 'clear', 'wind', 'fog'], dark: ['fog', 'fog', 'storm', 'clear', 'snow'], spiral: ['snow', 'wind', 'storm', 'aurora', 'clear', 'fog'] };
+  ocean: ['rain', 'rain', 'storm', 'clear', 'wind', 'fog'], dark: ['fog', 'fog', 'storm', 'clear', 'snow'], spiral: ['snow', 'wind', 'storm', 'aurora', 'clear', 'fog'],
+  savanna: ['sunny', 'sunny', 'clear', 'wind', 'storm'], jungle: ['rain', 'rain', 'storm', 'sunny', 'fog', 'clear'], toy: ['clear', 'sunny', 'clear', 'rain', 'aurora'],
+  witch: ['fog', 'aurora', 'clear', 'wind', 'storm'], frozen: ['snow', 'snow', 'wind', 'aurora', 'clear'], heaven: ['aurora', 'clear', 'sunny', 'aurora', 'wind'], abyss: ['fog', 'storm', 'fog', 'snow', 'clear'] };
 var WEATHER_MS = 3 * 3600000;
 function weatherAt(rk, t){
   const list = REGION_WEATHER[rk] || REGION_WEATHER.file, slot = Math.floor((t || Date.now()) / WEATHER_MS), ri = Math.max(0, REGIONS.findIndex(r => r.key === rk));
@@ -6544,6 +6672,15 @@ const SCENE_LAND = {
   dark: '<ellipse class="glow" cx="300" cy="64" rx="46" ry="32"/><path class="l1" d="M0 140 V96 L30 70 L42 98 L80 104 L100 58 L112 100 L170 106 L200 80 L214 104 L280 100 L300 50 L318 102 L360 98 L380 74 L392 100 L400 100 V140Z"/><g class="wave"><path class="l2" d="M-40 118 Q0 110 40 118 T120 118 T200 118 T280 118 T360 118 T440 118 V140 H-40Z"/></g>',
   spiral: '<path class="l1" d="M0 140 V100 L70 78 L120 96 L170 70 L230 98 L300 74 L400 96 V140Z"/><path class="l2" d="M120 140 L200 28 L280 140Z"/><path class="cap" d="M200 28 L218 54 L208 50 L200 58 L192 50 L182 54Z"/><path class="road" d="M150 128 Q200 118 250 124 Q205 108 165 108 Q200 96 236 100 Q204 86 178 88 Q200 74 222 76 Q206 62 190 64"/>',
 };
+Object.assign(SCENE_LAND, {
+  savanna: '<path class="l1" d="M0 140 V108 Q100 96 200 104 T400 100 V140Z"/><path class="trunk" d="M300 104 V78 M300 84 Q286 74 276 78 M300 80 Q314 70 326 74"/><ellipse class="l2" cx="300" cy="72" rx="34" ry="8"/><path class="l2" d="M0 140 V122 Q120 112 240 120 T400 118 V140Z"/>',
+  jungle: '<path class="l1" d="M0 140 V90 Q20 70 40 90 Q60 60 85 88 Q110 62 135 86 Q160 58 190 84 Q215 64 240 88 Q265 56 295 86 Q320 66 345 88 Q370 62 400 84 V140Z"/><path class="trunk" d="M70 140 V100 M160 140 V96 M260 140 V98 M350 140 V100"/><path class="l2" d="M0 140 V114 Q40 104 80 114 T160 114 T240 114 T320 114 T400 112 V140Z"/>',
+  toy: '<path class="l1" d="M0 140 V104 H40 V84 L56 70 L72 84 V104 H120 V90 H150 V104 H200 V78 L222 58 L244 78 V104 H300 V88 H330 V104 H360 V82 L376 68 L392 82 V140Z"/><g><rect class="win" x="52" y="88" width="6" height="6"/><rect class="win" x="218" y="84" width="7" height="7"/><rect class="win" x="372" y="88" width="6" height="6"/></g><path class="l2" d="M0 140 V120 H400 V140Z"/>',
+  witch: '<ellipse class="glow" cx="110" cy="70" rx="40" ry="26"/><path class="l1" d="M0 140 V100 L40 96 L60 66 L72 96 L130 100 L150 40 L170 100 L240 98 L262 72 L282 100 L340 96 L360 58 L378 98 L400 98 V140Z"/><path class="l2" d="M0 140 V118 Q100 110 200 118 T400 116 V140Z"/>',
+  frozen: '<path class="l1" d="M0 140 V96 L60 70 L110 94 L170 60 L230 92 L290 66 L350 90 L400 78 V140Z"/><path class="cap" d="M170 60 L186 72 L176 70 L170 76 L162 70 L154 72Z"/><path class="cap" d="M290 66 L304 76 L296 75 L290 80 L282 75 L276 76Z"/><path class="cap" d="M60 70 L72 79 L64 78 L60 82 L54 78 L48 79Z"/><path class="l2" d="M0 140 V118 Q100 112 200 118 T400 116 V140Z"/>',
+  heaven: '<ellipse class="l2" cx="80" cy="100" rx="70" ry="16"/><ellipse class="l2" cx="300" cy="96" rx="80" ry="18"/><path class="l1" d="M170 140 V80 H180 V70 H220 V80 H230 V140Z"/><path class="cap" d="M184 70 Q200 52 216 70Z"/><path class="l1" d="M0 140 V118 Q100 108 200 116 T400 112 V140Z"/>',
+  abyss: '<ellipse class="glow" cx="200" cy="96" rx="90" ry="34"/><path class="l1" d="M0 140 V80 L30 100 L50 60 L80 104 L120 96 L140 120 L260 120 L280 96 L320 104 L350 60 L370 100 L400 80 V140Z"/><path class="lava" d="M150 122 Q200 112 250 122 L246 130 L154 130Z"/><path class="l2" d="M0 140 V126 H400 V140Z"/>',
+});
 function applyScene(){
   const sc = $('#scene'); if (!sc) return;
   const on = store.get('dx_scene', true) !== false; sc.hidden = !on; if (!on) return;
