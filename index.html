@@ -603,6 +603,11 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 .lbrow{display:grid;grid-template-columns:36px 38px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .lbrow.me{border-color:var(--accent)}
 .lbrow.bot{border-style:dashed}
+.pasrow small{display:block;color:var(--muted);font-size:.75rem;text-align:right;max-width:60%}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.calday{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:4px 2px;text-align:center;display:grid;gap:1px;min-height:46px}
+.calday b{font-size:.8rem}.calday small{font-size:.58rem;line-height:1.15;color:var(--muted);overflow-wrap:anywhere}
+.calday.done{opacity:.55;background:var(--sunk)}.calday.today{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}.calday.big{border-width:2px;border-color:var(--star)}
 .pasbox{display:grid;gap:2px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px;background:var(--sunk)}
 .pasbox small{color:var(--muted);font-size:.78rem;line-height:1.3}
 .boxq{width:100%;box-sizing:border-box}
@@ -1528,6 +1533,7 @@ function renderPartner(){
     <div class="meters">${meter('Hunger', p.hunger)}${meter('Energy', p.energy)}${meter('Mood', p.mood)}</div>
     <div class="evobox">
       <div class="row statrow">${statChips(partnerStats(p))}</div>
+      ${(() => { const pd = state.details.get(p.id), pk = pd ? passiveOf(p.id, mainAttr(pd)) : null; return pk ? `<div class="row pasrow" title="${esc(PASSIVES[pk].desc)}"><span>${PASSIVES[pk].icon} PASSIVE <b>${esc(PASSIVES[pk].name)}</b></span><small>${esc(PASSIVES[pk].desc)}</small></div>` : ''; })()}
       <div class="row"><span>XP TO LV ${p.level + 1}</span><b>${p.xp} / ${XP_NEED(p.level)}</b></div>
       <div class="xptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div>
       <div class="row"><span>BOND <b>♥ ${p.bond || 0}</b> · ${BOND_TIERS[bondTier(p)].name}</span><span title="Personality">🧬 ${esc(persOf(p).name)}: ${esc(persOf(p).desc)}</span></div>
@@ -1984,6 +1990,7 @@ function boxMenu(i){
   const exName = away ? (EXPEDITIONS.find(e => e.key === m.exp.key) || EXPEDITIONS[0]).name : '';
   openOv('<div class="bhead"><img alt="" src="' + esc(m.image) + '"><div><h4>' + esc(m.name) + '</h4><div class="statrow"><span class="stage">Lv ' + m.level + '</span><span class="stage">' + lvName(m) + '</span>' + (m.gen ? '<span class="stage">Gen ' + (m.gen + 1) + '</span>' : '') + '</div></div></div>' +
     '<div class="row statrow">' + statChips(st) + '</div>' +
+    ((pd => pd ? '<p class="ownline" style="margin:0">' + PASSIVES[passiveOf(m.id, mainAttr(pd))].icon + ' Passive: <b>' + esc(PASSIVES[passiveOf(m.id, mainAttr(pd))].name) + '</b> · ' + esc(PASSIVES[passiveOf(m.id, mainAttr(pd))].desc) + '</p>' : '')(state.details.get(m.id))) +
     (synergiesOf(m).length ? '<p class="ownline" style="margin:0">🔗 Synergy groups: ' + synergiesOf(m).map(g => g.icon + ' ' + esc(g.name)).join(', ') + '</p>' : '') +
     (away ? '<p style="margin:0">' + (done ? esc(m.name) + ' is back from ' + esc(exName) + '!' : 'Exploring ' + esc(exName) + '. Back in ' + fmtLeft(m.exp.end - Date.now()) + '.') + '</p>' : '') +
     '<div class="bactions">' +
@@ -2935,7 +2942,8 @@ async function battle(diff, opts){
   const uPool = wild && diff.key === 'nightmare' ? ultraPool().filter(id => id !== p.id) : [];
   const ultraFoe = uPool.length > 0 && Math.random() < NIGHTMARE_ULTRA;
   const pool = ultraFoe ? uPool : regionPool(fStage).filter(id => id !== p.id);
-  const foeBase = opts.foe ? { id: opts.foe.id, name: opts.foe.name, image: opts.foe.image } : state.byId.get(opts.foeId || pick(pool.length ? pool : (state.stageIds[fStage] || []).filter(id => state.byId.has(id) && id !== p.id)));
+  const rareEnc = wild && !ultraFoe && !rareUp ? rareEncounter(fStage, p.id) : null;
+  const foeBase = opts.foe ? { id: opts.foe.id, name: opts.foe.name, image: opts.foe.image } : state.byId.get(opts.foeId || (rareEnc && rareEnc.id) || pick(pool.length ? pool : (state.stageIds[fStage] || []).filter(id => state.byId.has(id) && id !== p.id)));
   let myD = null, foeD = null;
   try{ [myD, foeD] = await Promise.all([getDetail(p.id), getDetail(foeBase.id)]); }catch{}
   await syncMoves(p);
@@ -2962,7 +2970,7 @@ async function battle(diff, opts){
   $('#overlay .sheet').innerHTML = `<h4>${opts.title ? esc(opts.title) : 'Wild battle! <span class="stage">' + diff.name + '</span>' + (wild ? ' <span class="stage' + (ultraFoe ? ' ultra' : '') + '">' + (ultraFoe ? 'Ultra' : stageName(fStage)) + '</span>' : '') + (R.key !== 'file' ? ' <span class="stage">' + R.icon + ' ' + esc(R.name) + '</span>' : '') + (rareUp ? ' <span class="stage">🌟 Rare</span>' : '') + ((p.streak || 0) >= 2 ? ' <span class="stage">🔥 ' + p.streak + ' streak</span>' : '')}</h4>
     <div class="arena">${side(me, 'fMe')}<div class="vs">VS</div>${side(foe, 'fFoe')}</div>
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
-    <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
+    <div class="blog" id="blog" aria-live="polite">${rareEnc ? '✨ Rare ' + rareEnc.label + ' encounter! Double rewards. ' : ''}A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
     <div class="autorow"><button class="seg${autoOn ? ' on' : ''}" id="autoBtn">🤖 Auto ${autoOn ? 'on' : 'off'}</button><button class="seg${bSpeed() > 1 ? ' on' : ''}" id="spdBtn">⏩ ${bSpeed()}x</button><span>${skyTag()}</span></div>
     <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}${dealsDamage(m) ? ' · 🎯' + hitPct(me, foe, m) + '%' + mxBadge(mxGet(foeKey, me, m.name)) : ''}</small></button>`).join('')}
       ${modes.length ? `<button class="act modebtn" data-mv="mode">✨ Mode Change<small>${modeCost} SP · once per battle</small></button>` : ''}
@@ -3059,7 +3067,7 @@ async function battle(diff, opts){
   if (outcome === 'win'){
     const g = growthOf(p), k = pick(['atk', 'int', 'def', 'spd', 'hp', 'sp']), v = k === 'hp' ? 3 + p.stage : k === 'sp' ? 2 : 1 + Math.floor(p.stage / 2);
     g[k] = (g[k] || 0) + v;
-    const ev = evoWin(p, diff), dd = Math.round((1 + 0.05 * Math.min(p.streak || 0, 10)) * (4 + 3 * fStage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1) * (ultraFoe ? ULTRA_REWARD : 1) * (1 + 0.1 * perk('scav')));
+    const ev = evoWin(p, diff), dd = Math.round((1 + 0.05 * Math.min(p.streak || 0, 10)) * (4 + 3 * fStage) * diff.reward * (heldOf(p) === 'h:charm' ? 1.3 : 1) * R.reward * (evOn('data') ? 2 : 1) * (rareUp ? 3 : 1) * (rareEnc ? 2 : 1) * (ultraFoe ? ULTRA_REWARD : 1) * (1 + 0.1 * perk('scav')));
     bump('wins'); addBond(p, 2);
     questProgress('win'); if (diff.key === 'hard' || diff.key === 'nightmare') questProgress('winHard');
     if (wild && diff.key === 'nightmare') bump('nmWins'); if (ultraFoe) bump('ultraWins');
@@ -3072,16 +3080,41 @@ async function battle(diff, opts){
     if (diff.battleEgg && Math.random() < diff.battleEgg * 0.8){ const it = randomDigimental(); giveItem(it); summary += ' Found a ' + itemName(it) + '!'; }
     const rd = regionDrop(); if (rd){ grantItem(rd); summary += ' Found ' + itemIcon(rd) + ' ' + itemName(rd) + '!'; }
     if (Math.random() < (diff.key === 'nightmare' ? 0.12 : diff.key === 'hard' ? 0.06 : 0)){ const dk = randomDisc(); giveItem(dk); summary += ' Found 💿 ' + itemName(dk) + '!'; }
+    if (rareEnc){ bump('rareEnc'); if (Math.random() < 0.3){ G.eggs.push('mystery'); summary += ' ✨ The rare Digimon left a Mystery Egg!'; } }
     if (evOn('eggs') && Math.random() < 0.12){ G.eggs.push('mystery'); summary += ' Egg Hunt: found a Mystery Egg!'; }
   } else if (outcome === 'lose'){ const lost = p.streak || 0; p.streak = 0; p.losses++; p.stageLosses = (p.stageLosses || 0) + 1; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.` + (lost >= 2 ? ` Its ${lost}-win streak ended.` : ''); }
   else summary = `${p.name} escaped from ${foe.name}.`;
   saveGame();
-  const xp = Math.round((outcome === 'win' ? 10 + fStage * 6 : outcome === 'lose' ? 3 + fStage * 2 : 0) * diff.reward * (rareUp && outcome === 'win' ? 3 : 1) * (ultraFoe && outcome === 'win' ? ULTRA_REWARD : 1) * (curWeather().xp || 1));
+  const xp = Math.round((outcome === 'win' ? 10 + fStage * 6 : outcome === 'lose' ? 3 + fStage * 2 : 0) * diff.reward * (rareUp && outcome === 'win' ? 3 : 1) * (rareEnc && outcome === 'win' ? 2 : 1) * (ultraFoe && outcome === 'win' ? ULTRA_REWARD : 1) * (curWeather().xp || 1));
   if (xp){ const lv = await gainXP(p, xp); summary += ' +' + lv.gained + ' XP.' + levelText(lv); }
   $('#bact').innerHTML = `<button class="big" id="bDone">Continue</button>`;
   log(summary);
   $('#bDone').onclick = () => { closeOv(); say(outcome === 'win' ? `${p.name} beat ${foe.name}!` : outcome === 'lose' ? `${p.name} lost to ${foe.name}.` : `${p.name} ran from ${foe.name}.`, outcome === 'win' ? 'happy' : null); };
 }
+
+
+// ----- rare encounters: some Digimon only turn up in certain weather or at night -----
+const RARE_ENC = {
+  snow:   { label: 'snowfall', re: /(Frigimon|Yukidarumon|Snow|Ice|Frost|Hyogamon|Blizzarmon|Korikakumon|Zudomon|Ikkakumon|Mammon|Penguinmon|Gururumon|Daipenmon)/i },
+  rain:   { label: 'rainy-day', re: /(Seadramon|Gomamon|Ikkakumon|Whamon|Shellmon|Gesomon|Marine|Otamamon|Gekomon|Syakomon|Octomon|Ebidramon|Divermon|Betamon|Rukamon|Dolphmon)/ },
+  storm:  { label: 'thunderstorm', re: /(Elecmon|Thunder|Raijin|Volt|Kabuterimon|Sparkmon|Raidramon|Plasma|Mihiramon|Pteramon)/i },
+  fog:    { label: 'foggy', re: /(Wizardmon|Witchmon|Phantomon|Soulmon|Bakemon|Myotismon|Vamdemon|Sorcerimon|Ghost|Mist)/i },
+  aurora: { label: 'aurora', re: /(Angemon|Angewomon|Holy|Seraphimon|Ophanimon|Unimon|Pegasusmon|Nefertimon|Lucemon|Magnamon|Shine)/ },
+  sunny:  { label: 'sunny', re: /(Piyomon|Birdramon|Garudamon|Hououmon|Flare|Sunflowmon|Coronamon|Firamon|Flaremon|Apollomon|Meramon)/ },
+  wind:   { label: 'windy', re: /(Hawkmon|Aquilamon|Kazemon|Zephyrmon|Wind|Sparrowmon|Falcomon|Peckmon|Crowmon|Harpymon|Parrotmon)/ },
+  night:  { label: 'midnight', re: /(Devimon|Vamdemon|Bakemon|Phantomon|Pumpkinmon|Candlemon|Fantomon|Skull|Black|Dark|Night)/ },
+};
+const RARE_CHANCE = 0.1;
+function rareEncounter(st, pid){
+  const w = curWeather().key, t = RARE_ENC[w] || (dayPhase() === 'night' ? RARE_ENC.night : null);
+  if (!t || Math.random() >= RARE_CHANCE) return null;
+  for (const s2 of [st, st + 1, st - 1]){
+    const pool = (state.stageIds[s2] || []).filter(id => id !== pid && state.byId.has(id) && !isExtra(id) && t.re.test(state.byId.get(id).name));
+    if (pool.length) return { id: pick(pool), label: t.label };
+  }
+  return null;
+}
+const rareHint = () => { const w = curWeather().key, t = RARE_ENC[w] || (dayPhase() === 'night' ? RARE_ENC.night : null); return t ? '✨ ' + t.label[0].toUpperCase() + t.label.slice(1) + ' Digimon are out right now' : ''; };
 
 // ================= DUNGEON: turn-based, procedurally generated floors =================
 const DG = { W: 34, H: 26, FLOORS: 5, VW: 11, VH: 9, SIGHT: 4 };
@@ -3517,7 +3550,7 @@ function dgUI(){
   $('#dgTgt').onclick = () => dgCycleTarget();
   $('#dgTurn').onclick = () => { dg.turnMode = !dg.turnMode; dgDraw(); };
   $('#dgGuard').onclick = () => dgGuard();
-  $('#dhead').onclick = e => { if (e.target.closest('[data-dauto]')) dgAutoToggle(); };
+  $('#dhead').onclick = e => { if (e.target.closest('[data-dauto]')) dgAutoToggle(); else if (e.target.closest('[data-dspd]')){ G.bspeed = bSpeed() === 1 ? 2 : bSpeed() === 2 ? 4 : 1; saveGame(); dgDraw(); } };
   // any other control takes over from auto-explore
   sheet.querySelector('.dctl').addEventListener('click', e => { const b = e.target.closest('button'); if (b && dg && dg.auto) dgAutoStop('You took over.'); }, true);
   $('#dteam').onclick = e => { const b = e.target.closest('[data-mate]'); if (b && dg && !dg.over) dgLead(dg.team[+b.dataset.mate]); };
@@ -3550,7 +3583,7 @@ function dgAutoToggle(on){
   if (!dg || dg.over) return;
   dg.auto = on === undefined ? !dg.auto : !!on;
   clearTimeout(dg.autoT); dg.autoStuck = 0;
-  if (dg.auto){ dg.turnMode = false; dgLog('🧭 Auto-explore on. Tap any control to take over.'); dgDraw(); dg.autoT = setTimeout(dgAutoTick, 250); }
+  if (dg.auto){ dg.turnMode = false; dgLog('🧭 Auto-explore on. Tap any control to take over.'); dgDraw(); dg.autoT = setTimeout(dgAutoTick, 250 / bSpeed()); }
   else { dgLog('🧭 Auto-explore off.'); dgDraw(); }
 }
 function dgAutoStop(why){ if (!dg || !dg.auto) return; dg.auto = false; clearTimeout(dg.autoT); if (why) dgLog('🧭 ' + why); dgDraw(); }
@@ -3561,7 +3594,7 @@ function dgAutoTick(){
   try{ dgAutoStep(); }catch(e){ console.warn('auto', e); dgAutoStop('Auto-explore hit a snag. Your move!'); return; }
   if (dg !== run || dg.over || !dg.auto) return;
   if (dg.turn === turn && dg.floor === floor){ if (++dg.autoStuck > 5){ dgAutoStop('Auto-explore is stuck here. Your move!'); return; } } else dg.autoStuck = 0;
-  dg.autoT = setTimeout(dgAutoTick, dg.floor !== floor ? 800 : DG_AUTO_MS);
+  dg.autoT = setTimeout(dgAutoTick, (dg.floor !== floor ? 800 : DG_AUTO_MS) / bSpeed());
 }
 // first step of the shortest known path to the nearest tile that passes goal(x, y); walks only on explored floor and steps around lava
 function dgAutoPath(u, goal){
@@ -3633,6 +3666,7 @@ function dgDraw(){
   const bar = (v, max, cls) => '<span class="dbar ' + cls + '"><i style="width:' + Math.max(0, v / max * 100) + '%"></i></span>';
   if (head) head.innerHTML = '<b>B' + dg.floor + 'F</b><span class="stage">' + dg.diff.name + '</span><span class="stage">' + esc(th.name) + '</span>' + (dg.keys ? '<span>🗝️ ' + dg.keys + '</span>' : '') +
     '<button class="dauto' + (dg.auto ? ' on' : '') + '" data-dauto aria-pressed="' + (dg.auto ? 'true' : 'false') + '">' + (dg.auto ? '⏸ Stop auto' : '🧭 Auto') + '</button>' +
+    '<button class="dauto' + (bSpeed() > 1 ? ' on' : '') + '" data-dspd>⏩ ' + bSpeed() + 'x</button>' +
     '<span>' + esc(m.name) + ' HP ' + m.hp + '/' + m.max + bar(m.hp, m.max, 'h') + '</span>' +
     '<span>SP ' + m.sp + '/' + m.st.sp + bar(m.sp, m.st.sp, 's') + '</span>' +
     '<span>Belly ' + Math.round(P().hunger) + '</span><span>Data +' + dg.data + '</span>';
@@ -4607,8 +4641,25 @@ function claimDaily(){
   if (!dailyReady()) return null;
   const s = dailyNextStreak(), r = DAILY[(s - 1) % 7];
   G.daily = { last: dayKey(), streak: s, best: Math.max(s, (G.daily && G.daily.best) || 0) };
-  G.data += r.data; grantItem(r.item); saveGame();
-  return { s, r };
+  G.data += r.data; grantItem(r.item); const cal = calStamp(); saveGame();
+  return { s, r, cal };
+}
+
+
+// ----- login calendar: a stamp for every day you claim your daily reward (doesn't need to be in a row), 28 prizes a month -----
+const CAL = [{ data: 50 }, { data: 60, item: 'clean' }, { data: 80 }, { data: 80, item: 'vit:atk' }, { data: 100 }, { data: 100, item: 'disc:?' }, { data: 150, item: 'egg:rare' },
+  { data: 80 }, { data: 90, item: 'vit:int' }, { data: 100 }, { data: 100, item: 'vit:def' }, { data: 120 }, { data: 120, item: 'disc:?' }, { data: 200, item: 'h:?' },
+  { data: 100 }, { data: 110, item: 'vit:spd' }, { data: 120 }, { data: 120, item: 'clean' }, { data: 140 }, { data: 140, item: 'disc:?' }, { data: 250, item: 'egg:golden' },
+  { data: 120 }, { data: 130, item: 'vit:all' }, { data: 150 }, { data: 150, item: 'disc:?' }, { data: 180 }, { data: 200, item: 'vit:all' }, { data: 400, item: 'egg:mega' }];
+const calMonth = () => dayKey().slice(0, 7);
+function calState(){ if (!G.cal || G.cal.m !== calMonth()) G.cal = { m: calMonth(), n: 0, last: '' }; return G.cal; }
+const calItemText = k => k === 'disc:?' ? '💿 Move Disc' : k === 'h:?' ? '🎒 Held item' : k ? itemIcon(k) + ' ' + itemName(k) : '';
+function calStamp(){
+  const C = calState(); if (C.last === dayKey() || C.n >= CAL.length) return null;
+  const r = CAL[C.n]; C.n++; C.last = dayKey();
+  const k = r.item === 'disc:?' ? randomDisc() : r.item === 'h:?' ? randomHeld() : r.item;
+  G.data += r.data; if (k) grantItem(k);
+  return { day: C.n, data: r.data, item: k };
 }
 
 // ----- crafting -----
@@ -4679,7 +4730,9 @@ function trainerScreen(tab, msg){
     body = '<div class="wallet"><span>Streak <b>' + (D.last === dayKey() || D.last === dayKey(Date.now() - 864e5) ? D.streak || 0 : 0) + ' day' + ((D.streak || 0) === 1 ? '' : 's') + '</b></span><span>Best <b>' + (D.best || 0) + '</b></span></div>' +
       '<div class="days">' + DAILY.map((r, i) => { const day = i + 1, cyc = ((next - 1) % 7) + 1, done = ready ? day < cyc : day <= cyc, today = ready && day === cyc;
         return '<div class="day' + (done ? ' done' : '') + (today ? ' today' : '') + '"><b>Day ' + day + '</b><small>' + esc(rewardLine(r.data, r.item)) + '</small></div>'; }).join('') + '</div>' +
-      (ready ? '<button class="big" id="dailyClaim">Claim day ' + (((next - 1) % 7) + 1) + ' reward</button>' : '<p class="ownline">Come back tomorrow to keep your streak going. Missing a day starts it over.</p>');
+      (ready ? '<button class="big" id="dailyClaim">Claim day ' + (((next - 1) % 7) + 1) + ' reward' + (calState().n < CAL.length ? ' + calendar stamp' : '') + '</button>' : '<p class="ownline">Come back tomorrow to keep your streak going. Missing a day starts it over.</p>') +
+      '<h5 class="lockh">📅 ' + new Date().toLocaleDateString('en-US', { month: 'long' }) + ' login calendar · ' + calState().n + ' / ' + CAL.length + '</h5><p class="ownline">Every day you claim your daily reward also stamps the calendar, even if you missed days. Big prizes on days 7, 14, 21 and 28 (a Mega Egg!). It starts over each month.</p>' +
+      '<div class="cal">' + CAL.map((r, i) => '<div class="calday' + (i < calState().n ? ' done' : '') + (i === calState().n && ready ? ' today' : '') + ((i + 1) % 7 === 0 ? ' big' : '') + '"><b>' + (i < calState().n ? '✓' : i + 1) + '</b><small>' + (r.item ? esc(calItemText(r.item)) : r.data + ' DD') + '</small></div>').join('') + '</div>';
   } else if (tab === 'ach'){
     const cl = G.achClaimed || {}, ready = achClaimable();
     G.stats = G.stats || {}; G.stats.peakData = Math.max(G.stats.peakData || 0, G.data || 0);
@@ -4715,7 +4768,7 @@ function trainerScreen(tab, msg){
   $('#trClose').onclick = () => { closeOv(); updateTrainerBadge(); if (state.tab === 'partner') renderPartner(); };
   $('#overlay').querySelectorAll('[data-tt]').forEach(b => b.onclick = () => trainerScreen(b.dataset.tt));
   tamerHandlers(again); alertsHandlers(again); cloudHandlers(again);
-  const dc = $('#dailyClaim'); if (dc) dc.onclick = () => { const r = claimDaily(); if (r) again('Day ' + r.s + ' claimed: ' + rewardLine(r.r.data, r.r.item) + '!'); };
+  const dc = $('#dailyClaim'); if (dc) dc.onclick = () => { const r = claimDaily(); if (r) again('Day ' + r.s + ' claimed: ' + rewardLine(r.r.data, r.r.item) + '!' + (r.cal ? ' 📅 Calendar stamp ' + r.cal.day + ': +' + r.cal.data + ' DigiData' + (r.cal.item ? ' and ' + itemIcon(r.cal.item) + ' ' + itemName(r.cal.item) : '') + '!' : '')); };
   const aa = $('#achAll'); if (aa) aa.onclick = () => {
     // claiming can complete "claim N achievements" too, so keep going until nothing new is ready
     let n = 0, data = 0; const items = [];
@@ -4753,6 +4806,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 32, title: 'Rare encounters, AI battles, gifts and a login calendar', items: ['✨ Rare encounters: some Digimon only show up in certain weather or at night (ice Digimon in snow, water Digimon in rain, ghosts at midnight and more). About 1 in 10 wild battles in the right conditions; they give double rewards and sometimes leave an egg.', '🤖 Battle the AI Tamers: World → Online → Friends lists every AI Tamer. Your first win against each one every day pays DigiData and sometimes a Move Disc.', '🎁 Friend gifts: send each friend one small gift a day (+15 DigiData for you); they open it from their Friends list.', '📅 Login calendar: every daily reward you claim also stamps a 28-day monthly calendar, with big prizes on days 7, 14, 21 and 28 (a Mega Egg).', '🗼 Tower leaderboard: a new Ranks tab for the highest Tower floor this week, AI Tamers included.', 'Your partner\'s passive now shows on the Partner page and in the Box. ⏩ Speed (1x/2x/4x) now works in dungeons too.'] },
   { v: 31, title: 'Smarter defaults', items: ['🥚 Rebirth is now also on the Partner page, next to Send to the Box, for a Lv 40+ Mega.', 'Every Digimon you bring into a dungeon now earns the digivolution points, not just your partner (half for teammates that fainted along the way).', 'When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the best team” for team expeditions now picks the Digimon with the highest chance of a smooth trip on that expedition, counting synergies (picked together so their bonuses kick in) and, on HARD trips, the stats team members lend each other. Rewards only break ties.'] },
   { v: 30, title: 'More synergies, achievements and titles', items: ['15 new synergies: Legendary Warriors, DATS Partners, Three Great Angels, DigiDestined 02, Knight Order, Dragon Kin, Heaven\'s Host, Night Haunt, Bug Swarm, Deep Ones, Joke Squad, and level groups: Rookie Rally, Champion Corps, Ultimate Vanguard and Mega Squad.', 'New titles: raise 3 different members of a named synergy group to unlock its title, like Knight Commander, Demon Lord, DigiDestined, Spirit Warrior or Dragon Tamer (21 in all). See your progress in the Synergies screen.', '23 new achievements (each one is also a title): Tower floors, Move Discs, rebirths, HARD expeditions, raid rewards, trades, synergies and more.'] },
   { v: 29, title: 'Leveling rebalance', items: ['Levels now take a bit longer: XP is +25% instead of +50%, about halfway between the old slow pace and the fast one. Catch-up for Digimon that lag behind their stage is now 1.5x for the first 4 levels.', 'Moves are learned 1–2 levels later than before. Moves your Digimon already know stay learned.'] },
@@ -5647,7 +5701,7 @@ async function netSync(){
   const O = onl(); if (!O.name) return;
   const N = await net(), F = N.F, p = P();
   await F.setDoc(F.doc(N.db, 'users', N.uid), jclean({ name: O.name, code: myCode(N.uid), title: titleOf() || '', tamerLv: (G.tamer && G.tamer.lv) || 1, found: foundCount(),
-    bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0, pvp: (G.stats && G.stats.pvpWins) || 0,
+    bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0, pvp: (G.stats && G.stats.pvpWins) || 0, [towerKey()]: towerState().best || 0, gifts: giftsOut(),
     partner: p ? { id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1 } : null, team: teamSnap() }));
   O.synced = Date.now(); saveGame();
 }
@@ -5729,7 +5783,8 @@ function botStats(i, t = Date.now()){
     colo: lv >= 5 ? Math.min(COLO.length, Math.floor((lv - 3) / (4 + botR(i, 4) * 3))) : 0,
     pvp: Math.floor(xp / (700 + botR(i, 5) * 900)),
     title: lv >= 10 && botR(i, 6) < .7 ? ACH[Math.floor(botR(i, 7) * ACH.length) % ACH.length].name : '',
-    partner: pm ? { name: pm.name, image: pm.image, level: Math.min(99, Math.max(1, Math.round(lv * 1.4 + botR(i, 8) * 4))) } : null };
+    [towerKey()]: started ? Math.min(50, Math.floor(Math.min(1, Math.max(0, (t - Math.max((7 * weekNo() - 3) * 864e5, botStart(i))) / 864e5) / 4) * lv * 1.6 * (0.6 + botR(i, 13) * 0.6))) : 0,
+    partner: pm ? { id: pm.id, name: pm.name, image: pm.image, level: Math.min(99, Math.max(1, Math.round(lv * 1.4 + botR(i, 8) * 4))) } : null };
 }
 function fmtAgo(t){ const m = Math.max(1, Math.round((Date.now() - t) / 6e4)); return m < 60 ? m + 'm ago' : Math.round(m / 60) + 'h ago'; }
 const botAll = () => BOT_TAMERS.map((_, i) => botStats(i)).filter(b => b.started);
@@ -5795,9 +5850,11 @@ const BOT_VALUE = [40, 80, 200, 500, 1200, 2600];
 const botTag = '<span class="botb" title="AI Tamer">🤖 AI</span>';
 
 var BOARDS = [['tamerLv', '⭐ Tamer level'], ['found', '📖 Digimon found'], ['bestStreak', '🔥 Win streak'], ['colo', '🏟️ Colosseum'], ['pvp', '⚡ Live wins']];
-const boardVal = (k, v) => k === 'colo' ? (v ? COLO[Math.min(v, COLO.length) - 1].name : '—') : (v || 0).toLocaleString();
+const towerKey = () => 'tw' + weekNo();
+const boardVal = (k, v) => k.startsWith('tw') ? (v ? 'Floor ' + v : '—') : k === 'colo' ? (v ? COLO[Math.min(v, COLO.length) - 1].name : '—') : (v || 0).toLocaleString();
 async function viewRanks(el){
-  const N = await net(), F = N.F, k = state.onlBoard || 'tamerLv';
+  const N = await net(), F = N.F, boards = BOARDS.concat([[towerKey(), '🗼 Tower (this week)']]);
+  let k = state.onlBoard || 'tamerLv'; if (k.startsWith('tw') && k !== towerKey()) k = state.onlBoard = towerKey();
   const snap = await F.getDocs(F.query(F.collection(N.db, 'users'), F.orderBy(k, 'desc'), F.limit(25)));
   const real = snap.docs.map(d => Object.assign({ uid: d.id }, d.data())), bots = botAll();
   const rows = real.concat(bots).sort((a, b) => (b[k] || 0) - (a[k] || 0)).slice(0, 25);
@@ -5808,7 +5865,7 @@ async function viewRanks(el){
     const md = await F.getDoc(F.doc(N.db, 'users', N.uid));
     if (md.exists()){ const r = Object.assign({ uid: N.uid }, md.data()), c = await F.getCountFromServer(F.query(F.collection(N.db, 'users'), F.where(k, '>', r[k] || 0))); me = '<p class="ownline">Your rank</p>' + row(r, c.data().count + bots.filter(b => (b[k] || 0) > (r[k] || 0)).length + 1); }
   }
-  el.innerHTML = '<div class="segs">' + BOARDS.map(([b, l]) => '<button class="seg' + (b === k ? ' on' : '') + '" data-board="' + b + '">' + l + '</button>').join('') + '</div>' +
+  el.innerHTML = '<div class="segs">' + boards.map(([b, l]) => '<button class="seg' + (b === k ? ' on' : '') + '" data-board="' + b + '">' + l + '</button>').join('') + '</div>' +
     '<div class="lbs">' + (rows.length ? rows.map((r, i) => row(r, i + 1)).join('') : '<p class="ownline">No Tamers yet. You could be the first!</p>') + '</div>' + me +
     '<h5 class="lockh">Recent activity</h5><div class="botfeed">' + botFeed().map(f => '<div><span>🤖 ' + f.txt + '</span><small>' + fmtAgo(f.at) + '</small></div>').join('') + '</div>' +
     '<p class="ownline">Your stats upload when you open this section and when you leave the app. Tamers marked ' + botTag + ' are computer players who level up, raid and trade alongside everyone.</p>';
@@ -5990,17 +6047,32 @@ function tradePostForm(box){
 }
 
 // ----- friends: add by code, battle their real team -----
+
+// ----- friend gifts: one small present per friend per day, delivered through your own profile -----
+const GIFT_POOL = ['vit:atk', 'vit:int', 'vit:def', 'vit:spd', 'vit:hp', 'vit:sp', 'clean', 'egg'];
+function giftsOut(){ const O = onl(), o = {}, keep = [dayKey(), dayKey(Date.now() - 864e5)]; for (const [u, g] of Object.entries(O.giftsOut || {})) if (g && keep.includes(g.d)) o[u] = g; O.giftsOut = o; return o; }
+// ----- battle the AI Tamers: their partner, scaled to their level. The first win against each one every day pays out -----
+function botFoe(i){
+  const b = botStats(i); if (!b.started || !b.partner || !b.partner.id) return null;
+  const id = b.partner.id, st = b.stage, base = baseStats(id, st), lv = b.partner.level, scale = 0.85 + lv * 0.012 + botR(i, 12) * 0.1, o = {};
+  STAT_KEYS.forEach(k => o[k] = Math.max(1, Math.round(base[k] * scale)));
+  const d = state.details.get(id) || null;
+  return { id, name: b.partner.name, image: b.partner.image, stage: st, level: lv, st: o, attr: d ? mainAttr(d) : 'Free', elem: ELEM_CACHE[id] || 'beast', moves: foeMoves(id, d, st, Math.min(10, Math.floor(lv / 5))) };
+}
 async function viewFriends(el){
   const N = await net(), F = N.F, O = onl(); O.friends = O.friends || [];
   const docs = await Promise.all(O.friends.map(f => F.getDoc(F.doc(N.db, 'users', f.uid)).then(s => s.exists() ? Object.assign({ uid: f.uid }, s.data()) : null).catch(() => null)));
-  const today = dayKey(); O.fb = O.fb || {};
+  const today = dayKey(), yday = dayKey(Date.now() - 864e5), bots = botAll(); O.fb = O.fb || {}; O.giftsIn = O.giftsIn || {}; const gOut = giftsOut();
+  const gIn = f => { const g = f && f.gifts && f.gifts[N.uid]; return g && GIFT_POOL.includes(g.k) && (g.d === today || g.d === yday) && !O.giftsIn[f.uid + ':' + g.d] ? g : null; };
   el.innerHTML = '<div class="wallet"><span>Your friend code <b>' + myCode(N.uid) + '</b></span><button class="favbtn" id="fCopy">Copy</button></div>' +
     '<div class="bkrow"><input id="fCode" class="onlin" maxlength="8" autocomplete="off" placeholder="Friend\'s code" style="text-transform:uppercase"><button class="act" id="fAdd">Add friend</button></div>' +
     '<div class="lbs">' + (docs.filter(Boolean).length ? docs.map((f, i) => !f ? '' : '<div class="tcard">' + (f.partner && f.partner.image ? '<img alt="" src="' + esc(f.partner.image) + '">' : '<span></span>') +
       '<div><b>' + esc(f.name) + '</b><small>' + (f.title ? '★ ' + esc(f.title) + ' · ' : '') + 'Tamer Lv ' + (f.tamerLv || 1) + ' · ' + (f.found || 0) + ' found</small>' +
       '<small>' + (f.team || []).map(m => esc(m.name) + ' Lv ' + m.level).join(', ') + '</small></div>' +
-      '<div class="fbtns"><button class="act flive" data-flive="' + i + '">⚡ Live battle<small>Real-time vs ' + esc(f.name) + '</small></button>' + (f.team || []).map((m, j) => '<button class="act" data-fbat="' + i + ':' + j + '">⚔️ ' + esc(m.name) + '</button>').join('') + '<button class="ghost" data-fdel="' + i + '">Remove</button></div></div>').join('')
+      '<div class="fbtns">' + (gIn(f) ? '<button class="big" data-gopen="' + i + '">🎁 Open ' + esc(f.name) + '\'s gift</button>' : '') + '<button class="act" data-gsend="' + i + '"' + (gOut[f.uid] && gOut[f.uid].d === today ? ' disabled' : '') + '>' + (gOut[f.uid] && gOut[f.uid].d === today ? '🎁 Gift sent today' : '🎁 Send a gift<small>+15 DigiData for you</small>') + '</button><button class="act flive" data-flive="' + i + '">⚡ Live battle<small>Real-time vs ' + esc(f.name) + '</small></button>' + (f.team || []).map((m, j) => '<button class="act" data-fbat="' + i + ':' + j + '">⚔️ ' + esc(m.name) + '</button>').join('') + '<button class="ghost" data-fdel="' + i + '">Remove</button></div></div>').join('')
       : '<p class="ownline">No friends yet. Swap friend codes and add each other!</p>') + '</div>' +
+    '<h5 class="lockh">🤖 AI Tamers</h5><div class="lbs">' + (bots.length ? bots.map(b => '<div class="tcard">' + (b.partner ? '<img alt="" src="' + esc(b.partner.image) + '">' : '<span></span>') + '<div><b>' + esc(b.name) + ' ' + botTag + '</b><small>Tamer Lv ' + b.tamerLv + (b.partner ? ' · ' + esc(b.partner.name) + ' Lv ' + b.partner.level : '') + '</small><small>' + (O.botWin && O.botWin[b.uid] === today ? '✓ Beaten today (rematches give no reward)' : 'First win today: +' + (40 + b.tamerLv * 6) + ' DigiData, 20% Move Disc') + '</small></div>' +
+      '<div class="fbtns"><button class="act" data-bbat="' + b.uid.slice(3) + '"' + (b.partner ? '' : ' disabled') + '>⚔️ Battle</button></div></div>').join('') : '<p class="ownline">No AI Tamers have started playing yet.</p>') + '</div>' +
     '<p class="ownline">⚡ Live battle: challenge a friend who has the game open. You each pick a move every turn (' + DUEL_TURN + ' seconds) with your current partners. Wins give +40 DigiData, and your first win against each friend every day gives +100 more.</p>' +
     '<p class="ownline">⚔️ Practice battles (the other buttons) use your friend\'s real team (stats and moves from the last time they were online). The first win against each friend every day gives +60 DigiData.</p>';
   $('#fCopy').onclick = async () => { try{ await navigator.clipboard.writeText(myCode(N.uid)); onlSay('Friend code copied.'); }catch{ onlSay('Your code: ' + myCode(N.uid)); } };
@@ -6015,6 +6087,29 @@ async function viewFriends(el){
     }catch(e){ onlSay(netErr(e)); }
   };
   el.querySelectorAll('[data-flive]').forEach(b => b.onclick = () => { const f = docs[+b.dataset.flive]; if (f) duelChallenge(f.uid, f.name); });
+  el.querySelectorAll('[data-gsend]').forEach(b => b.onclick = async () => {
+    const f = docs[+b.dataset.gsend]; if (!f || (O.giftsOut && O.giftsOut[f.uid] && O.giftsOut[f.uid].d === today)) return;
+    b.disabled = true; O.giftsOut = giftsOut(); O.giftsOut[f.uid] = { d: today, k: pick(GIFT_POOL) }; G.data += 15; bump('giftsSent'); saveGame(); updateCount();
+    try{ await netSync(); onlineView('🎁 Gift sent to ' + f.name + '! They can open it from their Friends list today or tomorrow. +15 DigiData.'); }catch(e){ onlSay(netErr(e)); }
+  });
+  el.querySelectorAll('[data-gopen]').forEach(b => b.onclick = () => {
+    const f = docs[+b.dataset.gopen], g = gIn(f); if (!g) return;
+    O.giftsIn[f.uid + ':' + g.d] = 1; grantItem(g.k); G.data += 30; bump('giftsGot'); saveGame(); updateCount();
+    onlineView('🎁 ' + f.name + ' sent you ' + itemIcon(g.k === 'egg' ? 'egg:mystery' : g.k) + ' ' + (g.k === 'egg' ? 'a Mystery Egg' : itemName(g.k)) + ' and 30 DigiData!');
+  });
+  el.querySelectorAll('[data-bbat]').forEach(b => b.onclick = () => {
+    const i = +b.dataset.bbat, foe = botFoe(i), p = P(), bs = botStats(i); if (!foe || !p || busy) return;
+    if (asleep(p) || careInit(p).sick || p.energy < 25){ onlSay(p.name + (asleep(p) ? ' is asleep.' : careInit(p).sick ? ' is sick.' : ' is too tired (25 energy).')); return; }
+    p.energy = clamp(p.energy - 25); saveGame();
+    battle(DIFFS[1], { foe, title: '🤖 vs ' + bs.name + '\'s ' + foe.name, onDone: outcome => {
+      O.botWin = O.botWin || {};
+      let line = outcome === 'win' ? p.name + ' beat ' + bs.name + '\'s ' + foe.name + '!' : outcome === 'lose' ? bs.name + '\'s ' + foe.name + ' won this time.' : 'You ran away.';
+      if (outcome === 'win'){ bump('botWins'); if (O.botWin[bs.uid] !== today){ O.botWin[bs.uid] = today; const dd = 40 + bs.tamerLv * 6; G.data += dd; addBond(p, 2); line += ' +' + dd + ' DigiData (first win today).'; if (Math.random() < 0.2){ const k = randomDisc(); giveItem(k); line += ' They gave you 💿 ' + itemName(k) + '!'; } } }
+      saveGame(); updateCount();
+      $('#overlay .sheet').innerHTML = '<h4>🤖 AI Tamer battle</h4><p style="margin:0">' + esc(line) + '</p><button class="big" id="bbBack">Back</button>';
+      $('#bbBack').onclick = () => { closeOv(); state.onlSub = 'friends'; setTab('world'); renderWorld('online'); };
+    } });
+  });
   el.querySelectorAll('[data-fdel]').forEach(b => b.onclick = () => {
     if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap to remove'; return; }
     O.friends.splice(+b.dataset.fdel, 1); saveGame(); onlineView();
