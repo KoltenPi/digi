@@ -98,7 +98,7 @@ async function main(){
   catch(e){if(e.code!=='EEXIST')throw e;const pid=Number(await fs.readFile(lock,'utf8'));let alive=true;try{process.kill(pid,0);}catch{alive=false;}if(alive)throw Error('A trainer runner is already active.');await fs.unlink(lock);await fs.writeFile(lock,String(process.pid),{flag:'wx'});lockOwned=true;}
   await fs.rm(path.join(data,'stop'),{force:true});
   server=http.createServer(async(req,res)=>{
-    const routes={'/':'index.html','/index.html':'index.html','/wiki_evo.js':'wiki_evo.js','/ai-trainers.js':'ai-trainers.js'};
+    const routes={'/':'index.html','/index.html':'index.html','/wiki_evo.js':'wiki_evo.js','/ai-trainers.js':'ai-trainers.js','/social.js':'social.js'};
     const file=routes[new URL(req.url,'http://localhost').pathname];if(!file){res.writeHead(404);return res.end();}
     res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':'text/html');res.end(await fs.readFile(path.join(root,file)));
   });

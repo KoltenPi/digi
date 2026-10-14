@@ -5889,6 +5889,7 @@ async function netSync(){
   await F.setDoc(F.doc(N.db, 'users', N.uid), jclean({ name: O.name, code: myCode(N.uid), title: titleOf() || '', tamerLv: (G.tamer && G.tamer.lv) || 1, found: foundCount(),
     bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0, pvp: (G.stats && G.stats.pvpWins) || 0, [towerKey()]: towerState().best || 0, gifts: giftsOut(),
     partner: p ? { id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1 } : null, team: teamSnap(),
+    tradeRequest: typeof tradeRequestProfile === 'function' ? tradeRequestProfile() : null,
     ai: typeof aiTrainerProfile === 'function' ? aiTrainerProfile() : null,
     mem: (G.memorial || []).slice(0, 15), memBest: Math.max(0, ...(G.memorial || []).map(e => e.a || 0)), memLast: (G.memorial || []).length ? G.memorial[0].d : 0 }));
   O.synced = Date.now(); saveGame();
@@ -5896,7 +5897,7 @@ async function netSync(){
 document.addEventListener('visibilitychange', () => { if (document.hidden && NET && onl().name) netSync().catch(() => {}); });
 
 // ----- the Online section of the World tab -----
-var ONL_TABS = [['ranks', '🏆 Ranks'], ['raid', '👑 Raid'], ['trades', '🔁 Trades'], ['friends', '👥 Friends'], ['trainers', '🤖 Trainers'], ['memorial', '🕊️ Memorial']];
+var ONL_TABS = [['ranks', '🏆 Ranks'], ['raid', '👑 Raid'], ['trades', '🔁 Trades'], ['requests', '📣 Requests'], ['rivalries', '🤝 Rivalries'], ['friends', '👥 Friends'], ['trainers', '🤖 Trainers'], ['memorial', '🕊️ Memorial']];
 // ----- Memorial: every Tamer's partners that lived out their lifespan, newest first or longest lived -----
 async function viewMemorial(el){
   const N = await net(), F = N.F, sort = state.memSort || 'new', key = sort === 'new' ? 'memLast' : 'memBest';
@@ -5940,7 +5941,7 @@ async function onlineView(msg){
     if (!O.synced || Date.now() - O.synced > 60000) netSync().catch(() => {});
     duelListen().catch(() => {});
     const body = $('#onlBody'); if (!body) return;
-    if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else if (sub === 'trainers') await viewAiTrainers(body); else if (sub === 'memorial') await viewMemorial(body); else await viewFriends(body);
+    if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else if (sub === 'requests') await viewTradeRequests(body); else if (sub === 'rivalries') viewRivalries(body); else if (sub === 'trainers') await viewAiTrainers(body); else if (sub === 'memorial') await viewMemorial(body); else await viewFriends(body);
   }catch(e){
     const b = $('#onlBody'); if (!b) return;
     b.innerHTML = '<div class="err">' + esc(netErr(e)) + '</div><button class="act" id="onlRetry">Try again</button>';
@@ -6182,12 +6183,13 @@ async function viewTrades(el){
       }
     }
     if (t.status !== 'taken') continue;
-    if (!O.claimed[d.id]){ O.claimed[d.id] = 1; G.data += t.paid || 0; sold.push(t.monName + ' went to ' + (t.takerName || 'someone') + (t.paid ? ' for ' + t.paid + ' DigiData' : '')); }
+    if (!O.claimed[d.id]){ O.claimed[d.id] = 1; G.data += t.paid || 0; relationshipEvent(t.taker,t.takerName,'trade','sale:'+d.id); sold.push(t.monName + ' went to ' + (t.takerName || 'someone') + (t.paid ? ' for ' + t.paid + ' DigiData' : '')); }
     F.deleteDoc(d.ref).catch(() => {});
   }
   if (sold.length){ saveGame(); updateCount(); }
   const open = await F.getDocs(F.query(F.collection(N.db, 'trades'), F.where('status', '==', 'open'), F.limit(60)));
-  const list = open.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data())).sort((a, b) => ((b.t && b.t.seconds) || 0) - ((a.t && a.t.seconds) || 0)).concat(botTrades());
+  const wanted=state.requestOffers;
+  const list = open.docs.map(d => Object.assign({ id: d.id, ref: d.ref }, d.data())).sort((a, b) => ((b.t && b.t.seconds) || 0) - ((a.t && a.t.seconds) || 0)).concat(botTrades()).filter(t=>!wanted||((t.mon?.id||t.monId)===wanted.monId&&t.price<=wanted.price&&t.from!==N.uid));
   const card = t => '<div class="tcard"><img alt="" src="' + esc(t.monImage) + '"><div><b>' + esc(t.monName) + '</b><small>' + LEVEL_EN[STAGES[t.monStage]] + ' · Lv ' + t.monLevel + ' · from ' + esc(t.fromName || '?') + (t.bot ? ' ' + botTag : '') + '</small>' + (t.note ? '<small>“' + esc(t.note) + '”</small>' : '') + '</div>' +
     (t.from === N.uid ? '<button class="ghost" data-tcancel="' + t.id + '">Cancel</button>' : '<button class="act" data-ttake="' + t.id + '"' + (G.data < (t.price || 0) ? ' disabled' : '') + '>' + (t.price ? t.price + ' DD' : 'Free') + '</button>') + '</div>';
   el.innerHTML = (sold.length ? '<p class="ownline" style="color:var(--good)">💰 ' + esc(sold.join('. ')) + '.</p>' : '') +
@@ -6195,6 +6197,7 @@ async function viewTrades(el){
     '<button class="act wide" id="tPostBtn">📤 Post a Digimon from your Box</button><div id="tPost" hidden></div>' +
     '<div class="lbs">' + (list.length ? list.map(card).join('') : '<p class="ownline">No trades posted yet.</p>') + '</div>' +
     '<p class="ownline">Posting a Digimon takes it out of your Box until someone takes it or you cancel. When someone takes it, you get the price the next time you open this board. AI Tamers 🤖 post new Digimon every 6 hours, and they may buy listings that have been up for a few hours if the price is fair.</p>';
+  if(wanted){el.insertAdjacentHTML('afterbegin','<p>Offers matching '+esc(wanted.monName)+' · up to '+wanted.price+' DD</p><button class="ghost" id="allTrades">Show all trades</button>');el.querySelector('#allTrades').onclick=()=>{state.requestOffers=null;viewTrades(el).catch(e=>onlSay(netErr(e)));};}
   $('#tPostBtn').onclick = () => tradePostForm($('#tPost'));
   el.querySelectorAll('[data-ttake]').forEach(b => b.onclick = async () => {
     const t = list.find(x => x.id === b.dataset.ttake); if (!t) return;
@@ -6205,6 +6208,7 @@ async function viewTrades(el){
     if (t.bot){
       const m = makePartner(t.monId); m.stage = t.monStage; m.stageLine = [t.monStage]; m.level = t.monLevel; m.xp = 0; m.line = [t.monId]; syncMoves(m);
       G.data -= t.price || 0; G.box.push(m); G.botTaken[t.id] = 1; bump('trades'); saveGame(); updateCount();
+      relationshipEvent(t.from||t.id,t.fromName,'trade','buy:'+t.id);completeTradeRequest(m);
       onlineView('🔁 ' + t.monName + ' joined your Box! ' + t.fromName + ' 🤖 says thanks.');
       return;
     }
@@ -6215,6 +6219,7 @@ async function viewTrades(el){
       });
       const m = Object.assign({}, t.mon); delete m.exp; delete m.fav; m.last = Date.now();
       G.data -= t.price || 0; G.box.push(m); bump('trades'); if (!raised(m.id)) G.col[m.id] = 'raised'; saveGame(); updateCount();
+      relationshipEvent(t.from,t.fromName,'trade','buy:'+t.id);completeTradeRequest(m);
       onlineView('🔁 ' + t.monName + ' joined your Box!');
     }catch(e){ onlSay(e && e.code === 'gone' ? 'Someone else got there first.' : netErr(e)); viewTrades(el).catch(() => {}); }
   });
@@ -6229,18 +6234,19 @@ async function viewTrades(el){
     }catch(e){ onlSay(netErr(e)); b.disabled = false; }
   });
 }
-function tradePostForm(box){
+function tradePostForm(box,request){
   if (!box.hidden){ box.hidden = true; return; }
-  const ok = G.box.map((m, i) => [m, i]).filter(([m]) => !m.exp && !m.fav);
+  const ok = G.box.map((m, i) => [m, i]).filter(([m]) => !m.exp && !m.fav && (!request || m.id === request.monId));
   box.hidden = false;
   box.innerHTML = ok.length ? '<p class="ownline">Pick a Digimon (favorites and ones on expeditions can\'t be traded):</p><div class="tpick">' + ok.map(([m, i]) => '<button class="bcell" data-tpick="' + i + '"><img alt="" src="' + esc(m.image) + '"><b>' + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + '</small></button>').join('') + '</div>' +
       '<div class="bkrow"><input id="tPrice" class="onlin" type="number" min="0" max="9999" inputmode="numeric" placeholder="Price in DigiData (0 = free)"><input id="tNote" class="onlin" maxlength="40" placeholder="Note (optional)"></div><button class="big" id="tSend" disabled>Post trade</button>'
     : '<p class="ownline">You have nothing to trade. Put a Digimon in your Box first.</p>';
+  if(request&&ok.length){box.querySelector('#tPrice').value=request.price;box.querySelector('#tPrice').max=request.price;box.querySelector('#tNote').value=('For '+request.name+' · request').slice(0,40);}
   let sel = null;
-  box.querySelectorAll('[data-tpick]').forEach(b => b.onclick = () => { sel = +b.dataset.tpick; box.querySelectorAll('[data-tpick]').forEach(x => x.classList.toggle('on', x === b)); $('#tSend').disabled = false; });
-  const send = $('#tSend'); if (send) send.onclick = async () => {
-    const m = G.box[sel]; if (!m) return;
-    const price = Math.max(0, Math.min(9999, Math.round(+$('#tPrice').value || 0))), note = String($('#tNote').value || '').replace(/[<>]/g, '').trim().slice(0, 40);
+  box.querySelectorAll('[data-tpick]').forEach(b => b.onclick = () => { sel = +b.dataset.tpick; box.querySelectorAll('[data-tpick]').forEach(x => x.classList.toggle('on', x === b)); box.querySelector('#tSend').disabled = false; });
+  const send = box.querySelector('#tSend'); if (send) send.onclick = async () => {
+    const m = G.box[sel]; if (!m || m.exp || m.fav || (request && m.id!==request.monId)) return;
+    const price = Math.max(0, Math.min(request?request.price:9999, Math.round(+box.querySelector('#tPrice').value || 0))), note = String(box.querySelector('#tNote').value || '').replace(/[<>]/g, '').trim().slice(0, 40);
     send.disabled = true;
     try{
       const N = await net(), F = N.F, mon = jclean(m); delete mon.exp; delete mon.fav; delete mon.msg;
@@ -6295,11 +6301,11 @@ async function viewFriends(el){
   el.querySelectorAll('[data-gsend]').forEach(b => b.onclick = async () => {
     const f = docs[+b.dataset.gsend]; if (!f || (O.giftsOut && O.giftsOut[f.uid] && O.giftsOut[f.uid].d === today)) return;
     b.disabled = true; O.giftsOut = giftsOut(); O.giftsOut[f.uid] = { d: today, k: pick(GIFT_POOL) }; G.data += 15; bump('giftsSent'); saveGame(); updateCount();
-    try{ await netSync(); onlineView('🎁 Gift sent to ' + f.name + '! They can open it from their Friends list today or tomorrow. +15 DigiData.'); }catch(e){ onlSay(netErr(e)); }
+    try{ await netSync(); relationshipEvent(f.uid,f.name,'gift','gift-out:'+today); onlineView('🎁 Gift sent to ' + f.name + '! They can open it from their Friends list today or tomorrow. +15 DigiData.'); }catch(e){ onlSay(netErr(e)); }
   });
   el.querySelectorAll('[data-gopen]').forEach(b => b.onclick = () => {
     const f = docs[+b.dataset.gopen], g = gIn(f); if (!g) return;
-    O.giftsIn[f.uid + ':' + g.d] = 1; grantItem(g.k); G.data += 30; bump('giftsGot'); saveGame(); updateCount();
+    O.giftsIn[f.uid + ':' + g.d] = 1; grantItem(g.k); G.data += 30; bump('giftsGot'); relationshipEvent(f.uid,f.name,'gift','gift-in:'+g.d); saveGame(); updateCount();
     onlineView('🎁 ' + f.name + ' sent you ' + itemIcon(g.k === 'egg' ? 'egg:mystery' : g.k) + ' ' + (g.k === 'egg' ? 'a Mystery Egg' : itemName(g.k)) + ' and 30 DigiData!');
   });
   el.querySelectorAll('[data-bbat]').forEach(b => b.onclick = () => {
@@ -6307,6 +6313,7 @@ async function viewFriends(el){
     if (asleep(p) || careInit(p).sick || p.energy < 25){ onlSay(p.name + (asleep(p) ? ' is asleep.' : careInit(p).sick ? ' is sick.' : ' is too tired (25 energy).')); return; }
     p.energy = clamp(p.energy - 25); saveGame();
     battle(DIFFS[1], { foe, title: '🤖 vs ' + bs.name + '\'s ' + foe.name, onDone: outcome => {
+      if(outcome==='win'||outcome==='lose')relationshipEvent(bs.uid,bs.name,outcome==='win'?'win':'loss');
       O.botWin = O.botWin || {};
       let line = outcome === 'win' ? p.name + ' beat ' + bs.name + '\'s ' + foe.name + '!' : outcome === 'lose' ? bs.name + '\'s ' + foe.name + ' won this time.' : 'You ran away.';
       if (outcome === 'win'){ bump('botWins'); if (O.botWin[bs.uid] !== today){ O.botWin[bs.uid] = today; const dd = 40 + bs.tamerLv * 6; G.data += dd; addBond(p, 2); line += ' +' + dd + ' DigiData (first win today).'; if (Math.random() < 0.2){ const k = randomDisc(); giveItem(k); line += ' They gave you 💿 ' + itemName(k) + '!'; } } }
@@ -6326,6 +6333,7 @@ async function viewFriends(el){
     p.energy = clamp(p.energy - 25); saveGame();
     battle(DIFFS[1], { foe, title: '🤝 vs ' + f.name + '\'s ' + foe.name, onDone: (outcome) => {
       let line = outcome === 'win' ? p.name + ' beat ' + f.name + '\'s ' + foe.name + '!' : outcome === 'lose' ? f.name + '\'s ' + foe.name + ' won this time.' : 'You ran away.';
+      if(outcome==='win'||outcome==='lose')relationshipEvent(f.uid,f.name,outcome==='win'?'win':'loss');
       if (outcome === 'win' && O.fb[f.uid] !== today){ O.fb[f.uid] = today; G.data += 60; addBond(p, 2); line += ' +60 DigiData (first win today).'; }
       saveGame(); updateCount();
       $('#overlay .sheet').innerHTML = '<h4>🤝 Friend battle</h4><p style="margin:0">' + esc(line) + '</p><button class="big" id="fbBack">Back</button>';
@@ -6652,7 +6660,7 @@ function duelFinish(S, winner, reason){
   let line = won ? '🏆 You beat ' + them + '!' : '😤 ' + them + ' won this time.';
   if (reason === 'timeout') line = won ? '🏆 ' + them + ' left the battle, so you win!' : '⌛ You were away too long, so ' + them + ' wins.';
   if (!G.duels[S.id]){
-    G.duels[S.id] = Date.now();
+    G.duels[S.id] = Date.now();relationshipEvent(friend,them,won?'win':'loss','duel:'+S.id);
     const ids = Object.keys(G.duels); if (ids.length > 60) ids.sort((a, b) => G.duels[a] - G.duels[b]).slice(0, ids.length - 60).forEach(k => delete G.duels[k]);
     if (won){
       let dd = 40; O.lw = O.lw || {};
@@ -6762,5 +6770,6 @@ setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
 </script>
 <script src="ai-trainers.js"></script>
+<script src="social.js"></script>
 </body>
 </html>

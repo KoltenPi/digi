@@ -10,7 +10,7 @@
     const bestSlot=G.party.reduce((best,m,i)=>!G.party[best]||m.stage>G.party[best].stage||(m.stage===G.party[best].stage&&(m.level||1)>(G.party[best].level||1))?i:best,-1);
     return {partner:!!p,pending:!!a.pending,uid:NET?.uid,daily:dailyReady(),money:G.data||0,medicineCost:MED_COST,
       stage:p?.stage||0,level:p?.level||1,hunger:p?.hunger||0,energy:p?.energy||0,mood:p?.mood||0,poop:p?.poop||0,sick:p?.sick||0,sleeping:p?asleep(p):false,
-      canEvolve:p?canEvolve(p):false,lastEvolveAttempt:a.lastEvolveAttempt||0,lastRaidAttempt:a.lastRaidAttempt||0,lastMarket:a.lastMarket||0,
+      canEvolve:p?canEvolve(p):false,lastEvolveAttempt:a.lastEvolveAttempt||0,lastRaidAttempt:a.lastRaidAttempt||0,lastMarket:a.lastMarket||0,lastRival:a.lastRival||0,
       raidLeft:RAID_TRIES-R.used,raidJoined:R.joined,raidDaysLeft:((weekNo()+1)*7*864e5-3*864e5-Date.now())/864e5,
       active:G.active,bestSlot,bestStage:G.party[bestSlot]?.stage||0,youngSlot:G.party.findIndex(m=>m.stage<5&&!m.final),
       surplusSlot:G.party.findIndex((m,i)=>i!==bestSlot&&m.stage>=4&&!m.fav&&!m.exp),
@@ -86,6 +86,16 @@
         else if($('#evoLater'))click('#evoLater');else if($('#ovClose'))click('#ovClose');
         break;
       }
+      case 'rival': {
+        a.lastRival=Date.now();saveGame();
+        const rivals=botAll().filter(b=>b.partner&&b.stage<=p.stage&&b.partner.level<=(p.level||1)+5);
+        if(!rivals.length){note('Looking for a suitable rival');break;}
+        const rival=rivals[(bot.id.length)%rivals.length];
+        await equip(bot);store.set('dx_auto',true);
+        const host=document.createElement('div');host.id='trainerFriends';document.body.appendChild(host);
+        try{await viewFriends(host);click('#trainerFriends [data-bbat="'+rival.uid.slice(3)+'"]');await until(()=>!!$('#bDone'));click('#bDone');await until(()=>!!$('#bbBack'));click('#bbBack');}
+        finally{host.remove();}break;
+      }
       case 'raid': {
         a.lastRaidAttempt=Date.now();saveGame();
         if(!p||p.stage<5||asleep(p)||p.sick||p.energy<50||raidLocal().used>=RAID_TRIES)break;
@@ -102,23 +112,32 @@
     const mine=await F.getDocs(F.query(F.collection(N.db,'trades'),F.where('from','==',N.uid)));
     O.claimed=O.claimed||{};
     for(const d of mine.docs){const t=d.data();if(t.status==='taken'&&!O.claimed[d.id]){
-      O.claimed[d.id]=1;G.data+=t.paid||0;a.tradesSold=(a.tradesSold||0)+1;a.tradeRevenue=(a.tradeRevenue||0)+(t.paid||0);note('Sold '+t.monName+' for '+(t.paid||0)+' DigiData');
+      O.claimed[d.id]=1;G.data+=t.paid||0;if(typeof relationshipEvent==='function')relationshipEvent(t.taker,t.takerName,'trade','sale:'+d.id);a.tradesSold=(a.tradesSold||0)+1;a.tradeRevenue=(a.tradeRevenue||0)+(t.paid||0);note('Sold '+t.monName+' for '+(t.paid||0)+' DigiData');
     }}
     note('Checked the trade board using earned DigiData');saveGame();
     const offers=await F.getDocs(F.query(F.collection(N.db,'trades'),F.where('status','==','open'),F.limit(60)));
+    if(typeof tradeRequestProfile==='function'&&!tradeRequestProfile()?.active&&G.data>=100&&G.box.length<G.boxCap){
+      const owned=new Set([...G.party,...G.box].map(m=>m.id));
+      const pool=state.all.filter(m=>!owned.has(m.id)&&(state.stageIds[0]||[]).includes(m.id));
+      const m=pool[(a.id.length+(a.actions||0))%Math.max(1,pool.length)];
+      if(m)O.tradeRequest={id:crypto.randomUUID(),active:true,monId:m.id,monName:m.name,price:Math.min(250,Math.floor(G.data*.2)),expiresAt:Date.now()+7*864e5};saveGame();
+    }
     return {offers:offers.docs.map(d=>({id:d.id,...d.data()})),hasOpen:mine.docs.some(d=>d.data().status==='open'),snapshot:snapshot()};
   }
   async function prepareTrade(offer,hasOpen,bot){
     const a=day(),N=await net(),F=N.F;if(a.pending)throw Error('Trade already pending');
     if(offer){
       if(a.buysToday>=2||G.box.length>=G.boxCap||G.data<offer.price)throw Error('Purchase limit');
-      a.pending={kind:'buy',id:offer.id,price:offer.price,mon:offer.mon,from:offer.from};
+      a.pending={kind:'buy',id:offer.id,price:offer.price,mon:offer.mon,from:offer.from,fromName:offer.fromName||'Trainer'};
     }else if(!hasOpen&&a.postsToday<1){
-      const m=G.box.filter(m=>!m.fav&&!m.exp).sort((a,b)=>b.stage-a.stage)[0];
+      const requests=typeof openTradeRequests==='function'?await openTradeRequests():[];
+      const spare=G.box.filter(m=>!m.fav&&!m.exp).sort((a,b)=>b.stage-a.stage);
+      const request=requests.find(r=>r.uid!==N.uid&&spare.some(m=>m.id===r.monId&&r.price>=releaseValue(m)*.8));
+      const m=(request?spare.find(m=>m.id===request.monId):null)||spare[0];
       if(!m)return false;
       if(!m.agentItemId)m.agentItemId=crypto.randomUUID();
       const mon=jclean(m);delete mon.msg;
-      a.pending={kind:'sell',id:F.doc(F.collection(N.db,'trades')).id,mon,price:Math.max(1,Math.min(9999,Math.round(releaseValue(m)*(bot.id==='harbor'?.8:1.1))))};
+      a.pending={kind:'sell',id:F.doc(F.collection(N.db,'trades')).id,mon,price:Math.max(1,Math.min(request?request.price:9999,Math.round(releaseValue(m)*(bot.id==='harbor'?.8:1.1)))),requestName:request?.name||''};
     }else return false;
     saveGame();return true; // Runner MUST persist this journal before settlement.
   }
@@ -134,12 +153,12 @@
         if(G.data<p.price||G.box.length>=G.boxCap)return false;
         tx.update(ref,{status:'taken',taker:N.uid,takerName:onl().name,paid:p.price});return true;
       });
-      if(ok){const m=jclean(p.mon);delete m.fav;delete m.exp;delete m.agentItemId;m.last=Date.now();G.data-=p.price;G.box.push(m);G.col[m.id]='raised';a.buysToday++;a.tradesBought=(a.tradesBought||0)+1;note('Bought '+m.name+' for '+p.price+' DigiData');}
+      if(ok){const m=jclean(p.mon);delete m.fav;delete m.exp;delete m.agentItemId;m.last=Date.now();G.data-=p.price;G.box.push(m);G.col[m.id]='raised';a.buysToday++;a.tradesBought=(a.tradesBought||0)+1;if(typeof relationshipEvent==='function')relationshipEvent(p.from,p.fromName,'trade','buy:'+p.id);if(typeof completeTradeRequest==='function')completeTradeRequest(m);note('Bought '+m.name+' for '+p.price+' DigiData');}
     }else{
       const index=G.box.findIndex(m=>m.agentItemId===p.mon.agentItemId);if(index<0)throw Error('Pending sale inventory missing');
       await F.runTransaction(N.db,async tx=>{
         const s=await tx.get(ref);if(s.exists()){if(s.data().from!==N.uid)throw Error('Trade identity mismatch');return;}
-        tx.set(ref,{from:N.uid,fromName:onl().name,mon:p.mon,monName:p.mon.name,monImage:p.mon.image,monStage:p.mon.stage,monLevel:p.mon.level||1,price:p.price,note:'ChatGPT strategy bot · '+a.strategy.slice(0,12),status:'open',t:F.serverTimestamp()});
+        tx.set(ref,{from:N.uid,fromName:onl().name,mon:p.mon,monName:p.mon.name,monImage:p.mon.image,monStage:p.mon.stage,monLevel:p.mon.level||1,price:p.price,note:p.requestName?('For '+p.requestName+' · request').slice(0,40):'ChatGPT strategy bot · '+a.strategy.slice(0,12),status:'open',t:F.serverTimestamp()});
       });
       G.box.splice(index,1);a.postsToday++;note('Listed '+p.mon.name+' for '+p.price+' DigiData');
     }
