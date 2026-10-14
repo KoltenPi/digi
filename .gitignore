@@ -1,0 +1,4 @@
+node_modules/
+trainers/data/
+trainers/*.log
+.env

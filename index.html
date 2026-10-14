@@ -5702,13 +5702,14 @@ async function netSync(){
   const N = await net(), F = N.F, p = P();
   await F.setDoc(F.doc(N.db, 'users', N.uid), jclean({ name: O.name, code: myCode(N.uid), title: titleOf() || '', tamerLv: (G.tamer && G.tamer.lv) || 1, found: foundCount(),
     bestStreak: (G.stats && G.stats.bestStreak) || 0, colo: (G.colo && G.colo.best) || 0, pvp: (G.stats && G.stats.pvpWins) || 0, [towerKey()]: towerState().best || 0, gifts: giftsOut(),
-    partner: p ? { id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1 } : null, team: teamSnap() }));
+    partner: p ? { id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1 } : null, team: teamSnap(),
+    ai: typeof aiTrainerProfile === 'function' ? aiTrainerProfile() : null }));
   O.synced = Date.now(); saveGame();
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && NET && onl().name) netSync().catch(() => {}); });
 
 // ----- the Online section of the World tab -----
-var ONL_TABS = [['ranks', '🏆 Ranks'], ['raid', '👑 Raid'], ['trades', '🔁 Trades'], ['friends', '👥 Friends']];
+var ONL_TABS = [['ranks', '🏆 Ranks'], ['raid', '👑 Raid'], ['trades', '🔁 Trades'], ['friends', '👥 Friends'], ['trainers', '🤖 Trainers']];
 async function onlineView(msg){
   const el = $('#onl'); if (!el) return;
   const O = onl();
@@ -5735,7 +5736,7 @@ async function onlineView(msg){
     if (!O.synced || Date.now() - O.synced > 60000) netSync().catch(() => {});
     duelListen().catch(() => {});
     const body = $('#onlBody'); if (!body) return;
-    if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else await viewFriends(body);
+    if (sub === 'ranks') await viewRanks(body); else if (sub === 'raid') await viewRaid(body); else if (sub === 'trades') await viewTrades(body); else if (sub === 'trainers') await viewAiTrainers(body); else await viewFriends(body);
   }catch(e){
     const b = $('#onlBody'); if (!b) return;
     b.innerHTML = '<div class="err">' + esc(netErr(e)) + '</div><button class="act" id="onlRetry">Try again</button>';
@@ -6547,5 +6548,6 @@ questInit(); updateQuestBadge();
 setTab(location.hash && +location.hash.slice(1) ? 'index' : state.tab);
 loadAll();
 </script>
+<script src="ai-trainers.js"></script>
 </body>
 </html>
