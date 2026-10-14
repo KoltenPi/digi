@@ -1583,7 +1583,7 @@ function renderPartner(){
   const rbb = $('#rebirthBtn'); if (rbb) rbb.onclick = () => {
     if ((p.gen || 0) >= 5 || (p.level || 1) < 40) return;
     if (!rbb.dataset.armed){ rbb.dataset.armed = '1'; rbb.innerHTML = 'Tap again to rebirth ' + esc(p.name) + '<small>it goes back to the start of its line</small>'; setTimeout(() => { if (rbb.isConnected && rbb.dataset.armed) renderPartner(); }, 3500); return; }
-    rebirth(p); saveGame(); renderPartner(); updateCount();
+    rbb.disabled = true; rebirth(p).then(() => { saveGame(); renderPartner(); updateCount(); });
   };
   const rb = $('#retireBtn'); if (rb) rb.onclick = () => {
     if (rb.dataset.armed){ retire(); return; }
@@ -2006,7 +2006,7 @@ function boxMenu(i){
   const rbn = $('#bxReborn'); if (rbn) rbn.onclick = () => {
     if ((m.gen || 0) >= 5) return;
     if (!rbn.dataset.armed){ rbn.dataset.armed = '1'; rbn.innerHTML = 'Tap again to rebirth ' + esc(m.name) + '<small>it goes back to the start of its line, Lv 1</small>'; return; }
-    rebirth(m); saveGame(); closeOv(); renderBox(); updateCount();
+    rbn.disabled = true; rebirth(m).then(() => { saveGame(); closeOv(); renderBox(); updateCount(); });
   };
   $('#bxClose').onclick = () => { closeOv(); renderBox(); };
   const c = $('#bxCollect'); if (c) c.onclick = () => collectExpeditions([m]);
@@ -2105,10 +2105,25 @@ async function collectExpeditions(list){
   $('#exDone').onclick = () => { closeOv(); renderBox(); updateCount(); };
 }
 
-// rebirth: a Lv 40+ Mega goes back to the first Digimon of its line as a new generation: +6% to every stat per generation (up to 5),
+// rebirth: a Lv 40+ Mega goes back to the baby (Fresh) Digimon its line starts from as a new generation: +6% to every stat per generation (up to 5),
 // keeps 30% of its trained stats, half its bond, all its moves and its held item
-function rebirth(m){
-  const first = (m.line || []).find(id => state.byId.has(id)) || m.id, b = state.byId.get(first), st = (m.stageLine || [0])[0] || 0;
+// the Fresh (baby) Digimon a line starts from: walk back through earlier forms until one is found, or pick a fitting baby
+async function babyOf(id){
+  if (inStage(id, 0)) return id;
+  const seen = new Set([id]); let frontier = [id];
+  for (let depth = 0; depth < 6 && frontier.length; depth++){
+    const next = [];
+    for (const f of frontier){
+      let d; try{ d = await getDetail(f); }catch{ continue; }
+      for (const e of d.priorEvolutions || []){ const pid = evoId(e); if (pid == null || seen.has(pid) || !state.byId.has(pid)) continue; seen.add(pid); if (inStage(pid, 0)) return pid; next.push(pid); }
+    }
+    frontier = next.slice(0, 12);
+  }
+  const pool = (state.stageIds[0] || []).filter(x => state.byId.has(x) && !isExtra(x));
+  return pool.length ? pool[Math.floor(Math.abs(seeded(id, 31)) * pool.length) % pool.length] : id;
+}
+async function rebirth(m){
+  const first = await babyOf((m.line || []).find(id => state.byId.has(id)) || m.id), b = state.byId.get(first), st = 0;
   const g = growthOf(m); Object.keys(g).forEach(k => g[k] = Math.round((g[k] || 0) * 0.3));
   const prev = m.name;
   Object.assign(m, { id: first, name: b.name, image: b.image, stage: st, level: STAGE_MIN_LV[st] || 1, xp: 0, evo: 0, mistakes: 0, stageMistakes: 0, stageLosses: 0, stageWins: 0,
@@ -4807,7 +4822,7 @@ function trainerScreen(tab, msg){
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
   { v: 32, title: 'Rare encounters, AI battles, gifts and a login calendar', items: ['✨ Rare encounters: some Digimon only show up in certain weather or at night (ice Digimon in snow, water Digimon in rain, ghosts at midnight and more). About 1 in 10 wild battles in the right conditions; they give double rewards and sometimes leave an egg.', '🤖 Battle the AI Tamers: World → Online → Friends lists every AI Tamer. Your first win against each one every day pays DigiData and sometimes a Move Disc.', '🎁 Friend gifts: send each friend one small gift a day (+15 DigiData for you); they open it from their Friends list.', '📅 Login calendar: every daily reward you claim also stamps a 28-day monthly calendar, with big prizes on days 7, 14, 21 and 28 (a Mega Egg).', '🗼 Tower leaderboard: a new Ranks tab for the highest Tower floor this week, AI Tamers included.', 'Your partner\'s passive now shows on the Partner page and in the Box. ⏩ Speed (1x/2x/4x) now works in dungeons too.'] },
-  { v: 31, title: 'Smarter defaults', items: ['🥚 Rebirth is now also on the Partner page, next to Send to the Box, for a Lv 40+ Mega.', 'Every Digimon you bring into a dungeon now earns the digivolution points, not just your partner (half for teammates that fainted along the way).', 'When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the best team” for team expeditions now picks the Digimon with the highest chance of a smooth trip on that expedition, counting synergies (picked together so their bonuses kick in) and, on HARD trips, the stats team members lend each other. Rewards only break ties.'] },
+  { v: 31, title: 'Smarter defaults', items: ['🥚 Rebirth is now also on the Partner page, next to Send to the Box, for a Lv 40+ Mega, and it always goes all the way back to a baby (Fresh) Digimon, even if your Digimon first hatched at a higher level.', 'Every Digimon you bring into a dungeon now earns the digivolution points, not just your partner (half for teammates that fainted along the way).', 'When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the best team” for team expeditions now picks the Digimon with the highest chance of a smooth trip on that expedition, counting synergies (picked together so their bonuses kick in) and, on HARD trips, the stats team members lend each other. Rewards only break ties.'] },
   { v: 30, title: 'More synergies, achievements and titles', items: ['15 new synergies: Legendary Warriors, DATS Partners, Three Great Angels, DigiDestined 02, Knight Order, Dragon Kin, Heaven\'s Host, Night Haunt, Bug Swarm, Deep Ones, Joke Squad, and level groups: Rookie Rally, Champion Corps, Ultimate Vanguard and Mega Squad.', 'New titles: raise 3 different members of a named synergy group to unlock its title, like Knight Commander, Demon Lord, DigiDestined, Spirit Warrior or Dragon Tamer (21 in all). See your progress in the Synergies screen.', '23 new achievements (each one is also a title): Tower floors, Move Discs, rebirths, HARD expeditions, raid rewards, trades, synergies and more.'] },
   { v: 29, title: 'Leveling rebalance', items: ['Levels now take a bit longer: XP is +25% instead of +50%, about halfway between the old slow pace and the fast one. Catch-up for Digimon that lag behind their stage is now 1.5x for the first 4 levels.', 'Moves are learned 1–2 levels later than before. Moves your Digimon already know stay learned.'] },
   { v: 28, title: 'Tower, Move Discs, passives and rebirth', items: ['🗼 Tower (World tab): climb 50 floors of tougher foes, carrying your HP between floors. Every 5th floor gives a Move Disc, every 10th is a boss with a big prize (up to a Mega Egg). Resets every week.', '💿 Move Discs: teach any Digimon a new move from its Moves screen. 28 discs, from Double hits to Barriers. They drop from Hard and Nightmare battles, dungeon bosses, HARD expeditions and the Tower, and the Shop sells random ones.', 'Passives: every species now has a passive based on its attribute (Vaccine, Virus, Data or Free), like Guardian, Venom Touch, Analyzer or Second Wind. See it in the Moves screen and next to its name in battle.', '🥚 Rebirth: a Lv 40+ Mega in the Box can start over as a new generation, keeping its moves and 30% of its training, with +6% to every stat per generation (up to Gen 6).', '🔍 Box search: filter by name, level (rookie, mega), fav or away.', '⏩ Battle speed: tap the 1x/2x/4x button in any battle.'] },
