@@ -1958,7 +1958,7 @@ function teamExpedition(exKey, sel){
     if (sel.has(m)) sel.delete(m); else if (sel.size >= free){ $('#teMsg').textContent = free ? 'A team can have up to ' + TEAM_MAX + ' Digimon.' : 'All expedition slots are busy. Get more in the Shop.'; return; } else sel.add(m);
     teamExpedition(ex.key, sel);
   });
-  $('#teBest').onclick = () => { sel.clear(); (ex.need ? idle.slice().sort((a, b) => expScore(b, ex) - expScore(a, ex)) : idle).slice(0, free).forEach(m => sel.add(m)); teamExpedition(ex.key, sel); };
+  $('#teBest').onclick = () => { sel.clear(); bestTeam(idle, ex, free).forEach(m => sel.add(m)); teamExpedition(ex.key, sel); };
   $('#teClear').onclick = () => { sel.clear(); teamExpedition(ex.key, sel); };
   $('#teBack').onclick = () => teamExpedition(null, sel);
   $('#teGo').onclick = () => {
@@ -2272,6 +2272,29 @@ const SYNERGIES = [
   { key: 's_mega', name: 'Mega Squad', icon: '👑', need: 3, stage: 5, st: { all: 0.05 } },
 ];
 const SYN_EXP = { data: 0.15, xp: 0.15, odds: 0.05 };   // per active synergy on a team expedition
+// what a team is expected to bring back: each member's rewards × its chance of a smooth trip, with synergy bonuses
+function teamValue(team, ex){
+  const act = activeSyn(team), rough = ex.hard ? 0.3 : 0.5;
+  return team.reduce((sum, m) => {
+    const sb = act.filter(a => synergiesOf(m).includes(a.g)).length, est = expEstimate(m, ex);
+    const odds = Math.min(0.99, expOdds(m, ex, ex.need ? team : null) + SYN_EXP.odds * sb);
+    return sum + (est.data * (1 + SYN_EXP.data * sb) + est.xp * XP_MUL * (1 + SYN_EXP.xp * sb)) * (odds + (1 - odds) * rough);
+  }, 0);
+}
+// pick the best team: add whichever Digimon raises the team's value most (so synergy partners get picked together), then try swaps
+function bestTeam(idle, ex, size){
+  const pool = idle.slice(), team = [];
+  while (team.length < size && pool.length){
+    let best = -1, bv = -1;
+    pool.forEach((m, i) => { const v = teamValue(team.concat(m), ex); if (v > bv){ bv = v; best = i; } });
+    team.push(pool.splice(best, 1)[0]);
+  }
+  for (let pass = 0; pass < 2; pass++) for (let i = 0; i < team.length; i++) for (let j = 0; j < pool.length; j++){
+    const t2 = team.slice(); t2[i] = pool[j];
+    if (teamValue(t2, ex) > teamValue(team, ex) + 0.01){ const out = team[i]; team[i] = pool[j]; pool[j] = out; }
+  }
+  return team;
+}
 function synElem(id){ try{ return ELEM_CACHE[id] || null; }catch{ return null; } }
 function synergiesOf(m){
   const name = (state.byId.get(m.id) || {}).name || m.name || '', e = synElem(m.id);
@@ -2542,8 +2565,14 @@ async function syncMoves(p){
   for (const m of learnset(p.id, d, p.stage)){
     if (m.learn > p.level || p.moves.some(k => k.name === m.name)) continue;
     p.moves.push({ name: m.name, kind: m.kind, power: m.power, desc: m.desc });
+    let swapNote = '';
     if (p.equip.length < 4) p.equip.push(m.name);
-    learned.push(m.name);
+    else {
+      // equip slots full: the new move replaces the lowest-level equipped move (the one learned longest ago), but Tackle stays as the free attack
+      const rank = n => p.moves.findIndex(k => k.name === n), old = p.equip.filter(n => n !== BASIC.name).sort((a, b) => rank(a) - rank(b))[0];
+      if (old){ p.equip[p.equip.indexOf(old)] = m.name; swapNote = ' (equipped in place of ' + old + ')'; }
+    }
+    learned.push(m.name + swapNote);
   }
   if (learned.length) saveGame();
   return learned;
@@ -4716,6 +4745,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 31, title: 'Smarter defaults', items: ['When your Digimon learns a new move and all 4 move slots are full, the new move now replaces your oldest equipped move automatically (Tackle stays as your free attack). Change it any time in Moves.', '🧭 “Pick the strongest” for team expeditions now builds the best team for that trip: it weighs each Digimon\'s rewards and odds, and picks synergy partners together so their bonuses kick in.'] },
   { v: 30, title: 'More synergies, achievements and titles', items: ['15 new synergies: Legendary Warriors, DATS Partners, Three Great Angels, DigiDestined 02, Knight Order, Dragon Kin, Heaven\'s Host, Night Haunt, Bug Swarm, Deep Ones, Joke Squad, and level groups: Rookie Rally, Champion Corps, Ultimate Vanguard and Mega Squad.', 'New titles: raise 3 different members of a named synergy group to unlock its title, like Knight Commander, Demon Lord, DigiDestined, Spirit Warrior or Dragon Tamer (21 in all). See your progress in the Synergies screen.', '23 new achievements (each one is also a title): Tower floors, Move Discs, rebirths, HARD expeditions, raid rewards, trades, synergies and more.'] },
   { v: 29, title: 'Leveling rebalance', items: ['Levels now take a bit longer: XP is +25% instead of +50%, about halfway between the old slow pace and the fast one. Catch-up for Digimon that lag behind their stage is now 1.5x for the first 4 levels.', 'Moves are learned 1–2 levels later than before. Moves your Digimon already know stay learned.'] },
   { v: 28, title: 'Tower, Move Discs, passives and rebirth', items: ['🗼 Tower (World tab): climb 50 floors of tougher foes, carrying your HP between floors. Every 5th floor gives a Move Disc, every 10th is a boss with a big prize (up to a Mega Egg). Resets every week.', '💿 Move Discs: teach any Digimon a new move from its Moves screen. 28 discs, from Double hits to Barriers. They drop from Hard and Nightmare battles, dungeon bosses, HARD expeditions and the Tower, and the Shop sells random ones.', 'Passives: every species now has a passive based on its attribute (Vaccine, Virus, Data or Free), like Guardian, Venom Touch, Analyzer or Second Wind. See it in the Moves screen and next to its name in battle.', '🥚 Rebirth: a Lv 40+ Mega in the Box can start over as a new generation, keeping its moves and 30% of its training, with +6% to every stat per generation (up to Gen 6).', '🔍 Box search: filter by name, level (rookie, mega), fav or away.', '⏩ Battle speed: tap the 1x/2x/4x button in any battle.'] },
