@@ -2382,9 +2382,9 @@ function movesFor(d, stage){
 // the lowest level for each stage: digivolving lifts a Digimon to at least this, so its new moves aren't far out of reach
 const STAGE_MIN_LV = [1, 5, 10, 18, 26, 35];
 const XP_NEED = lv => 10 + lv * 4;
-const XP_MUL = 1.5;   // every XP source gives 50% more
+const XP_MUL = 1.25;  // every XP source gives 25% more
 // Digimon whose level lags behind their stage (old saves, or lots of quick digivolving) catch up at double speed
-const xpCatchUp = p => (p.level || 1) < (STAGE_MIN_LV[p.stage] || 1) + 6 ? 2 : 1;
+const xpCatchUp = p => (p.level || 1) < (STAGE_MIN_LV[p.stage] || 1) + 4 ? 1.5 : 1;
 // raise a Digimon to its stage's starting level; returns the new level if it went up
 function stageFloor(p){ const f = STAGE_MIN_LV[p.stage] || 1; if (!p.level || p.level < f){ p.level = f; p.xp = 0; return f; } return 0; }
 const BASIC = { name: 'Tackle', kind: 'phys', power: 1, desc: 'A basic body attack. Costs no SP.' };
@@ -2412,7 +2412,7 @@ const learnCache = new Map();
 function learnset(id, d, stage){
   const key = id + '|' + stage + '|' + (d ? 1 : 0);
   if (learnCache.has(key)) return learnCache.get(key);
-  const base = STAGE_MIN_LV[stage] || 1, offs = [0, 1, 3, 5, 7, 10];
+  const base = STAGE_MIN_LV[stage] || 1, offs = [1, 3, 5, 7, 9, 12];
   const list = (d?.skills || []).filter(s => s.skill).slice(0, 6).map((s, i) => {
     const name = (s.translation && s.translation.trim()) || s.skill;
     const kind = moveKind(name, s.description);
@@ -4666,6 +4666,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 29, title: 'Leveling rebalance', items: ['Levels now take a bit longer: XP is +25% instead of +50%, about halfway between the old slow pace and the fast one. Catch-up for Digimon that lag behind their stage is now 1.5x for the first 4 levels.', 'Moves are learned 1–2 levels later than before. Moves your Digimon already know stay learned.'] },
   { v: 28, title: 'Tower, Move Discs, passives and rebirth', items: ['🗼 Tower (World tab): climb 50 floors of tougher foes, carrying your HP between floors. Every 5th floor gives a Move Disc, every 10th is a boss with a big prize (up to a Mega Egg). Resets every week.', '💿 Move Discs: teach any Digimon a new move from its Moves screen. 28 discs, from Double hits to Barriers. They drop from Hard and Nightmare battles, dungeon bosses, HARD expeditions and the Tower, and the Shop sells random ones.', 'Passives: every species now has a passive based on its attribute (Vaccine, Virus, Data or Free), like Guardian, Venom Touch, Analyzer or Second Wind. See it in the Moves screen and next to its name in battle.', '🥚 Rebirth: a Lv 40+ Mega in the Box can start over as a new generation, keeping its moves and 30% of its training, with +6% to every stat per generation (up to Gen 6).', '🔍 Box search: filter by name, level (rookie, mega), fav or away.', '⏩ Battle speed: tap the 1x/2x/4x button in any battle.'] },
   { v: 27, title: 'More move effects', items: ['New attack traits: ✌️ Double hit (always 2 hits), 🌀 Flurry (3–5 hits that chip through Barrier), 💫 Confuse, 🌫️ Blind, 🐌 Slow, 🔋 SP drain, 📣 Rally (powers you up as you hit), 🧱 Guard hit (take less damage next turn) and ⚙️ Recharge (get SP back).', 'New support moves: 🔍 Focus (next attack is a guaranteed critical hit) and 🌱 Regenerate heals (healing over 4 turns).', 'New status: 💫 confused (may hurt itself instead of acting).', 'Almost every attack now has an extra effect. Press and hold a move to see what it does.'] },
   { v: 26, title: 'Hard expeditions', items: ['Four new HARD expeditions that check your Digimon\'s stats instead of its level: 🌋 Magma Core (ATK, DEF, HP), 🌊 Net Ocean Abyss (INT, HP, SP), 🌪️ Storm Spire (SPD, INT, DEF) and 💠 Kernel Core (every stat, Mega-level).', 'Meet every need for a 75% smooth trip; beat them for up to 97%. Fall short, especially badly in one stat, and it gets risky fast. A rough HARD trip only brings back 30% of the rewards.', 'In a team, each member borrows 30% of the team\'s best in each needed stat, so a strong leader carries the rest.', 'They pay much more and can bring element and level eggs, held items, Crests, X-Antibodies and even Golden or Mega Eggs.'] },
