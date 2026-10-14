@@ -2056,6 +2056,7 @@ async function collectExpeditions(list){
     const pool = (state.stageIds[m.stage] || []).filter(id => state.byId.has(id) && !known(id));
     const seen = [];
     for (let k = 0; k < ex.finds && pool.length; k++){ const id = pick(pool); if (!known(id)){ G.col[id] = 'seen'; const d = state.byId.get(id); seen.push({ name: d.name, image: d.image }); } }
+    if (ok && ex.hard){ bump('hardExps'); if (ex.key === 'kernel') bump('kernelOk'); }
     nfCancel(nfUid(m)); m.exp = null;
     const lv = await gainXP(m, xp);
     questProgress('exp'); bump('exps');
@@ -2235,16 +2236,16 @@ function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p), p
 // ----- synergies: Digimon from the same group boost each other in your party, and earn more on expeditions sent together -----
 // named groups need 2 members and element groups need 3; having 2 more than that makes the bonus 1.5x
 const SYNERGIES = [
-  { key: 'rk', name: 'Royal Knights', icon: '🛡️', need: 2, re: /^(Omegamon|Dukemon|Alphamon|Ulforce|Magnamon|Duftmon|Sleipmon|Crani[au]m+on|Examon|Lord ?Knightmon|Gankoomon|Jesmon|Dynasmon)/i, st: { all: 0.06 } },
-  { key: 'demon', name: 'Seven Great Demon Lords', icon: '😈', need: 2, re: /^(Lucemon|Leviamon|Demon\b|Lilithmon|Beelzebumon|Belphemon|Barbamon|Ogudomon)/, st: { atk: 0.08, int: 0.08 } },
-  { key: 'bagra', name: 'Bagra Army', icon: '⚔️', need: 2, re: /Bagramon|Dark Knightmon|Tactimon|Blastmon|Neo Vamdemon Darkness|Dorbickmon|Gravimon|Splashmon|Apollomon Darkness|Skull Knightmon|Dark Volumon|Mad Leomon|Deckerdramon|Gattai Lilithmon|Majuu Lilithmon/, st: { atk: 0.1, spd: 0.05 } },
-  { key: 'xros', name: 'Team Xros Heart', icon: '❤️‍🔥', need: 2, re: /Shoutmon|Ballistamon|Dorulumon|Starmon|Pickmon|Cutemon|Sparrowmon|Monitamon|Chibick/, st: { hp: 0.08, atk: 0.06 } },
-  { key: 'chosen', name: 'Chosen Partners', icon: '🌟', need: 2, re: /^(Agumon|Greymon|Metal Greymon|War Greymon|Gabumon|Garurumon|Were Garurumon|Metal Garurumon|Piyomon|Birdramon|Garudamon|Hououmon|Tentomon|Kabuterimon|Atlur Kabuterimon \(Red\)|Herakle Kabuterimon|Palmon|Togemon|Lilimon|Rosemon|Gomamon|Ikkakumon|Zudomon|Vikemon|Patamon|Angemon|Holy Angemon|Seraphimon|Tailmon|Angewomon|Ofanimon|Omegamon)$/, st: { hp: 0.06, def: 0.06 } },
-  { key: 'tamers', name: 'Tamers\' Partners', icon: '🃏', need: 2, re: /^(Guilmon|Growmon|Megalo Growmon|Dukemon|Renamon|Kyubimon|Taomon|Sakuyamon|Terriermon|Galgomon|Rapidmon|Saint Galgomon|Lopmon|Turuiemon|Antylamon|Cherubimon|Impmon|Beelzebumon|Culumon|Guardromon|Andromon|Monodramon|Cyberdramon|Justimon)$/, st: { int: 0.08, spd: 0.05 } },
-  { key: 'sov', name: 'Four Holy Beasts', icon: '🐉', need: 2, re: /^(Zhuqiaomon|Qinglongmon|Baihumon|Xuanwumon|Huanglongmon|Fanglongmon)/, st: { all: 0.07 } },
-  { key: 'olympos', name: 'Olympos XII', icon: '🏛️', need: 2, re: /^(Apollomon|Dianamon|Jupitermon|Junomon|Neptunemon|Marsmon|Mercurimon|Minervamon|Vulcanusmon|Venusmon|Bacchusmon|Ceresmon|Plutomon|Mervamon|Jet Mervamon)/, st: { int: 0.08, def: 0.05 } },
-  { key: 'deva', name: 'Twelve Devas', icon: '🪷', need: 2, re: /^(Kumbhiramon|Vajramon|Mihiramon|Andiramon|Majiramon|Sandiramon|Indramon|Pajiramon|Makuramon|Sinduramon|Caturamon|Vikaralamon|Chatsuramon)/, st: { atk: 0.06, spd: 0.06 } },
-  { key: 'darkm', name: 'Dark Masters', icon: '🎭', need: 2, re: /^(Piemon|Metal Seadramon|Mugendramon|Pinochimon)$/, st: { atk: 0.07, int: 0.07 } },
+  { key: 'rk', name: 'Royal Knights', icon: '🛡️', need: 2, re: /^(Omegamon|Dukemon|Alphamon|Ulforce|Magnamon|Duftmon|Sleipmon|Crani[au]m+on|Examon|Lord ?Knightmon|Gankoomon|Jesmon|Dynasmon)/i, title: 'Knight Commander', st: { all: 0.06 } },
+  { key: 'demon', name: 'Seven Great Demon Lords', icon: '😈', need: 2, re: /^(Lucemon|Leviamon|Demon\b|Lilithmon|Beelzebumon|Belphemon|Barbamon|Ogudomon)/, title: 'Demon Lord', st: { atk: 0.08, int: 0.08 } },
+  { key: 'bagra', name: 'Bagra Army', icon: '⚔️', need: 2, re: /Bagramon|Dark Knightmon|Tactimon|Blastmon|Neo Vamdemon Darkness|Dorbickmon|Gravimon|Splashmon|Apollomon Darkness|Skull Knightmon|Dark Volumon|Mad Leomon|Deckerdramon|Gattai Lilithmon|Majuu Lilithmon/, title: 'Bagra General', st: { atk: 0.1, spd: 0.05 } },
+  { key: 'xros', name: 'Team Xros Heart', icon: '❤️‍🔥', need: 2, re: /Shoutmon|Ballistamon|Dorulumon|Starmon|Pickmon|Cutemon|Sparrowmon|Monitamon|Chibick/, title: 'Xros Heart General', st: { hp: 0.08, atk: 0.06 } },
+  { key: 'chosen', name: 'Chosen Partners', icon: '🌟', need: 2, re: /^(Agumon|Greymon|Metal Greymon|War Greymon|Gabumon|Garurumon|Were Garurumon|Metal Garurumon|Piyomon|Birdramon|Garudamon|Hououmon|Tentomon|Kabuterimon|Atlur Kabuterimon \(Red\)|Herakle Kabuterimon|Palmon|Togemon|Lilimon|Rosemon|Gomamon|Ikkakumon|Zudomon|Vikemon|Patamon|Angemon|Holy Angemon|Seraphimon|Tailmon|Angewomon|Ofanimon|Omegamon)$/, title: 'DigiDestined', st: { hp: 0.06, def: 0.06 } },
+  { key: 'tamers', name: 'Tamers\' Partners', icon: '🃏', need: 2, re: /^(Guilmon|Growmon|Megalo Growmon|Dukemon|Renamon|Kyubimon|Taomon|Sakuyamon|Terriermon|Galgomon|Rapidmon|Saint Galgomon|Lopmon|Turuiemon|Antylamon|Cherubimon|Impmon|Beelzebumon|Culumon|Guardromon|Andromon|Monodramon|Cyberdramon|Justimon)$/, title: 'Tamer of Shinjuku', st: { int: 0.08, spd: 0.05 } },
+  { key: 'sov', name: 'Four Holy Beasts', icon: '🐉', need: 2, re: /^(Zhuqiaomon|Qinglongmon|Baihumon|Xuanwumon|Huanglongmon|Fanglongmon)/, title: 'Holy Beast Keeper', st: { all: 0.07 } },
+  { key: 'olympos', name: 'Olympos XII', icon: '🏛️', need: 2, re: /^(Apollomon|Dianamon|Jupitermon|Junomon|Neptunemon|Marsmon|Mercurimon|Minervamon|Vulcanusmon|Venusmon|Bacchusmon|Ceresmon|Plutomon|Mervamon|Jet Mervamon)/, title: 'Olympian', st: { int: 0.08, def: 0.05 } },
+  { key: 'deva', name: 'Twelve Devas', icon: '🪷', need: 2, re: /^(Kumbhiramon|Vajramon|Mihiramon|Andiramon|Majiramon|Sandiramon|Indramon|Pajiramon|Makuramon|Sinduramon|Caturamon|Vikaralamon|Chatsuramon)/, title: 'Deva Master', st: { atk: 0.06, spd: 0.06 } },
+  { key: 'darkm', name: 'Dark Masters', icon: '🎭', need: 2, re: /^(Piemon|Metal Seadramon|Mugendramon|Pinochimon)$/, title: 'Dark Master', st: { atk: 0.07, int: 0.07 } },
   { key: 'e_holy', name: 'Holy Light', icon: '✨', need: 3, elem: 'holy', st: { def: 0.06, hp: 0.06 } },
   { key: 'e_dark', name: 'Shadow Pact', icon: '🌑', need: 3, elem: 'dark', st: { atk: 0.05, int: 0.05 } },
   { key: 'e_fire', name: 'Blaze', icon: '🔥', need: 3, elem: 'fire', st: { atk: 0.08 } },
@@ -2253,12 +2254,28 @@ const SYNERGIES = [
   { key: 'e_wind', name: 'Gale Wing', icon: '🌪️', need: 3, elem: 'wind', st: { spd: 0.08 } },
   { key: 'e_machine', name: 'Metal Empire', icon: '⚙️', need: 3, elem: 'machine', st: { atk: 0.04, def: 0.05 } },
   { key: 'e_beast', name: 'Wild Pack', icon: '🐾', need: 3, elem: 'beast', st: { atk: 0.04, spd: 0.05 } },
+  // ----- more groups -----
+  { key: 'warriors', name: 'Legendary Warriors', icon: '🔥', need: 2, title: 'Spirit Warrior', re: /^(Agunimon|Agnimon|Burning Greymon|Vritramon|Lobomon|Wolfmon|Kendo Garurumon|Garmmon|Kazemon|Fairymon|Zephyrmon|Shutumon|Beetlemon|Blitzmon|Metal Kabuterimon|Bolgmon|Kumamon|Chackmon|Korikakumon|Blizzarmon|Lowemon|Löwemon|Loewemon|Kaiser Leomon|Jäger Löwemon|Grottomon|Gigasmon|Arbormon|Petaldramon|Ranamon|Calmaramon|Mercurymon|Sakkakumon|Duskmon|Velgemon|Aldamon|Beowolfmon|Emperor Greymon|Magna Garurumon|Susanoomon)/, st: { atk: 0.06, spd: 0.06 } },
+  { key: 'dats', name: 'DATS Partners', icon: '🚔', need: 2, title: 'DATS Agent', re: /^(Agumon \((Savers|2006)|Geo Greymon|Rize Greymon|Shine Greymon|Gaomon|Gaogamon|Mach Gaogamon|Miragegaogamon|Lalamon|Sunflowmon|Lilamon|Falcomon|Peckmon|Crowmon|Yatagaramon|Ravemon|Kudamon|Reppamon|Chirinmon)/, st: { hp: 0.06, atk: 0.06 } },
+  { key: 'angels', name: 'Three Great Angels', icon: '👼', need: 2, title: 'Angel Herald', re: /^(Seraphimon|Ophanimon|Cherubimon|Kerpymon|Clavisangemon)/, st: { def: 0.08, int: 0.06 } },
+  { key: 'adv02', name: 'DigiDestined 02', icon: '💠', need: 2, title: 'Digital Pioneer', re: /^(V-mon|Veemon|XV-mon|X-Veemon|Ex-Veemon|Paildramon|Imperialdramon|Hawkmon|Aquilamon|Silphymon|Armadimon|Armadillomon|Ankylomon|Shakkoumon|Wormmon|Stingmon|Valkyrimon|Vikemon)/, st: { spd: 0.06, def: 0.06 } },
+  { key: 'knights', name: 'Knight Order', icon: '⚔️', need: 2, title: 'Knight Captain', re: /Knightmon/, st: { def: 0.08, hp: 0.04 } },
+  { key: 'dragons', name: 'Dragon Kin', icon: '🐲', need: 3, title: 'Dragon Tamer', re: /dramon/i, st: { atk: 0.06, hp: 0.05 } },
+  { key: 'heaven', name: 'Heaven\'s Host', icon: '😇', need: 3, title: 'Herald of Heaven', re: /(Angemon|Angewomon|Angel|Piddomon|Seraphimon|Ophanimon|Cherubimon|Dominimon|Kerpymon)/, st: { int: 0.06, def: 0.05 } },
+  { key: 'ghosts', name: 'Night Haunt', icon: '👻', need: 3, title: 'Ghost Whisperer', re: /(Bakemon|Soulmon|Phantomon|Fantomon|Vamdemon|Myotismon|Skull|Ghostmon|Candlemon|Pumpkinmon|Sorcerimon|Ladydevimon|Lady Devimon|Devimon|Boogeymon|Lilithmon)/, st: { int: 0.05, spd: 0.05 } },
+  { key: 'bugs', name: 'Bug Swarm', icon: '🐞', need: 3, title: 'Swarm Lord', re: /(Tentomon|Kabuterimon|Kuwagamon|Okuwamon|Stingmon|Wormmon|Dinobeemon|Funbeemon|Flybeemon|Kunemon|Dokunemon|Snimon|Waspmon|Cannonbeemon|Tigervespamon|Jewelbeemon)/, st: { spd: 0.07, atk: 0.04 } },
+  { key: 'deep', name: 'Deep Ones', icon: '🐙', need: 3, title: 'Abyss Diver', re: /(Seadramon|Gomamon|Ikkakumon|Zudomon|Vikemon|Whamon|Octomon|Shellmon|Gesomon|Ebidramon|Dagomon|Divermon|Pukumon|Plesiomon|Leviamon|Mantaraymon|Syakomon|Otamamon|Gekomon|Marine Angemon|Marine Devimon|Hangyomon|Anomalocarimon)/, st: { hp: 0.06, def: 0.04 } },
+  { key: 'jokers', name: 'Joke Squad', icon: '🤡', need: 2, title: 'Clown Prince', re: /(Numemon|Sukamon|Geremon|Nanimon|Etemon|Chuumon|Monzaemon|Pumpkinmon|Gotsumon|Bakemon|Kokuwamon)/, st: { spd: 0.05, hp: 0.05 } },
+  { key: 's_rookie', name: 'Rookie Rally', icon: '🐣', need: 3, stage: 2, st: { atk: 0.06, spd: 0.06 } },
+  { key: 's_champ', name: 'Champion Corps', icon: '🥇', need: 3, stage: 3, st: { hp: 0.06, def: 0.06 } },
+  { key: 's_ult', name: 'Ultimate Vanguard', icon: '💥', need: 3, stage: 4, st: { atk: 0.05, int: 0.05 } },
+  { key: 's_mega', name: 'Mega Squad', icon: '👑', need: 3, stage: 5, st: { all: 0.05 } },
 ];
 const SYN_EXP = { data: 0.15, xp: 0.15, odds: 0.05 };   // per active synergy on a team expedition
 function synElem(id){ try{ return ELEM_CACHE[id] || null; }catch{ return null; } }
 function synergiesOf(m){
   const name = (state.byId.get(m.id) || {}).name || m.name || '', e = synElem(m.id);
-  return SYNERGIES.filter(g => g.re ? g.re.test(name) : e === g.elem);
+  return SYNERGIES.filter(g => g.re ? g.re.test(name) : g.stage != null ? (m.stage | 0) === g.stage : e === g.elem);
 }
 // active synergies in a group of Digimon: [{ g, n, tier }]
 function activeSyn(list){
@@ -2283,7 +2300,7 @@ function synergyScreen(){
   const act = new Map(activeSyn(G.party).map(a => [a.g, a])), cnt = new Map();
   for (const m of G.party) for (const g of synergiesOf(m)) cnt.set(g, (cnt.get(g) || 0) + 1);
   const row = g => { const a = act.get(g), c = cnt.get(g) || 0;
-    return '<div class="synrow' + (a ? ' on' : '') + '"><span>' + g.icon + '</span><div><b>' + esc(g.name) + (a ? ' · active ×' + a.n : c ? ' · ' + c + ' / ' + g.need + ' in party' : '') + '</b><small>' + (g.elem ? 'Any ' + g.need + '+ ' + ELEMS[g.elem].name + '-element Digimon' : 'Needs ' + g.need + '+ members') + '. Party: ' + synText(g, 1) + ' (×1.5 with ' + (g.need + 2) + '+). Expeditions sent together: +15% DigiData and XP, smoother trips.</small></div></div>'; };
+    return '<div class="synrow' + (a ? ' on' : '') + '"><span>' + g.icon + '</span><div><b>' + esc(g.name) + (a ? ' · active ×' + a.n : c ? ' · ' + c + ' / ' + g.need + ' in party' : '') + '</b><small>' + (g.elem ? 'Any ' + g.need + '+ ' + ELEMS[g.elem].name + '-element Digimon' : g.stage != null ? 'Any ' + g.need + '+ ' + LEVEL_EN[STAGES[g.stage]] + ' Digimon' : 'Needs ' + g.need + '+ members') + '.' + (g.title ? ' Raise ' + SYN_TITLE_N + ' members for the title “' + esc(g.title) + '” (' + Math.min(SYN_TITLE_N, synRaised(g)) + ' / ' + SYN_TITLE_N + ').' : '') + ' Party: ' + synText(g, 1) + ' (×1.5 with ' + (g.need + 2) + '+). Expeditions sent together: +15% DigiData and XP, smoother trips.</small></div></div>'; };
   const sorted = SYNERGIES.slice().sort((a, b) => (act.has(b) - act.has(a)) || ((cnt.get(b) || 0) - (cnt.get(a) || 0)));
   openOv('<h4>🔗 Synergies</h4><p class="ownline">Digimon from the same group power each other up. In your party, members of an active synergy get its stat bonus in battles and dungeons. Send them on an expedition together (🧭 Send a team) for bigger rewards.</p><div class="synlist">' + sorted.map(row).join('') + '</div><button class="ghost" id="synClose">Close</button>');
   $('#synClose').onclick = () => { closeOv(); renderPartner(); };
@@ -4481,6 +4498,30 @@ const ACH = [
   { id: 'rich', name: 'DigiData Tycoon', desc: 'Hold 10,000 DigiData at once', stat: 'data', n: 10000, data: 0, item: 'h:charm' },
   { id: 'ach25', name: 'Achiever', desc: 'Claim 25 achievements', stat: 'achs', n: 25, data: 1000, item: 'egg:golden' },
   { id: 'ach60', name: 'Trophy Case', desc: 'Claim 60 achievements', stat: 'achs', n: 60, data: 3000, item: 'egg:golden' },
+  { id: 'ach90', name: 'Hall of Fame', desc: 'Claim 90 achievements', stat: 'achs', n: 90, data: 6000, item: 'egg:mega' },
+  // ----- even more -----
+  { id: 'tower10', name: 'Tower Climber', desc: 'Reach floor 10 of the Tower', stat: 'towerBest', n: 10, data: 500 },
+  { id: 'tower30', name: 'Sky Scraper', desc: 'Reach floor 30 of the Tower', stat: 'towerBest', n: 30, data: 1500, item: 'egg:rare' },
+  { id: 'tower50', name: 'Tower Conqueror', desc: 'Clear all 50 floors of the Tower', stat: 'towerBest', n: 50, data: 4000, item: 'egg:golden' },
+  { id: 'tfl100', name: 'Floor Sweeper', desc: 'Clear 100 Tower floors in total', stat: 'towerFloors', n: 100, data: 1500 },
+  { id: 'disc1', name: 'Disc Jockey', desc: 'Teach a move with a Move Disc', stat: 'discs', n: 1, data: 200 },
+  { id: 'disc15', name: 'Move Tutor', desc: 'Teach 15 moves with Move Discs', stat: 'discs', n: 15, data: 1200, item: 'h:specs' },
+  { id: 'reb1', name: 'Reborn', desc: 'Rebirth a Mega', stat: 'rebirths', n: 1, data: 800 },
+  { id: 'reb5', name: 'Eternal Cycle', desc: 'Rebirth 5 times', stat: 'rebirths', n: 5, data: 2500, item: 'egg:golden' },
+  { id: 'gen6', name: 'Sixth Generation', desc: 'Raise a Gen 6 Digimon', stat: 'maxGen', n: 6, data: 4000, item: 'egg:mega' },
+  { id: 'hardx1', name: 'Daredevil', desc: 'Finish a HARD expedition smoothly', stat: 'hardExps', n: 1, data: 300 },
+  { id: 'hardx25', name: 'Hardened Explorer', desc: 'Finish 25 HARD expeditions smoothly', stat: 'hardExps', n: 25, data: 1500, item: 'egg:rare' },
+  { id: 'kernel1', name: 'Core Breaker', desc: 'Come back smoothly from the Kernel Core', stat: 'kernelOk', n: 1, data: 1000, item: 'h:amulet' },
+  { id: 'syn2', name: 'Synergist', desc: 'Have 2 synergies active in your party at once', stat: 'synMax', n: 2, data: 300 },
+  { id: 'syn4', name: 'Perfect Harmony', desc: 'Have 4 synergies active in your party at once', stat: 'synMax', n: 4, data: 1200, item: 'vit:all' },
+  { id: 'raidw1', name: 'Raid Hero', desc: 'Claim a raid reward', stat: 'raidClaims', n: 1, data: 300 },
+  { id: 'raidw10', name: 'Raid Legend', desc: 'Claim 10 raid rewards', stat: 'raidClaims', n: 10, data: 2000, item: 'egg:golden' },
+  { id: 'trade1', name: 'Trader', desc: 'Get a Digimon from the trade board', stat: 'trades', n: 1, data: 150 },
+  { id: 'trade10', name: 'Market Mogul', desc: 'Get 10 Digimon from the trade board', stat: 'trades', n: 10, data: 900 },
+  { id: 'pvp50', name: 'Gladiator King', desc: 'Win 50 live battles', stat: 'pvpWins', n: 50, data: 4000, item: 'egg:golden' },
+  { id: 'found250', name: 'Naturalist', desc: 'Find 250 Digimon', stat: 'found', n: 250, data: 600 },
+  { id: 'box50', name: 'Hoarder', desc: 'Keep 50 Digimon in your Box', stat: 'boxN', n: 50, data: 800 },
+  { id: 'title10', name: 'Collector of Titles', desc: 'Unlock 10 synergy or collection titles', stat: 'colTitles', n: 10, data: 1500, item: 'egg:golden' },
 ];
 function achValue(stat){
   if (stat === 'found') return foundCount();
@@ -4494,6 +4535,11 @@ function achValue(stat){
   if (stat === 'ultras') return new Set([...ULTRA_IDS.filter(id => G.col[id] === 'raised'), ...(G.ultraIds || [])]).size;
   if (stat === 'data') return Math.max(G.data || 0, (G.stats && G.stats.peakData) || 0);
   if (stat === 'achs') return Object.keys(G.achClaimed || {}).length;
+  if (stat === 'towerBest') return Math.max((G.stats && G.stats.towerBest) || 0, (G.tower && G.tower.best) || 0);
+  if (stat === 'maxGen') return 1 + Math.max(0, ...[...G.party, ...G.box].map(m => m.gen || 0));
+  if (stat === 'synMax') return Math.max((G.stats && G.stats.synMax) || 0, activeSyn(G.party).length);
+  if (stat === 'boxN') return G.box.length;
+  if (stat === 'colTitles') return colTitles().length;
   return (G.stats && G.stats[stat]) || 0;
 }
 const achDone = a => achValue(a.stat) >= a.n;
@@ -4508,7 +4554,11 @@ const COL_LEVELS = ['Baby I', 'Baby II', 'Child', 'Adult', 'Perfect', 'Ultimate'
 const COL_STEPS = [{ pct: 25, data: 75 }, { pct: 50, data: 150, item: 'clean' }, { pct: 75, data: 300, item: 'egg:rare' }, { pct: 100, data: 600, item: 'vit:all' }];
 function colIds(lv){ return lv === 'Armor' ? [...state.armor] : (state.levelSets[lv] ? [...state.levelSets[lv]] : []); }
 function colProgress(lv){ const ids = colIds(lv); return { have: ids.filter(id => G.col[id]).length, total: ids.length }; }
-function colTitles(){ return COL_LEVELS.filter(lv => (G.colClaimed || {})[lv + ':100']).map(lv => ({ name: (LEVEL_EN[lv] || lv) + ' Master', col: true })); }
+function colTitles(){ return COL_LEVELS.filter(lv => (G.colClaimed || {})[lv + ':100']).map(lv => ({ name: (LEVEL_EN[lv] || lv) + ' Master', col: true }))
+  .concat(SYNERGIES.filter(g => g.title && synRaised(g) >= SYN_TITLE_N).map(g => ({ name: g.title, col: true }))); }
+// synergy group titles: raise this many different members of a group
+const SYN_TITLE_N = 3;
+function synRaised(g){ if (!g.re) return 0; let n = 0; for (const id in G.col) if (G.col[id] === 'raised'){ const d = state.byId.get(+id); if (d && g.re.test(d.name)) n++; } return n; }
 const colClaimable = () => COL_LEVELS.reduce((n, lv) => { const pr = colProgress(lv); return n + COL_STEPS.filter(s => pr.total && pr.have / pr.total * 100 >= s.pct && !(G.colClaimed || {})[lv + ':' + s.pct]).length; }, 0);
 
 // ----- daily login streak -----
@@ -4666,6 +4716,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 30, title: 'More synergies, achievements and titles', items: ['15 new synergies: Legendary Warriors, DATS Partners, Three Great Angels, DigiDestined 02, Knight Order, Dragon Kin, Heaven\'s Host, Night Haunt, Bug Swarm, Deep Ones, Joke Squad, and level groups: Rookie Rally, Champion Corps, Ultimate Vanguard and Mega Squad.', 'New titles: raise 3 different members of a named synergy group to unlock its title, like Knight Commander, Demon Lord, DigiDestined, Spirit Warrior or Dragon Tamer (21 in all). See your progress in the Synergies screen.', '23 new achievements (each one is also a title): Tower floors, Move Discs, rebirths, HARD expeditions, raid rewards, trades, synergies and more.'] },
   { v: 29, title: 'Leveling rebalance', items: ['Levels now take a bit longer: XP is +25% instead of +50%, about halfway between the old slow pace and the fast one. Catch-up for Digimon that lag behind their stage is now 1.5x for the first 4 levels.', 'Moves are learned 1–2 levels later than before. Moves your Digimon already know stay learned.'] },
   { v: 28, title: 'Tower, Move Discs, passives and rebirth', items: ['🗼 Tower (World tab): climb 50 floors of tougher foes, carrying your HP between floors. Every 5th floor gives a Move Disc, every 10th is a boss with a big prize (up to a Mega Egg). Resets every week.', '💿 Move Discs: teach any Digimon a new move from its Moves screen. 28 discs, from Double hits to Barriers. They drop from Hard and Nightmare battles, dungeon bosses, HARD expeditions and the Tower, and the Shop sells random ones.', 'Passives: every species now has a passive based on its attribute (Vaccine, Virus, Data or Free), like Guardian, Venom Touch, Analyzer or Second Wind. See it in the Moves screen and next to its name in battle.', '🥚 Rebirth: a Lv 40+ Mega in the Box can start over as a new generation, keeping its moves and 30% of its training, with +6% to every stat per generation (up to Gen 6).', '🔍 Box search: filter by name, level (rookie, mega), fav or away.', '⏩ Battle speed: tap the 1x/2x/4x button in any battle.'] },
   { v: 27, title: 'More move effects', items: ['New attack traits: ✌️ Double hit (always 2 hits), 🌀 Flurry (3–5 hits that chip through Barrier), 💫 Confuse, 🌫️ Blind, 🐌 Slow, 🔋 SP drain, 📣 Rally (powers you up as you hit), 🧱 Guard hit (take less damage next turn) and ⚙️ Recharge (get SP back).', 'New support moves: 🔍 Focus (next attack is a guaranteed critical hit) and 🌱 Regenerate heals (healing over 4 turns).', 'New status: 💫 confused (may hurt itself instead of acting).', 'Almost every attack now has an extra effect. Press and hold a move to see what it does.'] },
@@ -4710,7 +4761,7 @@ const GUIDE = [
   ['🌍 World', '<ul><li><b>Expeditions</b>: send a Digimon from your Box away for a while, or tap 🧭 Send a team in the Box to send several at once. Longer trips are riskier but bring back more DigiData, items and eggs.</li><li><b>Regions</b>: unlock new areas as you discover more Digimon. Each has its own foes and bonus rewards.</li><li><b>Colosseum</b>: fight a run of battles in a row for a best streak.</li><li><b>DigiFarm</b>: plant crops that grow in real time into DigiData, stat chips, Clean Slates and eggs.</li><li><b>Events</b>: limited-time bonuses like double XP or an egg hunt.</li></ul>'],
   ['🥚 Eggs & the Shop', '<p>Spend DigiData on eggs and items. Rookie, Champion and themed eggs (Dragon, Dark, X, and the element eggs) skip the baby stages. In-Training, Ultimate and Mega eggs hatch straight into those levels. Digimon that can\'t be raised any other way turn up twice as often in them.</p><p>Eggs you\'re given wait on the Partner page until you hatch them.</p>'],
   ['📦 Box & party', '<p>Keep up to six Digimon in your party; the rest live in the Box. Tap one to swap it in, send it on an expedition, or release it for DigiData.</p>'],
-  ['🔗 Synergies', '<p>Digimon from the same group power each other up: Royal Knights, the Seven Great Demon Lords, Bagra Army, Team Xros Heart, the Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, plus element groups (3 or more Holy, Dark, Fire, Water, Plant, Wind, Machine or Beast Digimon).</p><ul><li><b>Party</b>: when 2 or more members of a group are in your party (3 for element groups), those members get the group\'s stat bonus in battles, dungeons and raids. Two extra members make it 1.5× stronger.</li><li><b>Expeditions</b>: send members of a group together with 🧭 Send a team for +15% DigiData and XP per synergy and smoother trips.</li><li>Active synergies show under your party on the Partner page. Tap one to see every group.</li></ul>'],
+  ['🔗 Synergies', '<p>Digimon from the same group power each other up: Royal Knights, the Seven Great Demon Lords, Bagra Army, Team Xros Heart, the Chosen Partners, Tamers\' Partners, Four Holy Beasts, Olympos XII, Twelve Devas, Dark Masters, Legendary Warriors, DATS Partners, Three Great Angels, DigiDestined 02, Knight Order, Dragon Kin, Heaven\'s Host, Night Haunt, Bug Swarm, Deep Ones and the Joke Squad, plus element groups (3 or more Holy, Dark, Fire, Water, Plant, Wind, Machine or Beast Digimon) and level groups (3 Rookies, Champions, Ultimates or Megas). Raise 3 different members of a named group to unlock its title.</p><ul><li><b>Party</b>: when 2 or more members of a group are in your party (3 for element groups), those members get the group\'s stat bonus in battles, dungeons and raids. Two extra members make it 1.5× stronger.</li><li><b>Expeditions</b>: send members of a group together with 🧭 Send a team for +15% DigiData and XP per synergy and smoother trips.</li><li>Active synergies show under your party on the Partner page. Tap one to see every group.</li></ul>'],
   ['🏆 Trainer, quests & achievements', '<ul><li><b>Tamer level</b> rises as you play. Spend skill points in the Tamer tree for lasting bonuses.</li><li><b>Daily</b> rewards grow with your login streak.</li><li><b>Quests</b> give DigiData for everyday goals.</li><li><b>Achievements</b> and <b>Collection</b> milestones give rewards and titles. Pick the title shown under the app name in Titles.</li></ul>'],
   ['🌐 Online', '<p>Go online in World → Online with a Tamer name.</p><ul><li><b>Ranks</b>: leaderboards for discoveries, Tamer level, Colosseum and PvP, plus a feed of what the AI Tamers 🤖 are up to.</li><li><b>Raid</b>: a weekly boss everyone damages together, AI Tamers included. You get 3 fights every 3 hours.</li><li><b>Trades</b>: post a Digimon and swap with other Tamers. AI Tamers list new Digimon every 6 hours and may buy your fairly priced listings.</li><li><b>Friends</b>: add friends with their 8-character friend code, fight their team, or challenge them to a live battle.</li></ul>'],
   ['☁️ Saving your game', '<p>Your game saves on this device automatically. To keep it safe, turn on <b>Cloud save</b> in Trainer → ☁️ Backup. You get a 16-character recovery code: enter it on any device to load your game. Keep it secret, since anyone with it can load your game.</p><p>You can also make an offline backup code there.</p>'],
@@ -4950,7 +5001,7 @@ function towerClimb(){
     battle(DIFFS[1], { foeId: id, mult: towerMult(f), hpMul: towerBoss(f) ? 1.8 : 1, title: (towerBoss(f) ? '👑 Tower boss · Floor ' : '🗼 Tower · Floor ') + f, carry, noRun: true, onDone: outcome => {
       if (outcome !== 'win'){ towerEnd(cleared, got, false); return; }
       const data = towerData(f), loot = towerLoot(f); G.data += data; got += data; if (loot) grantItem(loot);
-      T.floor = f + 1; T.best = Math.max(T.best, f); cleared++; bump('towerFloors'); saveGame();
+      T.floor = f + 1; T.best = Math.max(T.best, f); G.stats = G.stats || {}; G.stats.towerBest = Math.max(G.stats.towerBest || 0, f); cleared++; bump('towerFloors'); saveGame();
       if (T.floor > TOWER_TOP){ towerEnd(cleared, got, true); return; }
       carry.hp = Math.min(Math.round(carry.hp + (carry.max || 0) * 0.25), carry.max || carry.hp);
       $('#overlay .sheet').innerHTML = '<h4>🗼 Floor ' + f + ' cleared!</h4><p style="margin:0">+' + data + ' DigiData' + (loot ? ' and ' + esc(itemIcon(loot) + ' ' + itemName(loot)) : '') + '. ' + esc(p.name) + ' has ' + carry.hp + ' / ' + carry.max + ' HP after a breather.</p>' +
@@ -5780,7 +5831,7 @@ async function viewRaid(el){
   const go = $('#raidGo'); if (go) go.onclick = () => raidFight(d.boss);
   const cl = $('#raidClaim'); if (cl) cl.onclick = () => {
     const item = pick(['egg:golden', 'egg:rare', 'egg:champion', randomCrest() || 'h:band', randomHeld()]), data = 300 + R.dmg * 2 + (ev ? 300 : 0);
-    R.claimed = true; G.data += data; grantItem(item);
+    R.claimed = true; G.data += data; grantItem(item); bump('raidClaims');
     // seasonal bosses also join your Box (or leave a Golden Egg if it's full)
     let extra = '';
     if (ev){ if (G.box.length < G.boxCap){ const m = hatchNew('ultimate', true, ev.id); m.name = state.byId.get(ev.id).name; G.col[ev.id] = 'raised'; extra = ' ' + ev.icon + ' ' + ev.name + ' joined your Box!'; } else { grantItem('egg:golden'); extra = ' Your Box was full, so ' + ev.name + ' left you a Golden Egg instead.'; } }
@@ -5853,7 +5904,7 @@ async function viewTrades(el){
     b.disabled = true;
     if (t.bot){
       const m = makePartner(t.monId); m.stage = t.monStage; m.stageLine = [t.monStage]; m.level = t.monLevel; m.xp = 0; m.line = [t.monId]; syncMoves(m);
-      G.data -= t.price || 0; G.box.push(m); G.botTaken[t.id] = 1; saveGame(); updateCount();
+      G.data -= t.price || 0; G.box.push(m); G.botTaken[t.id] = 1; bump('trades'); saveGame(); updateCount();
       onlineView('🔁 ' + t.monName + ' joined your Box! ' + t.fromName + ' 🤖 says thanks.');
       return;
     }
@@ -5863,7 +5914,7 @@ async function viewTrades(el){
         tx.update(t.ref, { status: 'taken', taker: N.uid, takerName: O.name, paid: t.price || 0 });
       });
       const m = Object.assign({}, t.mon); delete m.exp; delete m.fav; m.last = Date.now();
-      G.data -= t.price || 0; G.box.push(m); if (!raised(m.id)) G.col[m.id] = 'raised'; saveGame(); updateCount();
+      G.data -= t.price || 0; G.box.push(m); bump('trades'); if (!raised(m.id)) G.col[m.id] = 'raised'; saveGame(); updateCount();
       onlineView('🔁 ' + t.monName + ' joined your Box!');
     }catch(e){ onlSay(e && e.code === 'gone' ? 'Someone else got there first.' : netErr(e)); viewTrades(el).catch(() => {}); }
   });
