@@ -603,6 +603,10 @@ img.sil.silw{filter:url(#dxsil) blur(3px) opacity(.75)}
 .lbrow{display:grid;grid-template-columns:36px 38px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .lbrow.me{border-color:var(--accent)}
 .lbrow.bot{border-style:dashed}
+.pasbox{display:grid;gap:2px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px;background:var(--sunk)}
+.pasbox small{color:var(--muted);font-size:.78rem;line-height:1.3}
+.boxq{width:100%;box-sizing:border-box}
+.region.tboss{border-color:var(--bad)}
 .botb{display:inline-block;margin-left:4px;padding:0 5px;border:1px solid var(--line);border-radius:6px;font-size:.62rem;font-weight:700;vertical-align:middle;color:var(--muted);background:var(--sunk)}
 .botfeed{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:2px 10px}
 .botfeed div{display:flex;justify-content:space-between;gap:8px;padding:6px 0;font-size:.8rem;border-bottom:1px dashed var(--line)}
@@ -935,7 +939,9 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const shuffle = arr => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const clamp = v => Math.max(0, Math.min(100, v));
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// battle speed (1x, 2x, 4x) scales every pause in battles, raids, the Tower and dungeons
+const bSpeed = () => [1, 2, 4].includes(G && G.bspeed) ? G.bspeed : 1;
+const sleep = ms => new Promise(r => setTimeout(r, ms / (typeof G === 'object' && G ? bSpeed() : 1)));
 const store = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
@@ -1726,6 +1732,7 @@ function shopCard(icon, name, desc, btn, own){
 const priceBtn = (attr, price, ok) => '<button class="act price" ' + attr + (ok ? '' : ' disabled') + '>💾 ' + price.toLocaleString() + '</button>';
 function itemDesc(k){
   const t = itemType(k), v = k.split(':')[1];
+  if (t === 'disc'){ const dm = discOf(k); return dm ? 'Teaches ' + dm.name + ' in the Moves screen. ' + moveEffect(toBattle(dm, 3), false) : 'A Move Disc.'; }
   if (k === 'clean') return 'Clears this stage\'s care mistakes and lost battles.';
   if (k === 'vit:all') return 'Raises every stat at once (more at higher stages).';
   if (t === 'vit') return 'Raises ' + (STAT_LABEL[v] || v) + ' (more at higher stages).';
@@ -1797,7 +1804,7 @@ function renderShop(){
       sec('Personality Mints', 'Change a Digimon\'s personality from 🎒 Bag.', MINT_KEYS().map(itemCard).join('')) +
       sec('Digimentals', 'Unlock Armor digivolutions from Rookies.', VIRTUES.map(x => itemCard('dm:' + x)).join(''), ITEM_PRICE.dm + ' each') +
       sec('Crests', 'Unlock special Ultimate and Mega forms.', CREST_VIRTUES.map(x => itemCard('crest:' + x)).join(''), ITEM_PRICE.crest + ' each') +
-      sec('Special', '', itemCard('xab'), '') +
+      sec('Special', '', itemCard('xab') + shopCard('💿', 'Random Move Disc', 'Teaches one of ' + DISCS.length + ' moves (double hits, flurries, status, barriers, heals and more) to any Digimon, from its Moves screen.', priceBtn('data-discbuy="1"', 900, G.data >= 900)), '') +
       sec('Held items', 'A lasting bonus for the Digimon holding it. Rarer ones come from crafting and dungeon bosses.', HELD_KEYS.filter(k => HELD[k].price).map(itemCard).join(''));
   } else if (tab === 'devices'){
     const cur = G.device || 'v1', retro = curSkin() === 'retro';
@@ -1821,6 +1828,7 @@ function renderShop(){
     '<div class="segs">' + SHOP_TABS.map(([k, l]) => '<button class="seg' + (k === tab ? ' on' : '') + '" data-stab="' + k + '">' + l + '</button>').join('') + '</div>' +
     '<p id="shopMsg" style="margin:0;min-height:1.3em;font-size:.88rem"></p>' + body;
   v.querySelectorAll('[data-stab]').forEach(b => b.onclick = () => { store.set('dx_shoptab', b.dataset.stab); renderShop(); });
+  v.querySelectorAll('[data-discbuy]').forEach(b => b.onclick = () => { if (G.data < 900) return; G.data -= 900; const k = randomDisc(); giveItem(k); saveGame(); updateCount(); renderShop(); $('#shopMsg').textContent = 'Got 💿 ' + itemName(k) + '! Teach it from the Moves screen.'; });
   v.querySelectorAll('[data-devbuy]').forEach(b => b.onclick = () => {
     const d = DEVICES.find(x => x.key === b.dataset.devbuy); if (!d || devOwned(d.key) || G.data < d.price) return;
     G.data -= d.price; G.devices = [...new Set([...(G.devices || []), d.key])]; equipDevice(d.key); updateCount(); renderShop();
@@ -1859,10 +1867,10 @@ const EXPEDITIONS = [
   { key: 'ruins', name: 'Ancient Ruins', mins: 120, data: 3.2, xp: 3, egg: 0.06, rare: 0, risk: 0.12, finds: 2, relic: 0.2, chip: 0.4, clean: 0.12, desc: 'Crumbling code ruins with buried treasure.' },
   { key: 'dark', name: 'Dark Area', mins: 480, data: 10, xp: 9, egg: 0.25, rare: 0.08, risk: 0.3, finds: 4, relic: 0.35, crest: 0.1, xab: 0.12, chip: 0.7, clean: 0.25, desc: 'Dangerous depths with the richest rewards.' },
   // hard expeditions: a stat check instead of a level check. Meet the needs for a 75% smooth trip; beat them for more, fall short and it drops fast
-  { key: 'volcano', name: 'Magma Core', icon: '🌋', mins: 240, data: 7, xp: 7, egg: 0.3, rare: 0.05, finds: 3, chip: 0.6, held: 0.1, relic: 0.2, need: { atk: 20, def: 18, hp: 140 }, eggPool: ['efire', 'emachine', 'dragon'], hard: true, desc: 'A furnace at the heart of a data volcano. Only tough, hard-hitting Digimon get through the heat.' },
-  { key: 'abyss', name: 'Net Ocean Abyss', icon: '🌊', mins: 360, data: 9, xp: 9, egg: 0.3, rare: 0.08, finds: 4, chip: 0.6, held: 0.12, relic: 0.25, need: { int: 22, hp: 160, sp: 30 }, eggPool: ['ewater', 'edark', 'rare'], hard: true, desc: 'Crushing pressure and strange signals far below the Net Ocean. Needs a sharp mind and deep reserves.' },
-  { key: 'storm', name: 'Storm Spire', icon: '🌪️', mins: 360, data: 9, xp: 9, egg: 0.3, rare: 0.06, finds: 4, chip: 0.6, held: 0.12, crest: 0.08, need: { spd: 18, int: 18, def: 16 }, eggPool: ['ewind', 'eholy', 'lucky'], hard: true, desc: 'A lightning-struck tower in the sky. Fast, clever Digimon dodge the bolts on the way up.' },
-  { key: 'kernel', name: 'Kernel Core', icon: '💠', mins: 720, data: 22, xp: 20, egg: 0.45, rare: 0.15, finds: 6, chip: 1, held: 0.3, relic: 0.4, crest: 0.25, xab: 0.25, need: { hp: 260, atk: 30, int: 30, def: 30, spd: 22 }, eggPool: ['golden', 'ultimate', 'xegg', 'mega'], hard: true, desc: 'The guarded core of the Digital World itself. Only a Mega-level Digimon in top shape comes back smoothly.' },
+  { key: 'volcano', name: 'Magma Core', icon: '🌋', mins: 240, data: 7, xp: 7, egg: 0.3, rare: 0.05, finds: 3, chip: 0.6, held: 0.1, relic: 0.2, need: { atk: 20, def: 18, hp: 140 }, eggPool: ['efire', 'emachine', 'dragon'], disc: 0.15, hard: true, desc: 'A furnace at the heart of a data volcano. Only tough, hard-hitting Digimon get through the heat.' },
+  { key: 'abyss', name: 'Net Ocean Abyss', icon: '🌊', mins: 360, data: 9, xp: 9, egg: 0.3, rare: 0.08, finds: 4, chip: 0.6, held: 0.12, relic: 0.25, need: { int: 22, hp: 160, sp: 30 }, eggPool: ['ewater', 'edark', 'rare'], disc: 0.2, hard: true, desc: 'Crushing pressure and strange signals far below the Net Ocean. Needs a sharp mind and deep reserves.' },
+  { key: 'storm', name: 'Storm Spire', icon: '🌪️', mins: 360, data: 9, xp: 9, egg: 0.3, rare: 0.06, finds: 4, chip: 0.6, held: 0.12, crest: 0.08, need: { spd: 18, int: 18, def: 16 }, eggPool: ['ewind', 'eholy', 'lucky'], disc: 0.2, hard: true, desc: 'A lightning-struck tower in the sky. Fast, clever Digimon dodge the bolts on the way up.' },
+  { key: 'kernel', name: 'Kernel Core', icon: '💠', mins: 720, data: 22, xp: 20, egg: 0.45, rare: 0.15, finds: 6, chip: 1, held: 0.3, relic: 0.4, crest: 0.25, xab: 0.25, need: { hp: 260, atk: 30, int: 30, def: 30, spd: 22 }, eggPool: ['golden', 'ultimate', 'xegg', 'mega'], disc: 0.4, hard: true, desc: 'The guarded core of the Digital World itself. Only a Mega-level Digimon in top shape comes back smoothly.' },
 ];
 const EXP_STAT = { hp: 'HP', sp: 'SP', atk: 'ATK', int: 'INT', def: 'DEF', spd: 'SPD' };
 // how a Digimon measures up to a hard expedition: 1 = exactly meets every need. In a team, each member also borrows 30% of the team's best in each stat
@@ -1899,16 +1907,20 @@ function renderBox(){
     const bi = order[i], m = bi === undefined ? null : G.box[bi];
     if (!m){ cells.push('<div class="bcell empty"><span>Empty</span></div>'); continue; }
     const status = m.exp ? (expDone(m) ? '<i class="ok">Back!</i>' : '<i>' + fmtLeft(m.exp.end - Date.now()) + '</i>') : '';
-    cells.push('<button class="bcell' + (m.exp && !expDone(m) ? ' away' : '') + '" data-box="' + bi + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + '</small>' + status + '</button>');
+    cells.push('<button class="bcell' + (m.exp && !expDone(m) ? ' away' : '') + '" data-box="' + bi + '" data-q="' + esc((m.name + ' ' + lvName(m) + ' lv' + (m.level || 1) + (m.fav ? ' fav' : '') + (m.exp ? ' away' : '')).toLowerCase()) + '"><img alt="" src="' + esc(m.image) + '"><b>' + (m.fav ? '⭐ ' : '') + esc(m.name) + '</b><small>Lv ' + (m.level || 1) + ' · ' + lvName(m) + '</small>' + status + '</button>');
   }
   v.innerHTML = '<div class="ptop"><h2>Storage Box</h2></div>' +
     '<div class="wallet"><span>Expeditions out <b>' + expRunning() + ' / ' + G.expSlots + '</b></span><button class="favbtn" id="boxShop">More slots</button></div>' +
     '<p style="margin:0;color:var(--muted)">Digimon in the Box rest without getting hungry. Tap one to move it to your party, release it, or send it on a timed expedition. Use “Send to the Box” on the Partner tab to store one.</p>' +
+    '<input id="boxQ" class="onlin boxq" type="search" autocomplete="off" placeholder="🔍 Search the Box: name, level (rookie, mega), fav, away" value="' + esc(state.boxQ || '') + '">' +
     '<div class="segs">' + BOX_SORTS.map(([k, l]) => '<button class="seg' + (k === sortKey ? ' on' : '') + '" data-bsort="' + k + '">' + l + '</button>').join('') + '</div>' +
     (ready.length ? '<button class="big" id="collectAll">Collect ' + ready.length + ' finished expedition' + (ready.length === 1 ? '' : 's') + '</button>' : '') +
     (G.box.some(m => !m.exp) ? '<button class="act" id="teamExp"' + (expRunning() < G.expSlots ? '' : ' disabled') + ' style="width:100%">🧭 Send a team on an expedition<small>' + (expRunning() < G.expSlots ? (G.expSlots - expRunning()) + ' expedition slot' + (G.expSlots - expRunning() === 1 ? '' : 's') + ' free · up to ' + TEAM_MAX + ' Digimon per team' : 'all expedition slots are busy') + '</small></button>' : '') +
     '<div class="boxgrid">' + cells.join('') + '</div>';
   v.querySelectorAll('[data-box]').forEach(b => b.onclick = () => boxMenu(+b.dataset.box));
+  const bq = $('#boxQ'), filt = () => { const q = (state.boxQ || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+    v.querySelectorAll('.boxgrid .bcell').forEach(c => c.hidden = q.length > 0 && (!c.dataset.q || !q.every(w => c.dataset.q.includes(w)))); };
+  if (bq){ bq.oninput = () => { state.boxQ = bq.value; filt(); }; filt(); }
   v.querySelectorAll('[data-bsort]').forEach(b => b.onclick = () => { store.set('dx_boxsort', b.dataset.bsort); renderBox(); });
   $('#boxShop').onclick = () => setTab('shop');
   const ca = $('#collectAll'); if (ca) ca.onclick = () => collectExpeditions(ready);
@@ -1964,7 +1976,7 @@ function boxMenu(i){
   busy = true; initMoves(m);
   const st = partnerStats(m), away = !!m.exp, done = expDone(m), partyRoom = G.party.length < PARTY_MAX;
   const exName = away ? (EXPEDITIONS.find(e => e.key === m.exp.key) || EXPEDITIONS[0]).name : '';
-  openOv('<div class="bhead"><img alt="" src="' + esc(m.image) + '"><div><h4>' + esc(m.name) + '</h4><div class="statrow"><span class="stage">Lv ' + m.level + '</span><span class="stage">' + lvName(m) + '</span></div></div></div>' +
+  openOv('<div class="bhead"><img alt="" src="' + esc(m.image) + '"><div><h4>' + esc(m.name) + '</h4><div class="statrow"><span class="stage">Lv ' + m.level + '</span><span class="stage">' + lvName(m) + '</span>' + (m.gen ? '<span class="stage">Gen ' + (m.gen + 1) + '</span>' : '') + '</div></div></div>' +
     '<div class="row statrow">' + statChips(st) + '</div>' +
     (synergiesOf(m).length ? '<p class="ownline" style="margin:0">🔗 Synergy groups: ' + synergiesOf(m).map(g => g.icon + ' ' + esc(g.name)).join(', ') + '</p>' : '') +
     (away ? '<p style="margin:0">' + (done ? esc(m.name) + ' is back from ' + esc(exName) + '!' : 'Exploring ' + esc(exName) + '. Back in ' + fmtLeft(m.exp.end - Date.now()) + '.') + '</p>' : '') +
@@ -1973,10 +1985,16 @@ function boxMenu(i){
       (away && !done ? '<button class="act" id="bxRush"' + (G.data < rushCost(m) ? ' disabled' : '') + '>⏩ Finish now · ' + rushCost(m) + ' DigiData<small>' + (G.data < rushCost(m) ? 'not enough DigiData (you have ' + G.data + ')' : 'brings ' + esc(m.name) + ' back right away') + '</small></button>' : '') +
       (!away ? '<button class="act" id="bxParty"' + (partyRoom ? '' : ' disabled') + '>Move to party<small>' + (partyRoom ? G.party.length + ' / ' + PARTY_MAX + ' in party' : 'party is full') + '</small></button>' +
         '<button class="act" id="bxExp"' + (expRunning() < G.expSlots ? '' : ' disabled') + '>Send on an expedition<small>' + expRunning() + ' / ' + G.expSlots + ' teams out</small></button>' +
+        (m.stage >= 5 && (m.level || 1) >= 40 && !m.exp ? '<button class="act" id="bxReborn">🥚 Rebirth' + (m.gen ? ' (Gen ' + (m.gen + 1) + ')' : '') + '<small>' + ((m.gen || 0) >= 5 ? 'already at the highest generation' : 'start over as an egg: +6% stats forever, keeps its moves') + '</small></button>' : '') +
         '<button class="ghost danger" id="bxRelease"' + (m.fav ? ' disabled' : '') + '>' + (m.fav ? 'Favorites can\'t be released' : 'Release · +' + releaseValue(m) + ' DigiData') + '</button>' : '') +
       '<button class="act" id="bxFav">' + (m.fav ? '⭐ Favorite<small>tap to unfavorite</small>' : '☆ Favorite<small>keeps it at the top and safe from release</small>') + '</button>' +
       '<button class="ghost" id="bxClose">Close</button></div>');
   $('#bxFav').onclick = () => { m.fav = !m.fav; saveGame(); closeOv(); boxMenu(G.box.indexOf(m)); };
+  const rbn = $('#bxReborn'); if (rbn) rbn.onclick = () => {
+    if ((m.gen || 0) >= 5) return;
+    if (!rbn.dataset.armed){ rbn.dataset.armed = '1'; rbn.innerHTML = 'Tap again to rebirth ' + esc(m.name) + '<small>it goes back to the start of its line, Lv 1</small>'; return; }
+    rebirth(m); saveGame(); closeOv(); renderBox(); updateCount();
+  };
   $('#bxClose').onclick = () => { closeOv(); renderBox(); };
   const c = $('#bxCollect'); if (c) c.onclick = () => collectExpeditions([m]);
   const ru = $('#bxRush'); if (ru) ru.onclick = () => {
@@ -2029,6 +2047,7 @@ async function collectExpeditions(list){
     }
     if (ok && ex.relic && Math.random() < ex.relic){ const k = randomDigimental(); giveItem(k); got(itemIcon(k), itemName(k), 'rare'); }
     if (ok && ex.crest && Math.random() < ex.crest){ const k = randomCrest(); if (k){ giveItem(k); got(itemIcon(k), itemName(k), 'epic'); } }
+    if (ok && ex.disc && Math.random() < ex.disc){ const k = randomDisc(); giveItem(k); got('💿', itemName(k), 'epic'); }
     if (ok && ex.held && Math.random() < ex.held){ const k = randomHeld(); giveItem(k); got(itemIcon(k), itemName(k), 'epic'); }
     if (ok && ex.xab && Math.random() < ex.xab){ giveItem('xab'); got(itemIcon('xab'), itemName('xab'), 'epic'); }
     if (ex.chip && Math.random() < ex.chip * (ok ? 1 : 0.5)){ const k = randomChip(); giveItem(k); got(itemIcon(k), itemName(k)); }
@@ -2072,6 +2091,17 @@ async function collectExpeditions(list){
   $('#exDone').onclick = () => { closeOv(); renderBox(); updateCount(); };
 }
 
+// rebirth: a Lv 40+ Mega goes back to the first Digimon of its line as a new generation: +6% to every stat per generation (up to 5),
+// keeps 30% of its trained stats, half its bond, all its moves and its held item
+function rebirth(m){
+  const first = (m.line || []).find(id => state.byId.has(id)) || m.id, b = state.byId.get(first), st = (m.stageLine || [0])[0] || 0;
+  const g = growthOf(m); Object.keys(g).forEach(k => g[k] = Math.round((g[k] || 0) * 0.3));
+  const prev = m.name;
+  Object.assign(m, { id: first, name: b.name, image: b.image, stage: st, level: STAGE_MIN_LV[st] || 1, xp: 0, evo: 0, mistakes: 0, stageMistakes: 0, stageLosses: 0, stageWins: 0,
+    line: [first], stageLine: [st], final: false, ultra: false, gen: Math.min(5, (m.gen || 0) + 1), bond: Math.round((m.bond || 0) / 2), streak: 0, born: Date.now(), last: Date.now(), flags: {} });
+  bump('rebirths'); G.col[first] = 'raised';
+  say('🥚 ' + prev + ' was reborn as ' + m.name + ' (Gen ' + (m.gen + 1) + ')! Every stat is now +' + Math.round(6 * m.gen) + '% for good.', 'happy');
+}
 function sendToBox(){
   const p = P(); if (!p || busy) return;
   if (G.party.length < 2){ say('Keep at least one Digimon in your party.'); return; }
@@ -2200,7 +2230,7 @@ function growthOf(p){
   if (!p.growth) p.growth = { hp: 0, sp: 0, atk: Math.max(0, Math.round(((p.str || 2) - 2) / 2)), int: 0, spd: 0 };
   return p.growth;
 }
-function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p), pm = persOf(p).mul || {}, hm = (HELD[heldOf(p)] || {}).mul || {}, bm = bondStatMul(p) * (p.ultra ? ULTRA_MUL : 1), sm = synMul(p); const o = {}; STAT_KEYS.forEach(k => o[k] = Math.max(1, Math.round((b[k] + (g[k] || 0)) * (pm[k] || 1) * (hm[k] || 1) * bm * (sm[k] || 1)))); return o; }
+function partnerStats(p){ const b = baseStats(p.id, p.stage), g = growthOf(p), pm = persOf(p).mul || {}, hm = (HELD[heldOf(p)] || {}).mul || {}, bm = bondStatMul(p) * (p.ultra ? ULTRA_MUL : 1) * (1 + 0.06 * Math.min(5, p.gen || 0)), sm = synMul(p); const o = {}; STAT_KEYS.forEach(k => o[k] = Math.max(1, Math.round((b[k] + (g[k] || 0)) * (pm[k] || 1) * (hm[k] || 1) * bm * (sm[k] || 1)))); return o; }
 
 // ----- synergies: Digimon from the same group boost each other in your party, and earn more on expeditions sent together -----
 // named groups need 2 members and element groups need 3; having 2 more than that makes the bonus 1.5x
@@ -2532,11 +2562,22 @@ async function movesScreen(){
     const row = m => { const b = toBattle(m, p.stage), on = eq.has(m.name);
       return '<button class="mvrow' + (on ? ' on' : '') + '" data-eq="' + esc(m.name) + '"><span class="mvk ' + m.kind + '">' + kindLabel(m) + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>' + esc(moveLabel(b)) + (dealsDamage(b) ? ' · 🎯' + (moveTrait(b) === 'quick' ? 100 : 95) + '%' : '') + '</small><small class="mvfx">' + esc(moveEffect(b, false)) + '</small></span><span class="mvc">' + (on ? '✓' : '') + '</span></button>'; };
     const next = d ? learnset(p.id, d, p.stage).filter(m => m.learn > p.level && !p.moves.some(k => k.name === m.name)) : [];
+    const pk = passiveOf(p.id, mainAttr(d)), discs = Object.keys(G.items).filter(k => k.startsWith('disc:') && hasItem(k) && discOf(k));
     $('#overlay .sheet').innerHTML = '<h4>Moves · ' + esc(p.name) + ' <span class="stage">Lv ' + p.level + '</span></h4>' +
+      '<div class="pasbox"><b>' + PASSIVES[pk].icon + ' Passive: ' + esc(PASSIVES[pk].name) + '</b><small>' + esc(PASSIVES[pk].desc) + ' Every ' + esc(mainAttr(d)) + ' species has a passive like this; it always works.</small></div>' +
       '<p style="margin:0;color:var(--muted);font-size:.85rem">Tap a move to equip or unequip it. In battle, press and hold a move to see what it does. 🎯 is accuracy against an equally fast foe: it drops against faster foes (down to 70%) and rises a little against slower ones. Up to 4 equipped moves are used in battles and dungeons, and Guard is always available. Moves stay learned when your Digimon digivolves.</p>' +
       '<div class="mvlist">' + p.moves.map(row).join('') + '</div>' +
       (next.length ? '<h3 style="margin:6px 0 0">Coming up</h3><div class="mvlist">' + next.map(m => '<div class="mvrow locked"><span class="mvk ' + m.kind + '">' + kindLabel(m) + '</span><span class="mvt"><b>' + esc(m.name) + '</b><small>Learns at Lv ' + m.learn + ' · ' + esc(moveLabel(toBattle(m, p.stage))) + '</small><small class="mvfx">' + esc(moveEffect(toBattle(m, p.stage), false)) + '</small></span><span></span></div>').join('') + '</div>' : '') +
+      '<h3 style="margin:6px 0 0">💿 Move Discs</h3>' + (discs.length ? '<div class="mvlist">' + discs.map(k => { const dm = discOf(k), b = toBattle(dm, p.stage), known = p.moves.some(x => x.name === dm.name);
+        return '<div class="mvrow"><span class="mvk ' + dm.kind + '">' + kindLabel(dm) + '</span><span class="mvt"><b>' + esc(dm.name) + ' ×' + G.items[k] + '</b><small>' + esc(moveLabel(b)) + '</small><small class="mvfx">' + esc(moveEffect(b, false)) + '</small></span><button class="act" data-teach="' + k + '"' + (known ? ' disabled' : '') + '>' + (known ? 'Known' : 'Teach') + '</button></div>'; }).join('') + '</div>'
+        : '<p class="ownline">No Move Discs yet. They drop from Hard and Nightmare battles, dungeon bosses, HARD expeditions and the Tower, and the Shop sells random ones.</p>') +
       '<p id="mvMsg" style="margin:0;min-height:1.2em;font-size:.85rem;color:var(--bad)"></p><button class="big" id="mvDone">Done</button>';
+    $('#overlay').querySelectorAll('[data-teach]').forEach(b => b.onclick = () => {
+      const k = b.dataset.teach, dm = discOf(k); if (!dm || !hasItem(k) || p.moves.some(x => x.name === dm.name)) return;
+      if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Use disc?'; return; }
+      G.items[k]--; p.moves.push({ name: dm.name, kind: dm.kind, power: dm.power, desc: 'Taught by a Move Disc.' }); if (p.equip.length < 4) p.equip.push(dm.name);
+      bump('discs'); saveGame(); draw(); $('#mvMsg').style.color = 'var(--good)'; $('#mvMsg').textContent = p.name + ' learned ' + dm.name + '!' + (p.equip.includes(dm.name) ? ' It\'s equipped.' : ' Tap it above to equip it.');
+    });
     $('#overlay').querySelectorAll('[data-eq]').forEach(b => b.onclick = () => {
       const n = b.dataset.eq;
       if (p.equip.includes(n)){ if (p.equip.length === 1){ $('#mvMsg').textContent = 'Keep at least one move equipped.'; return; } p.equip = p.equip.filter(x => x !== n); }
@@ -2557,6 +2598,41 @@ function fighter(name, image, st, attr, moves, mood){
 function evadeChance(att, def){ return Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (curWeather().evade || 0); }
 const hitPct = (att, def, mv) => mv && moveTrait(mv) === 'quick' ? 100 : Math.max(0, Math.round(100 * (1 - evadeChance(att, def))));
 const ACC_TEXT = '95% accuracy against an equally fast foe (97% vs slower ones, down to 70% vs much faster ones)';
+// ----- Move Discs: teach any Digimon a move. Found in Hard/Nightmare battles, dungeon bosses, HARD expeditions and the Tower -----
+const DISCS = [
+  { name: 'Twin Strike', kind: 'phys', power: 1.6 }, { name: 'Needle Flurry', kind: 'phys', power: 1.6 }, { name: 'Illusion Wave', kind: 'mag', power: 1.5 },
+  { name: 'Smoke Screen', kind: 'mag', power: 1.4 }, { name: 'Sticky Web', kind: 'mag', power: 1.4 }, { name: 'Virus Siphon', kind: 'mag', power: 1.5 },
+  { name: 'Battle Cry', kind: 'phys', power: 1.5 }, { name: 'Shield Bash', kind: 'phys', power: 1.5 }, { name: 'Plasma Charge', kind: 'mag', power: 1.6 },
+  { name: 'Piercing Lance', kind: 'phys', power: 1.8 }, { name: 'Quick Jab', kind: 'phys', power: 1.4 }, { name: 'Giga Crash', kind: 'phys', power: 2.3 },
+  { name: 'Flame Wave', kind: 'mag', power: 1.8 }, { name: 'Frost Breath', kind: 'mag', power: 1.8 }, { name: 'Rock Smash', kind: 'phys', power: 1.8 },
+  { name: 'Nightmare Howl', kind: 'mag', power: 1.7 }, { name: 'Guillotine Edge', kind: 'phys', power: 1.9 }, { name: 'Holy Light', kind: 'mag', power: 1.8 },
+  { name: 'Toxic Sting', kind: 'phys', power: 1.6 }, { name: 'Thunder Bolt', kind: 'mag', power: 1.8 }, { name: 'Lullaby Song', kind: 'mag', power: 1.3 },
+  { name: 'Barrier Wall', kind: 'buff', power: 1.25 }, { name: 'Accel Boost', kind: 'buff', power: 1.25 }, { name: 'Focus Mind', kind: 'buff', power: 1.25 },
+  { name: 'Power Charge', kind: 'buff', power: 1.3 }, { name: 'Healing Bloom', kind: 'heal', power: 0.35 }, { name: 'Recovery Data', kind: 'heal', power: 0.4 },
+  { name: 'Life Drain', kind: 'drain', power: 1.5 },
+];
+const randomDisc = () => 'disc:' + Math.floor(Math.random() * DISCS.length);
+const discOf = k => DISCS[+String(k).split(':')[1]] || null;
+// ----- passives: every species has one, picked from its attribute -----
+const PASSIVES = {
+  aura:       { name: 'Holy Aura', icon: '😇', attr: 'Vaccine', desc: 'Heals 6% of its max HP whenever it lands a critical hit.' },
+  guardian:   { name: 'Guardian', icon: '🛡️', attr: 'Vaccine', desc: 'The first hit it takes each battle does half damage.' },
+  purifier:   { name: 'Purifier', icon: '✨', attr: 'Vaccine', desc: 'Shrugs off the first status problem each battle.' },
+  venom:      { name: 'Venom Touch', icon: '☠️', attr: 'Virus', desc: 'Its attacks have a 12% chance to poison.' },
+  bloodlust:  { name: 'Bloodlust', icon: '🩸', attr: 'Virus', desc: '+15% damage against foes below half HP.' },
+  berserk:    { name: 'Berserk', icon: '😤', attr: 'Virus', desc: '+20% damage while below 40% HP.' },
+  analyzer:   { name: 'Analyzer', icon: '🧠', attr: 'Data', desc: '+10% critical-hit chance.' },
+  overclock:  { name: 'Overclock', icon: '🔌', attr: 'Data', desc: 'Recovers 6% of its max SP at the start of each of its turns.' },
+  firewall:   { name: 'Firewall', icon: '🧯', attr: 'Data', desc: '50% chance to resist any status problem.' },
+  adapt:      { name: 'Adaptable', icon: '🌈', attr: 'Free', desc: '+8% damage with every attack.' },
+  lucky:      { name: 'Lucky', icon: '🍀', attr: 'Free', desc: 'Dodges 6% more attacks.' },
+  secondwind: { name: 'Second Wind', icon: '🌬️', attr: 'Free', desc: 'Once per battle, heals 20% of its max HP when it drops below 30%.' },
+};
+function passiveOf(id, attr){
+  const a = ['Vaccine', 'Virus', 'Data'].includes(attr) ? attr : 'Free', pool = Object.keys(PASSIVES).filter(k => PASSIVES[k].attr === a);
+  return pool[Math.floor(Math.abs(seeded(id | 0, 77)) * pool.length) % pool.length];
+}
+const pasTag = k => k && PASSIVES[k] ? PASSIVES[k].icon + ' ' + PASSIVES[k].name : '';
 // ----- move traits: a second effect on top of damage, so each move has a reason to be brought -----
 const TRAITS = {
   pierce:   { name: 'Piercing',    icon: '🎯', tip: 'Ignores 60% of the foe\'s DEF and goes straight through Guard. 10% less base power.' },
@@ -2643,10 +2719,10 @@ function moveCore(att, def, mv, R, local){
   if (mv.kind === 'guard'){ att.guard = true; const g = Math.max(2, Math.ceil(att.st.sp * 0.2)); att.sp = Math.min(att.st.sp, att.sp + g); return { text: att.name + ' guards and recovers ' + g + ' SP.' }; }
   att.sp -= mv.cost || 0;
   const tr = moveTrait(mv), blind = att.blind > 0 ? 0.25 : 0; if (att.blind > 0) att.blind--;
-  const evade = tr === 'quick' ? 0 : Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (local ? curWeather().evade || 0 : 0) + blind;
+  const evade = tr === 'quick' ? 0 : Math.max(0.03, Math.min(0.3, 0.05 + (def.st.spd - att.st.spd) * 0.012)) + (local ? curWeather().evade || 0 : 0) + blind + (def.pas === 'lucky' ? 0.06 : 0);
   if (R() < evade) return { text: att.name + ' used ' + mv.name + '… but ' + def.name + ' dodged!' + (blind ? ' (blinded)' : ''), miss: true };
   const focused = !!att.focus; att.focus = false;
-  const crit = focused || R() < Math.max(0.04, Math.min(0.48, 0.06 + (att.critBonus || 0) + (tr === 'quick' ? 0.15 : 0) + (att.st.spd - def.st.spd) * 0.01));
+  const crit = focused || R() < Math.max(0.04, Math.min(0.5, 0.06 + (att.critBonus || 0) + (tr === 'quick' ? 0.15 : 0) + (att.pas === 'analyzer' ? 0.1 : 0) + (att.st.spd - def.st.spd) * 0.01));
   const em = elemMult(att.elem, def.elem), am = attrMult(att.attr, def.attr) * em;
   const phys = mv.kind === 'phys' || mv.kind === 'atk', aStat = phys ? att.st.atk : att.st.int;
   // DEF softens both physical (ATK) and SP-powered attacks; equal attack and defense keeps damage about where it was
@@ -2654,12 +2730,16 @@ function moveCore(att, def, mv, R, local){
   const defFactor = 1.35 * (2 * aStat) / (2 * aStat + dStat);
   const hits = tr === 'multi' ? 2 + Math.floor(R() * 3) : tr === 'twin' ? 2 : tr === 'flurry' ? 3 + Math.floor(R() * 3) : 1, low = def.hp < def.st.hp * 0.35;
   const pw = (tr === 'multi' ? 0.42 * hits : tr === 'twin' ? 0.62 * hits : tr === 'flurry' ? 0.3 * hits : traitPow(tr, def)) * (mv.power || 1);
-  const mods = (att.buff || 1) * (1 - (att.weak || 0)) * (att.status && att.status.k === 'brn' ? 0.75 : 1) * (def.shield > 0 ? (tr === 'flurry' ? 0.8 : 0.6) : 1) * (def.guard && tr !== 'pierce' ? 0.5 : 1) * (local ? skyMult(att) : 1) * (att.tdm || 1) * (def.ttk || 1);
+  const mods = (att.buff || 1) * (1 - (att.weak || 0)) * (att.status && att.status.k === 'brn' ? 0.75 : 1) * (def.shield > 0 ? (tr === 'flurry' ? 0.8 : 0.6) : 1) * (def.guard && tr !== 'pierce' ? 0.5 : 1) * (local ? skyMult(att) : 1) * (att.tdm || 1) * (def.ttk || 1)
+    * (att.pas === 'adapt' ? 1.08 : 1) * (att.pas === 'bloodlust' && def.hp < def.st.hp * 0.5 ? 1.15 : 1) * (att.pas === 'berserk' && att.hp < att.st.hp * 0.4 ? 1.2 : 1) * (def.pas === 'guardian' && !def.pGuard ? 0.5 : 1);
+  const guarded = def.pas === 'guardian' && !def.pGuard; if (guarded) def.pGuard = true;
   const dmg = Math.max(1, Math.round(aStat * pw * defFactor * (0.85 + R() * 0.3) * am * (crit ? 1.6 : 1) * mods));
   def.hp = Math.max(0, def.hp - dmg);
   let text = att.name + ' used ' + mv.name + '! ' + (hits > 1 ? 'Hit ' + hits + ' times for ' : '') + dmg + ' damage.', heal = 0;
   if (mv.kind === 'drain'){ heal = Math.max(1, Math.round(dmg / 2)); att.hp = Math.min(att.st.hp, att.hp + heal); text += ' Drained ' + heal + ' HP.'; }
   if (crit) text += ' Critical hit!';
+  if (crit && att.pas === 'aura'){ const h = Math.max(1, Math.round(att.st.hp * 0.06)); att.hp = Math.min(att.st.hp, att.hp + h); text += ' 😇 +' + h + ' HP.'; }
+  if (guarded) text += ' 🛡️ Guardian halved it!';
   if (am > 1) text += ' Super effective!'; else if (am < 1) text += ' Not very effective…';
   if (em !== 1 && ELEMS[att.elem] && ELEMS[def.elem]) text += ' (' + ELEMS[att.elem].icon + '→' + ELEMS[def.elem].icon + ')';
   if (def.guard) text += tr === 'pierce' ? ' (pierced the guard)' : ' (guarded)';
@@ -2680,9 +2760,11 @@ function moveCore(att, def, mv, R, local){
   if (tr === 'charge'){ const g = Math.max(1, Math.round(att.st.sp * 0.15)); att.sp = Math.min(att.st.sp, att.sp + g); text += ' +' + g + ' SP.'; }
   if (focused) text += ' (focused)';
   if (def.status && def.status.k === 'slp' && def.hp > 0){ def.status = null; text += ' ' + def.name + ' woke up!'; }
-  const sk = moveStatus(mv) || (tr === 'burn' ? 'brn' : tr === 'chill' ? 'frz' : tr === 'confuse' ? 'cnf' : null);
-  const chance = sk === 'frz' ? 0.25 : sk === 'par' && local && curWeather().par ? 0.45 : 0.3;
-  if (sk && def.hp > 0 && !def.status && !def.noStatus && R() < chance){ def.status = { k: sk, t: sk === 'slp' ? 1 + Math.floor(R() * 3) : sk === 'par' || sk === 'cnf' ? 3 : sk === 'frz' ? 1 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
+  if (def.hp > 0 && def.pas === 'secondwind' && !def.pWind && def.hp < def.st.hp * 0.3){ def.pWind = true; const h = Math.round(def.st.hp * 0.2); def.hp = Math.min(def.st.hp, def.hp + h); text += ' 🌬️ ' + def.name + ' got a second wind (+' + h + ' HP)!'; }
+  let sk = moveStatus(mv) || (tr === 'burn' ? 'brn' : tr === 'chill' ? 'frz' : tr === 'confuse' ? 'cnf' : null);
+  let chance = sk === 'frz' ? 0.25 : sk === 'par' && local && curWeather().par ? 0.45 : 0.3;
+  if (!sk && att.pas === 'venom'){ sk = 'psn'; chance = 0.12; }
+  if (sk && def.hp > 0 && !def.status && !def.noStatus && R() < chance && (def.pas === 'firewall' && R() < 0.5 ? (text += ' 🧯 ' + def.name + '\'s Firewall blocked it!', false) : def.pas === 'purifier' && !def.pPure ? (def.pPure = true, text += ' ✨ ' + def.name + ' shrugged it off!', false) : true)){ def.status = { k: sk, t: sk === 'slp' ? 1 + Math.floor(R() * 3) : sk === 'par' || sk === 'cnf' ? 3 : sk === 'frz' ? 1 : 4 }; text += ' ' + def.name + ' is ' + STATUS[sk].name + '!'; }
   return { text, dmg, crit, am, heal, hits };
 }
 function doMove(att, def, mv){ return moveCore(att, def, mv, Math.random, true); }
@@ -2724,7 +2806,7 @@ async function moveFx(aSel, dSel, mv, r, elem, onHit){
       const [x0, y0] = fxCenter(A, box), [x1, y1] = fxCenter(D, box);
       const p = document.createElement('span'); p.className = 'fxproj'; p.textContent = (ELEMS[elem] || {}).icon || '✦'; box.appendChild(p);
       const tf = (x, y, s, a) => 'translate(' + (x - 15) + 'px,' + (y - 15) + 'px) scale(' + s + ') rotate(' + a + 'deg)';
-      try{ await p.animate([{ transform: tf(x0, y0, .5, 0), opacity: .4 }, { transform: tf((x0 + x1) / 2, Math.min(y0, y1) - 36, 1.25, dir * 180), opacity: 1, offset: .5 }, { transform: tf(x1, y1, 1, dir * 360), opacity: 1 }], { duration: 400, easing: 'ease-in' }).finished; }catch{ await sleep(400); }
+      try{ await p.animate([{ transform: tf(x0, y0, .5, 0), opacity: .4 }, { transform: tf((x0 + x1) / 2, Math.min(y0, y1) - 36, 1.25, dir * 180), opacity: 1, offset: .5 }, { transform: tf(x1, y1, 1, dir * 360), opacity: 1 }], { duration: 400 / bSpeed(), easing: 'ease-in' }).finished; }catch{ await sleep(400); }
       p.remove();
     } else { fxClass(A, dir > 0 ? 'fx-lunge-r' : 'fx-lunge-l', 420); await sleep(150); }
   }
@@ -2813,7 +2895,7 @@ async function battle(diff, opts){
   const me = applyPerks(fighter(p.name, p.image, mine, mainAttr(myD), partnerMoves(p), p.mood), p);
   const modes = modeFormsOf(p.name), modeCost = Math.max(2, Math.round(me.st.sp * 0.4));
   const foe = fighter(foeBase.name, foeBase.image, foeSt, mainAttr(foeD), foeMoves(foeBase.id, foeD, fStage, diff.lv));
-  me.elem = elemOf(myD); foe.elem = elemOf(foeD);
+  me.elem = elemOf(myD); foe.elem = elemOf(foeD); me.pas = passiveOf(p.id, me.attr); foe.pas = passiveOf(foeBase.id, foe.attr);
   const foeKey = foeBase.id;
   if (opts.foe){ foe.moves = (opts.foe.moves || []).map(m => Object.assign({}, m)); if (!foe.moves.length) foe.moves = [toBattle(BASIC, opts.foe.stage || 0), GUARD]; foe.attr = opts.foe.attr || foe.attr; foe.elem = opts.foe.elem || foe.elem; }
   if (opts.carry){ if (opts.carry.hp != null) me.hp = Math.max(1, Math.min(me.st.hp, opts.carry.hp)); if (opts.carry.sp != null) me.sp = Math.max(0, Math.min(me.st.sp, opts.carry.sp)); }
@@ -2822,13 +2904,13 @@ async function battle(diff, opts){
 
   let autoOn = !!store.get('dx_auto', false), pendRes = null;
   const side = (f, id) => `<div class="fighter" id="${id}"><img alt="" src="${esc(f.image)}"><b>${esc(f.name)}</b>
-      <span class="attr">${esc(f.attr)} · ${elemTag(f.elem)}</span>
+      <span class="attr">${esc(f.attr)} · ${elemTag(f.elem)}${f.pas ? ' · <span title="' + esc(PASSIVES[f.pas].desc) + '">' + PASSIVES[f.pas].icon + '</span>' : ''}</span>
       <div class="bars"><div class="hp"><i></i></div><small class="hpt"></small><div class="hp spb"><i></i></div><small class="spt"></small></div></div>`;
   $('#overlay .sheet').innerHTML = `<h4>${opts.title ? esc(opts.title) : 'Wild battle! <span class="stage">' + diff.name + '</span>' + (wild ? ' <span class="stage' + (ultraFoe ? ' ultra' : '') + '">' + (ultraFoe ? 'Ultra' : stageName(fStage)) + '</span>' : '') + (R.key !== 'file' ? ' <span class="stage">' + R.icon + ' ' + esc(R.name) + '</span>' : '') + (rareUp ? ' <span class="stage">🌟 Rare</span>' : '') + ((p.streak || 0) >= 2 ? ' <span class="stage">🔥 ' + p.streak + ' streak</span>' : '')}</h4>
     <div class="arena">${side(me, 'fMe')}<div class="vs">VS</div>${side(foe, 'fFoe')}</div>
     <div class="row statrow"><span>You: ${statChips(me.st)}</span></div>
     <div class="blog" id="blog" aria-live="polite">A wild ${esc(foe.name)} appeared! ${me.st.spd >= foe.st.spd ? `${esc(me.name)} is faster.` : `${esc(foe.name)} is faster.`}</div>
-    <div class="autorow"><button class="seg${autoOn ? ' on' : ''}" id="autoBtn">🤖 Auto ${autoOn ? 'on' : 'off'}</button><span>${skyTag()}</span></div>
+    <div class="autorow"><button class="seg${autoOn ? ' on' : ''}" id="autoBtn">🤖 Auto ${autoOn ? 'on' : 'off'}</button><button class="seg${bSpeed() > 1 ? ' on' : ''}" id="spdBtn">⏩ ${bSpeed()}x</button><span>${skyTag()}</span></div>
     <div class="bact" id="bact">${me.moves.map((m, i) => `<button class="act" data-mv="${i}">${esc(m.name)}<small>${esc(moveLabel(m))}${dealsDamage(m) ? ' · 🎯' + hitPct(me, foe, m) + '%' + mxBadge(mxGet(foeKey, me, m.name)) : ''}</small></button>`).join('')}
       ${modes.length ? `<button class="act modebtn" data-mv="mode">✨ Mode Change<small>${modeCost} SP · once per battle</small></button>` : ''}
       ${opts.noRun ? '' : '<button class="act" data-mv="run">Run<small>Escape (SPD)</small></button>'}</div>`;
@@ -2856,6 +2938,7 @@ async function battle(diff, opts){
     $('#overlay').querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { if (b.classList.contains('dis')) return; pendRes = null; setButtons(false); hideMoveTip(); res(b.dataset.mv); });
   });
   draw(); setButtons(false);
+  const sb = $('#spdBtn'); if (sb) sb.onclick = () => { G.bspeed = bSpeed() === 1 ? 2 : bSpeed() === 2 ? 4 : 1; saveGame(); sb.textContent = '⏩ ' + bSpeed() + 'x'; sb.classList.toggle('on', bSpeed() > 1); };
   const ab = $('#autoBtn'); if (ab) ab.onclick = () => {
     autoOn = !autoOn; store.set('dx_auto', autoOn); ab.textContent = '🤖 Auto ' + (autoOn ? 'on' : 'off'); ab.classList.toggle('on', autoOn);
     if (autoOn && pendRes){ const r = pendRes; pendRes = null; setButtons(false); r(autoChoice(me, foe, modes, modeCost)); }
@@ -2935,6 +3018,7 @@ async function battle(diff, opts){
     if (diff.battleEgg && Math.random() < diff.battleEgg * (1 + 0.15 * perk('eggs'))){ G.eggs.push(diff.rare ? 'rare' : 'mystery'); summary += ' It dropped ' + (diff.rare ? 'a Rare Mystery Egg!' : 'a Mystery Egg!'); }
     if (diff.battleEgg && Math.random() < diff.battleEgg * 0.8){ const it = randomDigimental(); giveItem(it); summary += ' Found a ' + itemName(it) + '!'; }
     const rd = regionDrop(); if (rd){ grantItem(rd); summary += ' Found ' + itemIcon(rd) + ' ' + itemName(rd) + '!'; }
+    if (Math.random() < (diff.key === 'nightmare' ? 0.12 : diff.key === 'hard' ? 0.06 : 0)){ const dk = randomDisc(); giveItem(dk); summary += ' Found 💿 ' + itemName(dk) + '!'; }
     if (evOn('eggs') && Math.random() < 0.12){ G.eggs.push('mystery'); summary += ' Egg Hunt: found a Mystery Egg!'; }
   } else if (outcome === 'lose'){ const lost = p.streak || 0; p.streak = 0; p.losses++; p.stageLosses = (p.stageLosses || 0) + 1; p.evo += 1; p.mood = clamp(p.mood - 10); summary = `${p.name} was defeated… Train up and try again.` + (lost >= 2 ? ` Its ${lost}-win streak ended.` : ''); }
   else summary = `${p.name} escaped from ${foe.name}.`;
@@ -3064,7 +3148,7 @@ function dgStep(u, tx, ty, maxR){
 
 function dgUnit(id, name, st, attr, moves, hpScale){
   const hp = Math.max(1, Math.round(st.hp * (hpScale || 1)));
-  return { id, name, st, attr, moves, hp, max: hp, sp: st.sp, x: 0, y: 0, img: dgImage(id) };
+  return { id, name, st, attr, moves, hp, max: hp, sp: st.sp, x: 0, y: 0, img: dgImage(id), pas: passiveOf(id, attr) };
 }
 
 async function dungeon(diff){
@@ -3204,7 +3288,7 @@ function dgDown(u, by){
   if (u.house && dg.mroomHit && !dg.enemies.some(e => e.house)){ const bonus = Math.round(25 * (dg.stage + 1) * dg.diff.reward); dg.data += bonus; dgLog('🏆 Monster House cleared! +' + bonus + ' DigiData.'); }
   if (u.boss){
     bump('bosses'); const bonus = Math.round(60 * (dg.stage + 1) * dg.diff.reward * (evOn('boss') ? 1.5 : 1)); dg.data += bonus;
-    const drop = pick([randomCrest() || randomHeld(), randomHeld(), pick(['egg:rare', 'egg:champion', 'egg:golden', 'egg:xegg'])]); (dg.relics = dg.relics || []).push(drop);
+    const drop = pick([randomCrest() || randomHeld(), randomHeld(), randomDisc(), pick(['egg:rare', 'egg:champion', 'egg:golden', 'egg:xegg'])]); (dg.relics = dg.relics || []).push(drop);
     dgLog('👑 Boss defeated! +' + bonus + ' DigiData and a ' + itemName(drop) + '!'); dg.boss = null;
   }
 }
@@ -3611,8 +3695,8 @@ const itemBasePrice = k => k === 'pers:?' ? 150 : k.startsWith('pers:') ? 350 : 
 const randomChip = () => Math.random() < 0.08 ? 'vit:all' : 'vit:' + pick(CHIP_KEYS);
 const virtue = w => { w = String(w || '').replace(/[^A-Za-z]/g, ''); w = w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); return VIRTUE_ALIAS[w] || (VIRTUES.includes(w) ? w : 'Miracles'); };
 const itemType = k => k.split(':')[0];
-const itemName = k => k.startsWith('egg:') ? eggName(k.slice(4)) : k === 'pers:?' ? 'Mystery Mint' : k.startsWith('pers:') ? (PERS[k.slice(5)] ? PERS[k.slice(5)].name + ' Mint' : 'Mint') : k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
-const itemIcon = k => k.startsWith('egg:') ? '🥚' : k === 'pers:?' ? '🎲' : k.startsWith('pers:') ? '🌿' : k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
+const itemName = k => k.startsWith('disc:') ? 'Disc: ' + ((discOf(k) || {}).name || '?') : k.startsWith('egg:') ? eggName(k.slice(4)) : k === 'pers:?' ? 'Mystery Mint' : k.startsWith('pers:') ? (PERS[k.slice(5)] ? PERS[k.slice(5)].name + ' Mint' : 'Mint') : k.startsWith('h:') ? (HELD[k] ? HELD[k].name : 'Held item') : k === 'egg:rare' ? 'Rare Mystery Egg' : k === 'xab' ? 'X-Antibody' : k === 'clean' ? 'Clean Slate' : k === 'vit:all' ? 'Ultimate Chip' : itemType(k) === 'vit' ? STAT_LABEL[k.split(':')[1]] + ' Chip' : (itemType(k) === 'dm' ? 'Digimental of ' : 'Crest of ') + k.split(':')[1];
+const itemIcon = k => k.startsWith('disc:') ? '💿' : k.startsWith('egg:') ? '🥚' : k === 'pers:?' ? '🎲' : k.startsWith('pers:') ? '🌿' : k.startsWith('h:') ? (HELD[k] ? HELD[k].icon : '🎒') : k === 'egg:rare' ? '🥚' : k === 'xab' ? '🧬' : k === 'clean' ? '🕊️' : k === 'vit:all' ? '🌟' : itemType(k) === 'vit' ? '💾' : itemType(k) === 'dm' ? '🥚' : '🔰';
 const itemUsable = k => k === 'clean' || itemType(k) === 'vit' || itemType(k) === 'pers';
 const MINT_KEYS = () => ['pers:?', ...PERS_KEYS.map(k => 'pers:' + k)];
 const USABLE_KEYS = () => ['clean', ...CHIP_KEYS.map(c => 'vit:' + c), 'vit:all', ...MINT_KEYS()];
@@ -3727,7 +3811,8 @@ function bagScreen(msg){
   const p = P(); if (!p) return;
   busy = true;
   const usable = USABLE_KEYS().filter(hasItem);
-  const evoItems = Object.keys(G.items).filter(k => hasItem(k) && !itemUsable(k) && !k.startsWith('h:'));
+  const evoItems = Object.keys(G.items).filter(k => hasItem(k) && !itemUsable(k) && !k.startsWith('h:') && !k.startsWith('disc:'));
+  const discInv = Object.keys(G.items).filter(k => hasItem(k) && k.startsWith('disc:'));
   const cur = heldOf(p), heldOwned = HELD_KEYS.filter(hasItem);
   const effect = k => k === 'pers:?' ? 'Random new personality (now ' + persOf(p).name + ')' : k.startsWith('pers:') ? 'Become ' + PERS[k.slice(5)].name + ': ' + PERS[k.slice(5)].desc + (p.pers === k.slice(5) ? ' (already)' : '') : k === 'clean' ? 'Clears ' + failures(p) + ' failure' + (failures(p) === 1 ? '' : 's') + ' this stage'
     : k === 'vit:all' ? 'All stats up' : '+' + chipGain(k.split(':')[1], p.stage) + ' ' + STAT_LABEL[k.split(':')[1]];
@@ -3737,6 +3822,7 @@ function bagScreen(msg){
     (usable.length ? '<div class="shop">' + usable.map(k => '<div class="shopitem"><span class="upic" aria-hidden="true">' + itemIcon(k) + '</span><div class="info"><b>' + esc(itemName(k)) + ' ×' + G.items[k] + '</b><small>' + esc(effect(k)) + '</small></div>' +
       '<button class="act" data-use="' + k + '"' + ((k === 'clean' && !failures(p)) || k === 'pers:' + p.pers ? ' disabled' : '') + '>Use</button></div>').join('') + '</div>'
       : '<p class="ownline">No usable items. Buy Clean Slates and stat chips in the Shop, or find them on expeditions.</p>') +
+    (discInv.length ? '<p class="ownline">💿 Move Discs: ' + discInv.map(k => esc(itemName(k).slice(6) + ' ×' + G.items[k])).join(' · ') + '. Teach them from the Moves screen.</p>' : '') +
     (evoItems.length ? '<p class="ownline">Evolution items: ' + evoItems.map(k => esc(itemIcon(k) + ' ' + itemName(k) + (itemKept(k) ? '' : ' ×' + G.items[k]))).join(' · ') + '. These are used automatically when your Digimon digivolves.</p>' : '') +
     '<h5 class="lockh">Held item</h5><div class="shop"><div class="shopitem"><span class="upic" aria-hidden="true">' + (cur ? HELD[cur].icon : '✋') + '</span><div class="info"><b>' + (cur ? esc(HELD[cur].name) : 'Nothing held') + '</b><small>' + (cur ? esc(HELD[cur].desc) : 'Give ' + esc(p.name) + ' an item to hold for a lasting bonus.') + '</small></div>' + (cur ? '<button class="act" data-unhold="1">Remove</button>' : '') + '</div>' +
       heldOwned.map(k => '<div class="shopitem"><span class="upic" aria-hidden="true">' + HELD[k].icon + '</span><div class="info"><b>' + esc(HELD[k].name) + ' ×' + G.items[k] + '</b><small>' + esc(HELD[k].desc) + '</small></div><button class="act" data-hold="' + k + '">Hold</button></div>').join('') + '</div>' +
@@ -4198,6 +4284,7 @@ function statusLabel(u){ return u.status ? STATUS[u.status.k].icon + ' ' + STATU
 // runs at the start of a unit's turn; returns { skip, text }
 function statusTurn(u, R = Math.random){
   const r = statusCore(u, R);
+  if (u.pas === 'overclock' && u.st && u.st.sp && u.hp > 0) u.sp = Math.min(u.st.sp, (u.sp || 0) + Math.max(1, Math.round(u.st.sp * 0.06)));
   if (u.regen > 0 && u.hp > 0){ const h = Math.max(1, Math.round(((u.st && u.st.hp) || u.max || 10) * 0.08)); u.hp = Math.min((u.st && u.st.hp) || u.max || u.hp + h, u.hp + h); u.regen--; r.text = (r.text ? r.text + ' ' : '') + u.name + ' regenerates ' + h + ' HP.'; }
   return r;
 }
@@ -4579,6 +4666,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 28, title: 'Tower, Move Discs, passives and rebirth', items: ['🗼 Tower (World tab): climb 50 floors of tougher foes, carrying your HP between floors. Every 5th floor gives a Move Disc, every 10th is a boss with a big prize (up to a Mega Egg). Resets every week.', '💿 Move Discs: teach any Digimon a new move from its Moves screen. 28 discs, from Double hits to Barriers. They drop from Hard and Nightmare battles, dungeon bosses, HARD expeditions and the Tower, and the Shop sells random ones.', 'Passives: every species now has a passive based on its attribute (Vaccine, Virus, Data or Free), like Guardian, Venom Touch, Analyzer or Second Wind. See it in the Moves screen and next to its name in battle.', '🥚 Rebirth: a Lv 40+ Mega in the Box can start over as a new generation, keeping its moves and 30% of its training, with +6% to every stat per generation (up to Gen 6).', '🔍 Box search: filter by name, level (rookie, mega), fav or away.', '⏩ Battle speed: tap the 1x/2x/4x button in any battle.'] },
   { v: 27, title: 'More move effects', items: ['New attack traits: ✌️ Double hit (always 2 hits), 🌀 Flurry (3–5 hits that chip through Barrier), 💫 Confuse, 🌫️ Blind, 🐌 Slow, 🔋 SP drain, 📣 Rally (powers you up as you hit), 🧱 Guard hit (take less damage next turn) and ⚙️ Recharge (get SP back).', 'New support moves: 🔍 Focus (next attack is a guaranteed critical hit) and 🌱 Regenerate heals (healing over 4 turns).', 'New status: 💫 confused (may hurt itself instead of acting).', 'Almost every attack now has an extra effect. Press and hold a move to see what it does.'] },
   { v: 26, title: 'Hard expeditions', items: ['Four new HARD expeditions that check your Digimon\'s stats instead of its level: 🌋 Magma Core (ATK, DEF, HP), 🌊 Net Ocean Abyss (INT, HP, SP), 🌪️ Storm Spire (SPD, INT, DEF) and 💠 Kernel Core (every stat, Mega-level).', 'Meet every need for a 75% smooth trip; beat them for up to 97%. Fall short, especially badly in one stat, and it gets risky fast. A rough HARD trip only brings back 30% of the rewards.', 'In a team, each member borrows 30% of the team\'s best in each needed stat, so a strong leader carries the rest.', 'They pay much more and can bring element and level eggs, held items, Crests, X-Antibodies and even Golden or Mega Eggs.'] },
   { v: 25, title: 'Faster raids', items: ['Raid fights now refill every 3 hours: 3 fights every 3 hours instead of 3 a day. The Raid screen shows when your next fights are ready.'] },
@@ -4830,6 +4918,54 @@ function coloMatch(i){
   } });
   next();
 }
+
+// ----- Tower: 50 floors of tougher and tougher foes, resets every week. A climb carries HP between floors -----
+const TOWER_TOP = 50, TOWER_COST = 30;
+function towerState(){ const w = weekNo(); if (!G.tower || G.tower.week !== w) G.tower = { week: w, floor: 1, best: 0, prevBest: (G.tower && G.tower.best) || 0 }; return G.tower; }
+const towerBoss = f => f % 10 === 0;
+function towerFoe(f, stage){ const pool = (state.stageIds[Math.min(5, stage)] || []).filter(id => state.byId.has(id) && !isExtra(id) && !state.armor.has(id)); return pool[Math.floor(Math.abs(seeded(weekNo() * 131 + f, 909)) * pool.length) % pool.length]; }
+const towerMult = f => (0.8 + f * 0.032) * (towerBoss(f) ? 1.15 : 1);
+const towerData = f => Math.round((15 + f * 6) * (towerBoss(f) ? 4 : 1));
+const TOWER_BOSS_LOOT = { 10: 'egg:champion', 20: 'h:?', 30: 'egg:rare', 40: 'egg:golden', 50: 'egg:mega' };
+function towerLoot(f){ if (towerBoss(f)) return TOWER_BOSS_LOOT[f] === 'h:?' ? randomHeld() : TOWER_BOSS_LOOT[f]; if (f % 5 === 0) return randomDisc(); return null; }
+function towerView(p){
+  const T = towerState(), ends = (weekNo() + 1) * 7 * 864e5 - 3 * 864e5 - Date.now();
+  const next = [];
+  for (let f = T.floor; f < Math.min(TOWER_TOP + 1, T.floor + 5); f++){ const id = p ? towerFoe(f, p.stage) : null, b = id && state.byId.get(id);
+    next.push('<div class="region' + (towerBoss(f) ? ' tboss' : '') + '"><div class="qtop"><b>' + (towerBoss(f) ? '👑 Floor ' + f + ' · BOSS' : '🗼 Floor ' + f) + '</b><span>foes ×' + towerMult(f).toFixed(2) + '</span></div><small>' + (b ? esc(shown(id, b.name)) : '?') + ' · +' + towerData(f) + ' DigiData' + (f % 5 === 0 ? ' · ' + (towerBoss(f) ? (TOWER_BOSS_LOOT[f] === 'h:?' ? '🎒 a held item' : esc(itemIcon(TOWER_BOSS_LOOT[f]) + ' ' + itemName(TOWER_BOSS_LOOT[f]))) : '💿 a Move Disc') : '') + '</small></div>'); }
+  return '<p class="ownline">Climb as high as you can. Your partner carries its HP from floor to floor (with a 25% breather) until it loses or you stop to rest; the next climb starts where you left off. Every 5th floor gives a Move Disc and every 10th is a boss with a big prize. The Tower resets every week.</p>' +
+    '<div class="wallet"><span>Next floor <b>' + Math.min(T.floor, TOWER_TOP) + ' / ' + TOWER_TOP + '</b></span><span>Best this week <b>' + T.best + '</b></span><span>Resets in <b>' + fmtLeft(ends) + '</b></span></div>' +
+    (T.floor > TOWER_TOP ? '<p class="ownline" style="color:var(--good)">🏆 You conquered all ' + TOWER_TOP + ' floors this week!</p>' :
+      (p ? '<button class="big" id="towerGo"' + (p.energy < TOWER_COST ? ' disabled' : '') + '>' + (p.energy < TOWER_COST ? esc(p.name) + ' is too tired (' + TOWER_COST + ' energy)' : '🗼 Climb from floor ' + T.floor + ' with ' + esc(p.name) + ' · ' + TOWER_COST + ' energy') + '</button>' : '') +
+      '<div class="regions">' + next.join('') + '</div>');
+}
+function towerClimb(){
+  const p = P(); if (!p || busy) return;
+  if (asleep(p) || careInit(p).sick){ renderWorld('tower', p.name + (asleep(p) ? ' is asleep.' : ' is sick.')); return; }
+  const T = towerState(); if (T.floor > TOWER_TOP || p.energy < TOWER_COST) return;
+  p.energy = clamp(p.energy - TOWER_COST); saveGame();
+  const carry = { hp: null, sp: null }; let cleared = 0, got = 0;
+  const go = () => { const f = T.floor, id = towerFoe(f, p.stage);
+    battle(DIFFS[1], { foeId: id, mult: towerMult(f), hpMul: towerBoss(f) ? 1.8 : 1, title: (towerBoss(f) ? '👑 Tower boss · Floor ' : '🗼 Tower · Floor ') + f, carry, noRun: true, onDone: outcome => {
+      if (outcome !== 'win'){ towerEnd(cleared, got, false); return; }
+      const data = towerData(f), loot = towerLoot(f); G.data += data; got += data; if (loot) grantItem(loot);
+      T.floor = f + 1; T.best = Math.max(T.best, f); cleared++; bump('towerFloors'); saveGame();
+      if (T.floor > TOWER_TOP){ towerEnd(cleared, got, true); return; }
+      carry.hp = Math.min(Math.round(carry.hp + (carry.max || 0) * 0.25), carry.max || carry.hp);
+      $('#overlay .sheet').innerHTML = '<h4>🗼 Floor ' + f + ' cleared!</h4><p style="margin:0">+' + data + ' DigiData' + (loot ? ' and ' + esc(itemIcon(loot) + ' ' + itemName(loot)) : '') + '. ' + esc(p.name) + ' has ' + carry.hp + ' / ' + carry.max + ' HP after a breather.</p>' +
+        '<p class="ownline" style="margin:0">Next: ' + (towerBoss(T.floor) ? '👑 BOSS ' : '') + 'floor ' + T.floor + ' (foes ×' + towerMult(T.floor).toFixed(2) + ')</p>' +
+        '<button class="big" id="twNext">Keep climbing</button><button class="ghost" id="twRest">Stop here and rest</button>';
+      $('#twNext').onclick = go; $('#twRest').onclick = () => towerEnd(cleared, got, false, true);
+    } }); };
+  go();
+}
+function towerEnd(cleared, data, top, rested){
+  const T = towerState(), p = P();
+  if (cleared) addBond(p, Math.min(5, cleared));
+  saveGame();
+  $('#overlay .sheet').innerHTML = '<h4>' + (top ? '🏆 Tower conquered!' : rested ? '🗼 Resting' : '🗼 Climb over') + '</h4><p style="margin:0">' + (cleared ? 'Cleared ' + cleared + ' floor' + (cleared === 1 ? '' : 's') + ' for +' + data + ' DigiData. ' : '') + (top ? 'You beat all ' + TOWER_TOP + ' floors this week!' : 'Next climb starts at floor ' + T.floor + '.') + '</p><button class="big" id="twDone">Continue</button>';
+  $('#twDone').onclick = () => { closeOv(); setTab('world'); renderWorld('tower'); updateCount(); };
+}
 function coloEnd(i, won, rounds){
   const p = P(), rank = COLO[i], first = won && (G.colo.best || 0) <= i;
   let html;
@@ -4904,6 +5040,8 @@ function renderWorld(sub, msg){
           '<small>Opponents: ' + foes.map(id => esc(shown(id, state.byId.get(id).name))).join(', ') + '</small>' +
           '<small>' + (done ? 'Replay: +' + Math.round(coloData(i) * 0.3) + ' DigiData' : 'First clear: +' + coloData(i) + ' DigiData' + (r.item ? ' · ' + esc(itemIcon(r.item) + ' ' + itemName(r.item)) : '')) + '</small>' +
           (open && p ? '<button class="act" data-colo="' + i + '"' + (p.energy < 30 ? ' disabled' : '') + '>' + (p.energy < 30 ? 'Too tired (30 energy)' : done ? 'Fight again' : 'Fight') + '</button>' : '') + '</div>'; }).join('') + '</div>';
+  } else if (sub === 'tower'){
+    body = towerView(p);
   } else if (sub === 'online'){
     body = '<div id="onl"><div class="status">Connecting…</div></div>';
   } else {
@@ -4920,7 +5058,7 @@ function renderWorld(sub, msg){
       (F.gym < GYM.length - 1 ? '<button class="act" id="gymUp"' + (G.data < GYM[F.gym].cost ? ' disabled' : '') + '>' + (F.gym ? 'Upgrade' : 'Build') + ' · ' + GYM[F.gym].cost + ' DD</button>' : '<span class="rq ok">Max level</span>') + '</div>';
   }
   v.innerHTML = '<div class="ptop"><h2>Digital World</h2><span class="stage">' + curRegion().icon + ' ' + esc(curRegion().name) + '</span><span class="stage">' + skyTag() + '</span></div>' + eventBanner() +
-    '<div class="segs">' + [['map', '🗺️ Map'], ['colo', '🏟️ Colosseum'], ['farm', '🌾 Farm'], ['online', '🌐 Online']].map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-ws="' + k + '">' + l + '</button>').join('') + '</div>' +
+    '<div class="segs">' + [['map', '🗺️ Map'], ['colo', '🏟️ Colosseum'], ['tower', '🗼 Tower'], ['farm', '🌾 Farm'], ['online', '🌐 Online']].map(([k, l]) => '<button class="seg' + (k === sub ? ' on' : '') + '" data-ws="' + k + '">' + l + '</button>').join('') + '</div>' +
     body + '<p id="wMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>';
   v.querySelectorAll('[data-ws]').forEach(b => b.onclick = () => renderWorld(b.dataset.ws));
   v.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => {
@@ -4930,6 +5068,7 @@ function renderWorld(sub, msg){
     saveGame(); updateCount(); renderWorld('map', m);
   });
   v.querySelectorAll('[data-colo]').forEach(b => b.onclick = () => coloMatch(+b.dataset.colo));
+  const tg = $('#towerGo'); if (tg) tg.onclick = towerClimb;
   v.querySelectorAll('[data-pp]').forEach(b => b.onclick = () => { state.farmPick = +b.dataset.pp; renderWorld('farm'); });
   v.querySelectorAll('[data-plant]').forEach(b => b.onclick = () => {
     const [i, k] = b.dataset.plant.split(':'), c = CROPS.find(x => x.key === k), F = farmInit();
@@ -5928,12 +6067,12 @@ async function duelFighter(){
   const f = applyPerks(fighter(p.name, p.image, partnerStats(p), mainAttr(d), partnerMoves(p), p.mood), p);
   return jclean({ id: p.id, name: p.name, image: p.image, stage: p.stage, level: p.level || 1, st: f.st, attr: f.attr, elem: elemOf(d),
     moves: f.moves.map(m => ({ name: m.name, kind: m.kind, power: m.power || 0, cost: m.cost || 0, desc: m.desc || '' })),
-    crit: f.critBonus || 0, tdm: f.tdm || 1, ttk: f.ttk || 1, endure: Math.min(1, f.endureChance || 0), noStatus: !!f.noStatus });
+    crit: f.critBonus || 0, tdm: f.tdm || 1, ttk: f.ttk || 1, endure: Math.min(1, f.endureChance || 0), noStatus: !!f.noStatus, pas: passiveOf(p.id, f.attr) });
 }
 function duelUnit(s){
   s = s || {}; const st = {}; STAT_KEYS.forEach(k => st[k] = Math.max(1, Math.round(+((s.st || {})[k]) || 1)));
   const moves = (s.moves || []).filter(m => m && m.name).slice(0, 6); if (!moves.length) moves.push(Object.assign({ cost: 0 }, BASIC), GUARD);
-  return { name: s.name || '?', image: s.image || '', st, hp: st.hp, sp: st.sp, attr: s.attr || 'Free', elem: s.elem || 'beast', moves, critBonus: +s.crit || 0, tdm: +s.tdm || 1, ttk: +s.ttk || 1, endureChance: +s.endure || 0, noStatus: !!s.noStatus, guard: false, buff: 1, status: null };
+  return { name: s.name || '?', image: s.image || '', st, hp: st.hp, sp: st.sp, attr: s.attr || 'Free', elem: s.elem || 'beast', moves, critBonus: +s.crit || 0, tdm: +s.tdm || 1, ttk: +s.ttk || 1, endureChance: +s.endure || 0, noStatus: !!s.noStatus, pas: PASSIVES[s.pas] ? s.pas : null, guard: false, buff: 1, status: null };
 }
 function duelStatus(u, R){ return statusTurn(u, R); }
 // the same damage rules as normal battles, minus local weather and time of day (which differ between phones)
