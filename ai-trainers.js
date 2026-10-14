@@ -5,6 +5,7 @@ function aiTrainerProfile(){
   return {team:a.team,id:String(a.id||'').slice(0,30),strategy:String(a.strategy||'').slice(0,80),policyVersion:1,
     startedAt:a.startedAt||0,updatedAt:Date.now(),actions:a.actions||0,raidDamage:a.raidDamage||0,weekRaidDamage:G.raid?.week===raidWeek()?G.raid.dmg||0:0,
     tradesBought:a.tradesBought||0,tradesSold:a.tradesSold||0,tradeRevenue:a.tradeRevenue||0,
+    findings:(a.findings||[]).slice(0,40).map(x=>({key:String(x.key).slice(0,80),category:String(x.category).slice(0,30),title:String(x.title).slice(0,100),evidence:String(x.evidence).slice(0,400),firstSeen:Number(x.firstSeen)||0,lastSeen:Number(x.lastSeen)||0,count:Number(x.count)||1})),
     lastAction:String(a.lastAction||'Starting').slice(0,160),recent:(a.recent||[]).slice(-5).map(x=>({at:x.at,text:String(x.text).slice(0,160)}))};
 }
 async function viewAiTrainers(el){
@@ -28,6 +29,18 @@ async function viewAiTrainers(el){
     }).join('')+'</div>':'<p class="ownline">No '+label+' trainers have checked in yet.</p>');
   };
   el.innerHTML='<h3>🤖 Trainer challenge</h3><p class="ownline">14 ChatGPT-coded trainers raise partners, trade, and help with raids. No paid AI API.</p>'+
-    '<details class="guide"><summary>How the comparison works</summary><p class="ownline">The teams use different methods and start times: ChatGPT plays saved game accounts with no bonus resources; the built-in Claude team simulates progress over time. Compare their visible results with that difference in mind. ChatGPT activity updates when its runner checks in.</p></details><button class="act" id="aiRefresh">Refresh activity</button>'+group('chatgpt')+group('claude');
+    '<details class="guide"><summary>How the comparison works</summary><p class="ownline">The teams use different methods and start times: ChatGPT plays saved game accounts with no bonus resources; the built-in Claude team simulates progress over time. Compare their visible results with that difference in mind. ChatGPT activity updates when its runner checks in.</p></details><button class="act" id="aiRefresh">Refresh activity</button>'+trainerFindings(rows)+group('chatgpt')+group('claude');
   el.querySelector('#aiRefresh').onclick=()=>viewAiTrainers(el).catch(e=>onlSay(netErr(e)));
+}
+function trainerFindings(rows){
+  const items=new Map();
+  for(const r of rows)for(const f of (r.ai?.findings||[]).slice(0,40)){
+    const key=r.ai.team+':'+f.key;
+    let item=items.get(key);
+    if(!item){item={...f,count:0,names:[]};items.set(key,item);}
+    item.count+=Math.max(0,Number(f.count)||0);item.names.push(r.name);
+    item.firstSeen=Math.min(item.firstSeen,f.firstSeen);
+    if(f.lastSeen>=item.lastSeen){item.lastSeen=f.lastSeen;item.evidence=f.evidence;}
+  }
+  return '<details class="guide" id="trainerFindings"><summary>Findings for future fixes · '+items.size+'</summary><p class="ownline">Suspected bugs, possible exploits, balance signals, and runner problems observed during normal play. These need review; trainers do not deliberately exploit the game. Repeated reports are grouped. Only instrumented trainers contribute.</p>'+(!items.size?'<p>No findings recorded yet. Monitoring starts with this update.</p>':[...items.values()].sort((a,b)=>b.lastSeen-a.lastSeen).map(f=>'<div class="upd"><b>'+esc(f.title)+'</b><p>'+esc(f.category)+' · Needs review · '+f.count+' observations</p><p>'+esc(f.evidence)+'</p><small>'+esc([...new Set(f.names)].join(', '))+' · First '+esc(new Date(f.firstSeen).toLocaleString())+' · Latest '+esc(new Date(f.lastSeen).toLocaleString())+'</small></div>').join(''))+'</details>';
 }
