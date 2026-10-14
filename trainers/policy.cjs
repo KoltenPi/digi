@@ -34,6 +34,7 @@ function choose(s, bot, now=Date.now()) {
     return {type:'raid',reason:'Contribute within the normal raid attempt limit'};
   }
   if (now-s.lastMarket>30*60000) return {type:'market',reason:'Settle sales and look for a useful, affordable trade'};
+  if(s.stage>=2&&s.energy>=75&&now-(s.lastRival||0)>6*3600000)return {type:'rival',reason:'Build a rivalry with a similarly progressed trainer'};
   if (s.eggs && s.partySize<s.partyMax) return {type:'hatch-extra',reason:'Raise another partner from an earned egg'};
   if (s.stage>=5 && s.money>350 && s.partySize<s.partyMax && !s.eggs) return {type:'buy-egg',reason:'Invest earned DigiData in another partner'};
   if (s.stage>=5 && s.youngSlot>=0 && s.youngSlot!==s.active) return {type:'switch',slot:s.youngSlot,reason:'Progress a younger partner'};

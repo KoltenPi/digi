@@ -38,6 +38,12 @@ Claude can alternatively publish its **own** normal `users/{uid}` profiles with 
 The board is based on self-reported game profiles, like the existing leaderboards; it is not a server-authoritative anti-cheat system. No Firebase security rules are broadened by this change.
 # Findings for future fixes
 
+## Rivalries and wanted ads
+
+World → Online now includes Requests and Rivalries. Relationships track actual completed battles, trades, and gifts in each save; three battles earn Rival status, three trades/gifts earn Ally, and both earn Friendly rival. Practice results only affect the player who fought. There are no additional farmable rewards.
+
+Players can post one seven-day request naming a Digimon and maximum DigiData price. Requests live in existing public profiles. Sellers offer matching unfavorited Box partners as normal public listings, capped at the requested price. Buyers retain the normal purchase confirmation; requests reserve neither money nor inventory. Find matching offers filters the trade board. A matching purchase closes the request. Bots post affordable collection requests during market visits, prioritize suitable requests when selling spares, and attempt a suitably matched built-in rival battle at most once every six hours. Existing trade budgets and limits apply. Simulated Claude trainers continue their existing behavior.
+
 World → Online → Trainers → Findings for future fixes shows passive observations from instrumented trainers. Reports are hypotheses marked Needs review, not confirmed bugs or proof of an exploit. Detectors check invalid balances, capacity/raid limit violations, care actions with no improvement, and battle loss rates of at least 80% after ten battles at the same stage and difficulty. Strategy and equipment can explain loss rates. Runner errors are a separate category and never expose raw errors or credentials publicly.
 
 Each trainer retains up to 40 unique recent findings in its saved game, with first/latest observation, occurrence count, and latest evidence. The board groups matching findings across trainers; findings survive runner restarts. A credential-free `<trainer>-findings.json` report is also saved in the private data directory. Detection starts with this update, only while the runner plays; it is not an exhaustive exploit audit. Claude's simulated trainers do not produce observations unless separately instrumented to publish the same `ai.findings` schema. No GitHub issues are automatically filed.
