@@ -154,6 +154,59 @@ h3 span{font:600 .75rem var(--mono);color:var(--muted);text-transform:none;lette
 .actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .actions.two{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bondtrack i{background:#e0457b}
+.dec{position:absolute;z-index:1;pointer-events:none;line-height:1;filter:drop-shadow(0 2px 2px rgba(0,0,0,.18))}
+.dec-wall{top:64px;right:20px;font-size:2rem}.decorprev .dec-wall{top:14px}
+.dec-f0{left:16px;bottom:40px;font-size:2.3rem}
+.dec-f1{right:18px;bottom:46px;font-size:2.1rem}
+.decorprev{height:170px;margin-bottom:6px}.decorprev .sprite{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);height:96px;width:auto}
+.capico{font-size:1.7rem;line-height:1}
+.capbtns{display:grid;gap:4px}
+.capres{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
+.capit{display:grid;justify-items:center;gap:2px;padding:8px 4px;border:1px solid var(--line);border-radius:10px;background:var(--panel);text-align:center;animation:capPop .35s both}
+.capit span{font-size:1.6rem}.capit small{font-size:.7rem;line-height:1.2;color:var(--muted)}
+.capit.rare{border-color:var(--star,#e3a32b);box-shadow:inset 0 0 0 2px var(--star,#e3a32b)}
+.capres .capit:nth-child(n+2){animation-delay:.06s}.capres .capit:nth-child(n+4){animation-delay:.12s}.capres .capit:nth-child(n+7){animation-delay:.18s}
+@keyframes capPop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.captable summary{cursor:pointer;font-weight:700;margin:6px 0}
+.infgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+/* partner card: stat tiles, traits, labelled progress bars, record */
+.pcard{gap:12px;padding:12px}
+.stgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.stgrid .st{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.stgrid .st small{font:700 .66rem var(--mono);color:var(--muted);letter-spacing:.06em}
+.stgrid .st b{font:800 1.05rem var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
+.traits{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px}
+.trait{display:grid;align-content:start;gap:2px;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);text-align:left}
+.trait small{font:700 .6rem var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.trait b{font-size:.86rem;color:var(--fg);line-height:1.2}
+.trait span{font-size:.74rem;line-height:1.3;color:var(--muted);overflow-wrap:anywhere}
+.pbars{display:grid;gap:10px}
+.pbar .ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font:700 .74rem var(--mono);color:var(--muted);margin-bottom:4px;list-style:none;cursor:default}
+details.b-life summary{list-style:none}details.b-life summary::-webkit-details-marker{display:none}
+.pbar .ph b{color:var(--fg);white-space:nowrap}.pbar .ph>span{min-width:0}
+.ptrack{height:8px;border-radius:999px;background:var(--sunk);overflow:hidden}
+.ptrack i{display:block;height:100%;border-radius:inherit;transition:width .4s}
+.b-xp .ptrack i{background:#3b6fd8}.b-evo .ptrack i{background:#ef7f4f}.b-bond .ptrack i{background:#e0457b}
+.l-good .ptrack i{background:#3aa66a}.l-warn .ptrack i{background:#e3a32b}.l-bad .ptrack i{background:#d94a3a}.l-bad .ph b{color:#d94a3a}
+.pinfo{display:inline-grid;place-items:center;width:15px;height:15px;margin-left:4px;border-radius:50%;border:1.5px solid currentColor;font:800 .6rem/1 var(--body);font-style:normal;vertical-align:1px;opacity:.7}
+.lifebd{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font:600 .72rem var(--mono);color:var(--muted)}
+.lifebd b{color:var(--fg)}.lifebd small{flex-basis:100%;font:500 .76rem var(--body);line-height:1.35}
+.rec{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding-top:10px;border-top:1px dashed var(--line)}
+.rec div{text-align:center;display:grid;gap:1px}
+.rec b{font:800 .95rem var(--mono);color:var(--fg);white-space:nowrap}
+.rec small{font:700 .62rem var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+[data-skin="card"] .stgrid .st{background:#fff;border:2.5px solid var(--ink);border-radius:12px}
+[data-skin="card"] .stgrid .st b,[data-skin="card"] .stgrid .st small{color:var(--ink)}
+[data-skin="card"] .ptrack{height:14px;border:2.5px solid var(--ink);border-radius:8px;background:#fff}
+[data-skin="card"] .ptrack i{border-right:2.5px solid var(--ink);border-radius:0}
+[data-skin="card"] .pbar .ph{font:800 .8rem var(--body)}
+[data-skin="card"] .rec{border-top:2px dashed var(--ink)}
+[data-skin="card"] .trait{background:#fff;border:2px solid var(--ink);border-radius:12px}
+[data-skin="retro"] .trait{border:2px solid currentColor;border-radius:0;background:transparent}
+[data-skin="retro"] .stgrid .st{border:2px solid currentColor;border-radius:0;background:transparent}
+[data-skin="retro"] .ptrack{border:2px solid currentColor;border-radius:0;background:transparent;padding:1px;height:12px}
+[data-skin="retro"] .ptrack i{background:var(--lcd-ink)!important;border-radius:0}
+[data-skin="retro"] .pbar .ph,[data-skin="retro"] .stgrid .st small{font:.92rem var(--body);letter-spacing:.02em}[data-skin="retro"] .rec small{font:.8rem var(--body)}
 .dailybar{width:100%;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--panel));color:var(--fg);border-radius:12px;padding:10px 12px;font-weight:700;text-align:left}
 #trainerBtn.alert{border-color:var(--accent);color:var(--accent)}
 .segs{display:flex;gap:4px;overflow-x:auto;padding-bottom:2px}
@@ -1575,21 +1628,21 @@ function renderPartner(){
     <div class="habitat${habitatClass(p)}"><div class="bubble" id="bubble" aria-live="polite">${esc(moodLine(p))}</div>
       <img class="sprite${sl ? ' sleep' : ''}" id="sprite" alt="${esc(p.name)}" src="${esc(p.image)}">${habitatExtras(p)}</div>
     <div class="meters">${meter('Hunger', p.hunger)}${meter('Energy', p.energy)}${meter('Mood', p.mood)}</div>
-    <div class="evobox">
-      <div class="row statrow">${statChips(partnerStats(p))}</div>
-      ${(() => { const pd = state.details.get(p.id), pk = pd ? passiveOf(p.id, mainAttr(pd)) : null; return pk ? `<div class="row pasrow" title="${esc(PASSIVES[pk].desc)}"><span>${PASSIVES[pk].icon} PASSIVE <b>${esc(PASSIVES[pk].name)}</b></span><small>${esc(PASSIVES[pk].desc)}</small></div>` : ''; })()}
-      <div class="row"><span>XP TO LV ${p.level + 1}</span><b>${p.xp} / ${XP_NEED(p.level)}</b></div>
-      <div class="xptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div>
-      <div class="row"><span>BOND <b>♥ ${p.bond || 0}</b> · ${BOND_TIERS[bondTier(p)].name}</span><span title="Personality">🧬 ${esc(persOf(p).name)}: ${esc(persOf(p).desc)}</span></div>
-      <div class="evotrack bondtrack"><i style="width:${p.bond || 0}%"></i></div>
-      ${(() => { const lp = lifeParts(p), a = ageDays(p), left = lp.total - a, old = left <= 1;
-        return `<div class="row lifeinfo" title="1 year = 1 day in your party. Base ${lp.base} for its level, bond ${lp.bond >= 0 ? '+' : ''}${lp.bond}, care mistakes ${lp.care}, rebirths +${lp.gen}${lp.item ? ', Longevity +' + lp.item : ''}. Digimon in the Box don't age."><span>🎂 AGE <b>${Math.floor(a)} yr${Math.floor(a) === 1 ? '' : 's'}</b> · EST. LIFESPAN <b>~${lp.total} yrs</b></span><span${old ? ' style="color:var(--bad)"' : ''}>${old ? '⚠️ ' : ''}${lifeText(left)} left</span></div>
-          <div class="evotrack lifetrack"><i style="width:${Math.min(100, a / lp.total * 100)}%;background:${left <= 1 ? 'var(--bad)' : left <= 3 ? 'var(--warn)' : 'var(--good)'}"></i></div>
-          <p class="ownline lifenote">Lifespan grows as it digivolves, with bond, rebirths and 🧪 Longevity Chips. Care mistakes shorten it (${lp.care}). Digimon resting in the Box don't age.</p>`; })()}
-      <div class="row"><span>WINS <b>${p.wins}</b> · LOSSES <b>${p.losses}</b>${(p.streak || 0) >= 2 ? ` · 🔥 STREAK <b>${p.streak}</b>` : ''}</span><span>THIS STAGE <b>${p.stageWins || 0}W · ${failures(p)} fail${failures(p) === 1 ? '' : 's'}</b></span></div>
-      ${atTop ? `<div class="row"><span>Final form reached. Keep battling or start a new egg.</span></div>`
-        : `<div class="row"><span>DIGIVOLUTION</span><b>${Math.min(p.evo, need)} / ${need}</b></div>
-           <div class="evotrack"><i style="width:${Math.min(100, p.evo / need * 100)}%"></i></div>`}
+    <div class="evobox pcard">
+      <div class="stgrid">${(() => { const st = partnerStats(p); return STAT_KEYS.map(k => `<div class="st st-${k}"><small>${STAT_LABEL[k]}</small><b>${st[k]}</b></div>`).join(''); })()}</div>
+      <div class="traits">
+        <div class="trait"><small>Personality</small><b>🧬 ${esc(persOf(p).name)}</b><span>${esc(persOf(p).desc)}</span></div>
+        ${(() => { const pd = state.details.get(p.id), pk = pd ? passiveOf(p.id, mainAttr(pd)) : null; return pk ? `<div class="trait"><small>Passive</small><b>${PASSIVES[pk].icon} ${esc(PASSIVES[pk].name)}</b><span>${esc(PASSIVES[pk].desc)}</span></div>` : ''; })()}
+      </div>
+      <div class="pbars">
+        <div class="pbar b-xp"><div class="ph"><span>⭐ Level <b>${p.level}</b> → ${p.level + 1}</span><b>${p.xp} / ${XP_NEED(p.level)} XP</b></div><div class="ptrack"><i style="width:${Math.min(100, p.xp / XP_NEED(p.level) * 100)}%"></i></div></div>
+        ${atTop ? `<div class="pbar b-evo"><div class="ph"><span>✨ Digivolution</span><b>Final form ✓</b></div><div class="ptrack"><i style="width:100%"></i></div></div>`
+          : `<div class="pbar b-evo"><div class="ph"><span>✨ Digivolution</span><b>${Math.min(p.evo, need)} / ${need}</b></div><div class="ptrack"><i style="width:${Math.min(100, p.evo / need * 100)}%"></i></div></div>`}
+        <div class="pbar b-bond"><div class="ph"><span>♥ Bond <b>${p.bond || 0}</b> · ${BOND_TIERS[bondTier(p)].name}</span><b>${p.bond || 0} / 100</b></div><div class="ptrack"><i style="width:${p.bond || 0}%"></i></div></div>
+        ${(() => { const lp = lifeParts(p), a = ageDays(p), left = lp.total - a, lv = left <= 1 ? 'bad' : left <= 3 ? 'warn' : 'good';
+          return `<div class="pbar b-life l-${lv}"><div class="ph"><span>🎂 Age <b>${Math.floor(a)}</b> of ~${lp.total} yrs</span><b>${left <= 1 ? '⚠️ ' : ''}${lifeText(left)} left</b></div><div class="ptrack"><i style="width:${Math.max(1.5, Math.min(100, a / lp.total * 100))}%"></i></div></div>`; })()}
+      </div>
+      <div class="rec"><div><b>${p.wins}</b><small>Wins</small></div><div><b>${p.losses}</b><small>Losses</small></div><div><b>${(p.streak || 0) >= 2 ? '🔥 ' + p.streak : p.streak || 0}</b><small>Streak</small></div><div><b>${p.stageWins || 0}W · ${failures(p)}F</b><small>Stage</small></div></div>
     </div>
     ${canEvolve(p) ? `<button class="big" id="evolveBtn">Digivolve!</button>` : ''}
     <div class="actions main">
@@ -1784,6 +1837,13 @@ function itemTile(k){
   return '<div class="itile"><span class="ic" aria-hidden="true">' + itemIcon(k) + '</span><div class="nm"><b>' + esc(/^(dm|crest):/.test(k) ? k.split(':')[1] : itemName(k)) + '</b><small>' + (kept ? (own ? 'Owned' : 'Not owned') : 'Owned: ' + own) + '</small></div>' +
     (kept && own ? '<button class="act" disabled>✓</button>' : '<button class="act" data-item="' + k + '"' + (G.data < price ? ' disabled' : '') + '>' + (/^(dm|crest):/.test(k) ? 'Buy' : price) + '</button>') + '</div>';
 }
+// place a decoration (or take it down if it's already up); the floor keeps the 2 most recent
+function placeDecor(x, toggle){
+  const D = G.decor = G.decor || { own: {}, wall: null, floor: [] }; D.floor = D.floor || [];
+  if (x.slot === 'wall'){ D.wall = toggle && D.wall === x.k ? null : x.k; return; }
+  if (D.floor.includes(x.k)){ if (toggle) D.floor = D.floor.filter(k => k !== x.k); return; }
+  D.floor = [x.k, ...D.floor].slice(0, 2);
+}
 // the shop lives in its own tab; older buttons that opened it now switch tabs
 function openShop(){ setTab('shop'); }
 // one card for everything in the shop: icon, name, what it does, and the button
@@ -1810,7 +1870,44 @@ function itemCard(k){
   const own = G.items[k] || 0, price = itemPrice(k), kept = itemKept(k);
   return shopCard(itemIcon(k), esc(itemName(k)), esc(itemDesc(k)), kept && own ? '<button class="act price" disabled>✓ Owned</button>' : priceBtn('data-item="' + k + '"', price, G.data >= price), !kept && own ? own + ' owned' : '');
 }
-const SHOP_TABS = [['eggs', '🥚 Eggs'], ['items', '🎒 Items'], ['market', '🕶️ Market'], ['devices', '📟 Digivices'], ['upgrades', '⬆️ Upgrades'], ['craft', '🛠️ Craft']];
+const SHOP_TABS = [['eggs', '🥚 Eggs'], ['items', '🎒 Items'], ['capsule', '🎰 Capsules'], ['market', '🕶️ Market'], ['decor', '🏡 Decor'], ['devices', '📟 Digivices'], ['upgrades', '⬆️ Upgrades'], ['craft', '🛠️ Craft']];
+// ----- Capsule Machine: pay for a random prize. Three machines, from everyday items to Mega Eggs -----
+const CAPSULES = [
+  { key: 'basic', name: 'Basic Capsule', icon: '🟢', price: 250, desc: 'Stat chips, food, energy, XP Disk S, mints, now and then an egg.',
+    table: [['vit:?', 40], ['clean', 8], ['use:feast', 14], ['use:nrg', 14], ['use:xps', 12], ['pers:?', 6], ['egg:mystery', 4], ['dm:?', 2]] },
+  { key: 'premium', name: 'Premium Capsule', icon: '🔵', price: 1200, desc: 'Ultimate Chips, XP Disk M, Move Discs, held items, boosters and better eggs.',
+    table: [['vit:all', 14], ['use:xpm', 16], ['disc:?', 15], ['h:?', 12], ['egg:rare', 10], ['use:treat', 9], ['bst:data', 7], ['bst:xp', 7], ['egg:lucky', 6], ['use:life', 2], ['egg:champion', 2]] },
+  { key: 'legend', name: 'Legend Capsule', icon: '🟡', price: 5000, desc: 'Golden, Ultimate and Mega Eggs, DigiCores, Crests, XP Disk L and Longevity Chips.',
+    table: [['egg:golden', 18], ['use:xpl', 20], ['egg:ultimate', 12], ['crest:?', 14], ['use:life', 10], ['xab', 9], ['h:core', 8], ['egg:mega', 5], ['bst:rare', 4]] },
+];
+function capsuleRoll(c){
+  const tot = c.table.reduce((n, r) => n + r[1], 0); let x = Math.random() * tot, k = c.table[0][0];
+  for (const [kk, w] of c.table){ if ((x -= w) < 0){ k = kk; break; } }
+  if (k === 'vit:?') return randomChip(); if (k === 'disc:?') return randomDisc(); if (k === 'h:?') return randomHeld(); if (k === 'dm:?') return randomDigimental();
+  if (k === 'crest:?') return randomCrest() || 'vit:all';
+  return k;
+}
+const capRare = k => /egg:(golden|ultimate|mega)|h:core|crest:|use:life/.test(k);
+// ----- Habitat decor: cosmetics for your partner's home. One for the wall, two for the floor -----
+const DECOR = [
+  { k: 'plant', icon: '🪴', name: 'Potted Plant', slot: 'floor', price: 300 }, { k: 'teddy', icon: '🧸', name: 'Teddy Bear', slot: 'floor', price: 500 },
+  { k: 'ball', icon: '⚽', name: 'Play Ball', slot: 'floor', price: 400 }, { k: 'games', icon: '🎮', name: 'Game Console', slot: 'floor', price: 1200 },
+  { k: 'couch', icon: '🛋️', name: 'Comfy Couch', slot: 'floor', price: 1800 }, { k: 'tree', icon: '🎄', name: 'Festive Tree', slot: 'floor', price: 2200 },
+  { k: 'cake', icon: '🎂', name: 'Birthday Cake', slot: 'floor', price: 1500 }, { k: 'fountain', icon: '⛲', name: 'Fountain', slot: 'floor', price: 4000 },
+  { k: 'statue', icon: '🗿', name: 'Stone Statue', slot: 'floor', price: 6000 }, { k: 'trophy', icon: '🏆', name: 'Golden Trophy', slot: 'floor', price: 9000 },
+  { k: 'ufo', icon: '🛸', name: 'Toy UFO', slot: 'floor', price: 14000 }, { k: 'crystal', icon: '💎', name: 'Data Crystal', slot: 'floor', price: 25000 },
+  { k: 'frame', icon: '🖼️', name: 'Painting', slot: 'wall', price: 400 }, { k: 'lantern', icon: '🏮', name: 'Paper Lantern', slot: 'wall', price: 900 },
+  { k: 'carp', icon: '🎏', name: 'Carp Streamer', slot: 'wall', price: 1100 }, { k: 'disco', icon: '🪩', name: 'Disco Ball', slot: 'wall', price: 2500 },
+  { k: 'rainbow', icon: '🌈', name: 'Rainbow', slot: 'wall', price: 4000 }, { k: 'planet', icon: '🪐', name: 'Planet Mobile', slot: 'wall', price: 7000 },
+  { k: 'crest', icon: '🔰', name: 'Crest Banner', slot: 'wall', price: 12000 }, { k: 'star', icon: '🌟', name: 'Wishing Star', slot: 'wall', price: 30000 },
+];
+const decorOwned = k => !!((G.decor || {}).own || {})[k];
+function decorOn(){ const D = G.decor || {}; return { wall: D.wall || null, floor: (D.floor || []).slice(0, 2) }; }
+function decorHtml(){
+  const on = decorOn(), d = k => DECOR.find(x => x.k === k);
+  return (on.wall && d(on.wall) ? '<span class="dec dec-wall" aria-hidden="true">' + d(on.wall).icon + '</span>' : '') +
+    on.floor.map((k, i) => d(k) ? '<span class="dec dec-f' + i + '" aria-hidden="true">' + d(k).icon + '</span>' : '').join('');
+}
 // the Black Market: 5 deals that change every day, each can be bought once
 const MARKET_POOL = [
   { k: 'h:core', price: 3200 }, { k: 'egg:mega', price: 8500 }, { k: 'egg:ultimate', price: 4200 }, { k: 'egg:golden', price: 2000 }, { k: 'crest:?', price: 650 },
@@ -1820,15 +1917,17 @@ const MARKET_POOL = [
   { k: 'use:life', price: 1100, n: 2 },
 ];
 function marketDeals(){
-  const d = dayKey(), seed = strSeed('mkt' + d), out = [], used = new Set();
+  const d = dayKey(), rr = marketRR(), seed = strSeed('mkt' + d + (rr ? ':' + rr : '')), out = [], used = new Set();
   for (let i = 0; out.length < 5 && i < 40; i++){ const j = Math.floor(Math.abs(seeded(seed, 700 + i)) * MARKET_POOL.length) % MARKET_POOL.length; if (used.has(j)) continue; used.add(j);
     let it = Object.assign({}, MARKET_POOL[j]);
     if (it.k === 'disc:?') it.k = 'disc:' + (Math.floor(Math.abs(seeded(seed, 800 + i)) * DISCS.length) % DISCS.length);
     if (it.k === 'crest:?'){ const left = CREST_VIRTUES.filter(v => !hasItem('crest:' + v)); if (!left.length) continue; it.k = 'crest:' + left[Math.floor(Math.abs(seeded(seed, 900 + i)) * left.length) % left.length]; }
-    it.n = it.n || 1; it.id = d + ':' + j; out.push(it); }
+    it.n = it.n || 1; it.id = d + ':' + rr + ':' + j; out.push(it); }
   return out;
 }
 const marketBought = id => !!((G.market || {}).d === dayKey() && G.market.got[id]);
+const marketRR = () => (G.market && G.market.d === dayKey() && G.market.rr) || 0;
+const marketRRCost = () => 400 * Math.pow(2, marketRR());
 // Digivices: shells for the Retro look (shell, screen and trim colours for the Shop preview; the full palettes live in CSS)
 const DEVICES = [
   { key: 'v1', name: 'Digivice', era: 'Classic', price: 0, sh: '#3b3f47', lcd: '#9bb36a', edge: '#14161a', desc: 'The classic grey handheld with a green screen. Free.' },
@@ -1892,7 +1991,20 @@ function renderShop(){
     const ends = new Date(); ends.setHours(24, 0, 0, 0);
     body = '<p class="ownline">🕶️ Rare goods you can\'t find anywhere else in the shop. Five new deals every day, one of each per Tamer. New stock in ' + fmtLeft(ends - Date.now()) + '.</p>' +
       sec('Today\'s deals', '', marketDeals().map(it => { const got = marketBought(it.id), pr = salePrice(it.price), nm = (it.n > 1 ? it.n + '× ' : '') + itemName(it.k);
-        return shopCard(itemIcon(it.k), esc(nm), esc(it.k.startsWith('egg:') ? (SHOP.find(x => x.key === it.k.slice(4)) || {}).desc || '' : itemDesc(it.k)), got ? '<button class="act price" disabled>✓ Bought</button>' : priceBtn('data-mkt="' + it.id + '"', pr, G.data >= pr), ''); }).join(''));
+        return shopCard(itemIcon(it.k), esc(nm), esc(it.k.startsWith('egg:') ? (SHOP.find(x => x.key === it.k.slice(4)) || {}).desc || '' : itemDesc(it.k)), got ? '<button class="act price" disabled>✓ Bought</button>' : priceBtn('data-mkt="' + it.id + '"', pr, G.data >= pr), ''); }).join('')) +
+      '<button class="act wide" id="mktRR"' + (G.data < marketRRCost() ? ' disabled' : '') + '>🎲 Shuffle the deals · 💾 ' + marketRRCost().toLocaleString() + '<small>Five brand-new deals. The price doubles each time today.</small></button>';
+  } else if (tab === 'capsule'){
+    body = '<p class="ownline">🎰 Pay for a capsule and get a random prize. A ×10 pull costs the price of 9.</p>' +
+      sec('Capsule Machines', '', CAPSULES.map(c => shopCard('<span class="capico">' + c.icon + '</span>', esc(c.name), esc(c.desc),
+        '<div class="capbtns">' + priceBtn('data-cap="' + c.key + ':1"', salePrice(c.price), G.data >= salePrice(c.price)) + priceBtn('data-cap="' + c.key + ':10"', salePrice(c.price * 9), G.data >= salePrice(c.price * 9)).replace('💾', '×10 · 💾') + '</div>', '')).join('')) +
+      '<details class="captable"><summary>What\'s inside?</summary>' + CAPSULES.map(c => { const tot = c.table.reduce((n, r) => n + r[1], 0); return '<p class="ownline"><b>' + c.icon + ' ' + esc(c.name) + '</b>: ' + c.table.map(([k, w]) => esc(k === 'vit:?' ? 'Stat Chip' : k === 'disc:?' ? 'Move Disc' : k === 'h:?' ? 'Held item' : k === 'dm:?' ? 'Digimental' : k === 'crest:?' ? 'Crest' : itemName(k)) + ' ' + Math.round(w / tot * 1000) / 10 + '%').join(' · ') + '</p>'; }).join('') + '</details>';
+  } else if (tab === 'decor'){
+    const on = decorOn();
+    const dcard = x => { const own = decorOwned(x.k), eq = x.slot === 'wall' ? on.wall === x.k : on.floor.includes(x.k);
+      return shopCard('<span class="capico">' + x.icon + '</span>', esc(x.name), x.slot === 'wall' ? 'Hangs on the wall.' : 'Sits on the floor.', !own ? priceBtn('data-dbuy="' + x.k + '"', x.price, G.data >= x.price) : '<button class="act price" data-deq="' + x.k + '">' + (eq ? '✓ Placed · remove' : 'Place') + '</button>', own ? 'Owned' : ''); };
+    body = '<p class="ownline">🏡 Decorate your partner\'s home. You can place one wall decoration and two on the floor; they show behind every partner. Owned: ' + DECOR.filter(x => decorOwned(x.k)).length + ' / ' + DECOR.length + '.</p>' +
+      '<div class="habitat decorprev' + (P() ? habitatClass(P()) : '') + '">' + decorHtml() + (P() ? '<img class="sprite" alt="" src="' + esc(P().image) + '">' : '') + '</div>' +
+      sec('Wall', '', DECOR.filter(x => x.slot === 'wall').map(dcard).join('')) + sec('Floor', '', DECOR.filter(x => x.slot === 'floor').map(dcard).join(''));
   } else if (tab === 'devices'){
     const cur = G.device || 'v1', retro = curSkin() === 'retro';
     const devCard = d => { const has = devOwned(d.key), on = has && cur === d.key;
@@ -1917,6 +2029,18 @@ function renderShop(){
     '<div class="segs">' + SHOP_TABS.map(([k, l]) => '<button class="seg' + (k === tab ? ' on' : '') + '" data-stab="' + k + '">' + l + '</button>').join('') + '</div>' +
     '<p id="shopMsg" style="margin:0;min-height:1.3em;font-size:.88rem"></p>' + body;
   v.querySelectorAll('[data-stab]').forEach(b => b.onclick = () => { store.set('dx_shoptab', b.dataset.stab); renderShop(); });
+  const mrr = $('#mktRR'); if (mrr) mrr.onclick = () => { const c = marketRRCost(); if (G.data < c) return; G.data -= c; if (!G.market || G.market.d !== dayKey()) G.market = { d: dayKey(), got: {} }; G.market.rr = (G.market.rr || 0) + 1; saveGame(); updateCount(); renderShop(); $('#shopMsg').textContent = '🎲 The dealer brought out five new deals.'; };
+  v.querySelectorAll('[data-cap]').forEach(b => b.onclick = () => {
+    const [ck, n] = b.dataset.cap.split(':'), c = CAPSULES.find(x => x.key === ck), cnt = +n, cost = salePrice(c.price * (cnt === 10 ? 9 : 1)); if (!c || G.data < cost) return;
+    G.data -= cost; const got = []; for (let i = 0; i < cnt; i++){ const k = capsuleRoll(c); grantItem(k); got.push(k); } bump('capsules', cnt); saveGame(); updateCount(); renderShop();
+    openOv('<h4>' + c.icon + ' ' + esc(c.name) + (cnt > 1 ? ' ×10' : '') + '</h4><div class="capres">' + got.map(k => '<div class="capit' + (capRare(k) ? ' rare' : '') + '"><span>' + itemIcon(k) + '</span><small>' + esc(itemName(k)) + '</small></div>').join('') + '</div>' +
+      '<button class="big" id="capAgain"' + (G.data < cost ? ' disabled' : '') + '>Again · 💾 ' + cost.toLocaleString() + '</button><button class="ghost" id="capDone">Done</button>');
+    $('#capDone').onclick = () => { closeOv(); renderShop(); };
+    $('#capAgain').onclick = () => { closeOv(); const nb = document.querySelector('[data-cap="' + b.dataset.cap + '"]'); if (nb) nb.click(); };
+  });
+  v.querySelectorAll('[data-dbuy]').forEach(b => b.onclick = () => { const x = DECOR.find(d => d.k === b.dataset.dbuy); if (!x || decorOwned(x.k) || G.data < x.price) return;
+    G.data -= x.price; G.decor = G.decor || { own: {}, wall: null, floor: [] }; G.decor.own = G.decor.own || {}; G.decor.own[x.k] = 1; placeDecor(x); bump('decor'); saveGame(); updateCount(); renderShop(); $('#shopMsg').textContent = 'Got the ' + x.name + ' and placed it in the habitat!'; });
+  v.querySelectorAll('[data-deq]').forEach(b => b.onclick = () => { const x = DECOR.find(d => d.k === b.dataset.deq); if (!x || !decorOwned(x.k)) return; placeDecor(x, true); saveGame(); renderShop(); });
   v.querySelectorAll('[data-mkt]').forEach(b => b.onclick = () => {
     const it = marketDeals().find(x => x.id === b.dataset.mkt), pr = it && salePrice(it.price); if (!it || marketBought(it.id) || G.data < pr) return;
     G.data -= pr; if (!G.market || G.market.d !== dayKey()) G.market = { d: dayKey(), got: {} }; G.market.got[it.id] = 1;
@@ -3913,6 +4037,7 @@ const raisedCount = () => { let n = 0; for (const id in G.col) if (G.col[id] ===
 const colBonus = () => Math.min(25, Math.floor(raisedCount() / 10));
 const ddMul = () => (1 + colBonus() / 100) * (boostOn('data') ? 1.5 : 1);
 const hasItem = k => (G.items[k] || 0) > 0;
+const infCost = p => Math.round(250 * Math.pow(1.3, p.inf || 0) / 10) * 10;
 function giveItem(k, n){ G.items[k] = (G.items[k] || 0) + (n || 1); }
 const randomDigimental = () => 'dm:' + pick(VIRTUES);
 function randomCrest(){ const left = CREST_VIRTUES.filter(v => !hasItem('crest:' + v)); return left.length ? 'crest:' + pick(left) : null; }
@@ -4035,6 +4160,8 @@ function bagScreen(msg){
       : '<p class="ownline">No usable items. Buy Clean Slates and stat chips in the Shop, or find them on expeditions.</p>') +
     (discInv.length ? '<p class="ownline">💿 Move Discs: ' + discInv.map(k => esc(itemName(k).slice(6) + ' ×' + G.items[k])).join(' · ') + '. Teach them from the Moves screen.</p>' : '') +
     (evoItems.length ? '<p class="ownline">Evolution items: ' + evoItems.map(k => esc(itemIcon(k) + ' ' + itemName(k) + (itemKept(k) ? '' : ' ×' + G.items[k]))).join(' · ') + '. These are used automatically when your Digimon digivolves.</p>' : '') +
+    '<h5 class="lockh">🔬 Data Infusion</h5><p class="ownline">Pour DigiData straight into ' + esc(p.name) + '\'s data for a permanent stat boost. Each infusion costs more than the last (' + (p.inf || 0) + ' so far).</p>' +
+      '<div class="infgrid">' + CHIP_KEYS.map(k => '<button class="act" data-inf="' + k + '"' + (G.data < infCost(p) ? ' disabled' : '') + '>+' + chipGain(k, p.stage) + ' ' + STAT_LABEL[k] + '<small>💾 ' + infCost(p).toLocaleString() + '</small></button>').join('') + '</div>' +
     '<h5 class="lockh">Held item</h5><div class="shop"><div class="shopitem"><span class="upic" aria-hidden="true">' + (cur ? HELD[cur].icon : '✋') + '</span><div class="info"><b>' + (cur ? esc(HELD[cur].name) : 'Nothing held') + '</b><small>' + (cur ? esc(HELD[cur].desc) : 'Give ' + esc(p.name) + ' an item to hold for a lasting bonus.') + '</small></div>' + (cur ? '<button class="act" data-unhold="1">Remove</button>' : '') + '</div>' +
       heldOwned.map(k => '<div class="shopitem"><span class="upic" aria-hidden="true">' + HELD[k].icon + '</span><div class="info"><b>' + esc(HELD[k].name) + ' ×' + G.items[k] + '</b><small>' + esc(HELD[k].desc) + '</small></div><button class="act" data-hold="' + k + '">Hold</button></div>').join('') + '</div>' +
     '<p id="bagMsg" style="margin:0;min-height:1.3em;font-size:.88rem">' + esc(msg || '') + '</p>' +
@@ -4042,6 +4169,8 @@ function bagScreen(msg){
   if ($('#overlay').hidden) openOv(html); else $('#overlay .sheet').innerHTML = html;
   $('#bagClose').onclick = () => { closeOv(); renderPartner(); };
   $('#bagShop').onclick = () => { closeOv(); setTab('shop'); };
+  $('#overlay').querySelectorAll('[data-inf]').forEach(b => b.onclick = () => { const k = b.dataset.inf, c = infCost(p); if (G.data < c) return;
+    G.data -= c; p.inf = (p.inf || 0) + 1; const g = growthOf(p), v = chipGain(k, p.stage); g[k] = (g[k] || 0) + v; bump('infusions'); saveGame(); updateCount(); bagScreen('🔬 Infused ' + p.name + ': +' + v + ' ' + STAT_LABEL[k] + ' for 💾 ' + c.toLocaleString() + '. Next one: ' + infCost(p).toLocaleString() + '.'); });
   $('#overlay').querySelectorAll('[data-hold]').forEach(b => b.onclick = () => { const k = b.dataset.hold; if (!hasItem(k)) return; if (cur) giveItem(cur); G.items[k]--; p.held = k; saveGame(); bagScreen(p.name + ' is now holding the ' + HELD[k].name + '.'); });
   const uh = $('[data-unhold]'); if (uh) uh.onclick = () => { if (!cur) return; giveItem(cur); p.held = null; saveGame(); bagScreen('Took the ' + HELD[cur].name + ' back.'); };
   $('#overlay').querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
@@ -4973,6 +5102,7 @@ function trainerScreen(tab, msg){
 // ================= TAMER PROFILE: you, your stats and codes, plus the help guide and the updates list =================
 // newest first; bump `v` when adding an entry so the profile button shows a dot until it's read
 const UPDATES = [
+  { v: 35, title: 'More ways to spend DigiData and a cleaner Partner card', items: ['🎰 Capsule Machines (Shop → Capsules): Basic, Premium and Legend capsules with random prizes, up to Mega Eggs and DigiCores. A ×10 pull costs the price of 9. “What\'s inside?” shows every prize and its chance.', '🏡 Habitat Decor (Shop → Decor): 20 decorations from a Potted Plant to a Wishing Star (30,000). Place one on the wall and two on the floor of your partner\'s home.', '🔬 Data Infusion (🎒 Bag): spend DigiData for a permanent stat boost on a Digimon. Each infusion costs more than the last, so there\'s always something to save for.', '🎲 Shuffle the Black Market for five new deals. The price doubles each time in a day.', '✨ The Partner card has been redesigned: stats in a neat grid, personality and passive side by side, labelled Level, Digivolution, Bond and Age bars, and your record at the bottom.'] },
   { v: 34, title: 'Age, lifespan and the Memorial', items: ['🎂 Digimon now age like a real V-Pet: every day in your party is one year. The Partner page shows its age, its estimated lifespan and about how long it has left.', 'Lifespan grows as it digivolves (Fresh ~8 years up to Mega ~26), with bond (up to +10), rebirths (+2 each) and the new 🧪 Longevity Chip (+2, up to +10). Each care mistake takes a year off (up to −8).', '📦 Digimon resting in the Box or out on expeditions don\'t age, so you can pause a partner any time. Rebirth starts a whole new life.', '🕊️ When a partner reaches the end of its lifespan it returns to the Digital World and leaves an egg and DigiData behind. Digimon you already had start their life count from today, and no Digimon lives less than 7 years.', '🕊️ New Memorial in World → Online: every Tamer\'s departed partners, sorted by Newest or Longest lived, plus your own past partners.'] },
   { v: 33, title: 'New items, the Black Market, raising rewards and 7 new areas', items: ['🗺️ 7 new places on the World map: Gear Savannah, Tropical Jungle, Toy Town, Witchelny, Frozen Lands, Heaven\'s Gate and the Dark Area. Each has its own Digimon, weather, scenery, first-visit gift and win drops.', '🛒 New Supplies in Shop → Items: Digi Feast, Energy Drink, Recovery Floppy, Bond Treat and XP Disks S/M/L. Use them from 🎒 Bag.', '📈 Boosters: Data Booster (+50% DigiData), Training Manual (+50% XP) and Rare Lure (3× rare encounters), 30 minutes each. Switch them on from 🎒 Bag.', '🕶️ The Black Market (Shop → Market): 5 rare deals that change every day, like DigiCores, Mega Eggs, Crests and specific Move Discs.', '🛡️ 5 new held items: Spirit Orb, War Gauntlet, Aegis Plate, Sage Crown and the rare DigiCore (every stat +8%).', '⬆️ New upgrades: Rest Pod (faster energy), Farm Sprinkler (faster crops) and Egg Nest (hatches can come holding an item).', '🥚 Raising rewards in Trainer → Collection: milestones for how many different Digimon you\'ve raised (5 up to 500) and for raising 10–100% of each level, with Mega Eggs, DigiCores and new titles. Every 10 raised also gives a permanent +1% DigiData and XP (up to +25%).'] },
   { v: 32, title: 'Rare encounters, AI battles, gifts and a login calendar', items: ['✨ Rare encounters: some Digimon only show up in certain weather or at night (ice Digimon in snow, water Digimon in rain, ghosts at midnight and more). About 1 in 10 wild battles in the right conditions; they give double rewards and sometimes leave an egg.', '🤖 Battle the AI Tamers: World → Online → Friends lists every AI Tamer. Your first win against each one every day pays DigiData and sometimes a Move Disc.', '🎁 Friend gifts: send each friend one small gift a day (+15 DigiData for you); they open it from their Friends list.', '📅 Login calendar: every daily reward you claim also stamps a 28-day monthly calendar, with big prizes on days 7, 14, 21 and 28 (a Mega Egg).', '🗼 Tower leaderboard: a new Ranks tab for the highest Tower floor this week, AI Tamers included.', 'Your partner\'s passive now shows on the Partner page and in the Box. ⏩ Speed (1x/2x/4x) now works in dungeons too.'] },
@@ -5551,7 +5681,7 @@ function careLine(p){
 function habitatExtras(p){
   careInit(p);
   const w = curWeather(), sl = asleep(p);
-  return '<div class="sky"><button class="skytag btn" data-act="sky" title="Weather and time of day">' + skyTag() + '</button></div>' +
+  return decorHtml() + '<div class="sky"><button class="skytag btn" data-act="sky" title="Weather and time of day">' + skyTag() + '</button></div>' +
     (w.key === 'rain' || w.key === 'storm' ? '<i class="wx rain" aria-hidden="true"></i>' : w.key === 'snow' ? '<i class="wx snow" aria-hidden="true"></i>' : w.key === 'fog' ? '<i class="wx fog" aria-hidden="true"></i>' : w.key === 'aurora' ? '<i class="wx aurora" aria-hidden="true"></i>' : '') +
     (p.poop ? '<div class="poops" aria-label="' + p.poop + ' mess' + (p.poop === 1 ? '' : 'es') + '">' + '💩'.repeat(p.poop) + '</div>' : '') +
     (p.sick ? '<span class="sickic" aria-label="sick">🤒</span>' : '') + (sl ? '<span class="zzz" aria-hidden="true">Z<small>z</small><small>z</small></span>' : '');
